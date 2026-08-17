@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="NHL Hockey Operations Analytics Platform - Internal analytical tools for player and game evaluation.">
+    <title>{% block title %}NHL Hockey Analytics Platform{% endblock %}</title>
+    <!-- Google Fonts integration inside styles.css -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="logo-section">
+            <span class="logo-badge">HOCKEY-OPS</span>
+            <span class="logo-text">Hockey Analytics Platform</span>
+        </div>
+        <nav class="nav-links">
+            <a href="/" class="{% if request.path == '/' %}active{% endif %}">Game Selector</a>
+            <a href="/diagnostics" class="{% if request.path == '/diagnostics' %}active{% endif %}">Diagnostics</a>
+            <a href="#" style="opacity: 0.5; cursor: not-allowed;">Player Profiles</a>
+            <a href="#" style="opacity: 0.5; cursor: not-allowed;">xG Model</a>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

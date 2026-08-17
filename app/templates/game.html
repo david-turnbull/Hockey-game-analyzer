@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ stats.away_team_abbrev }} @ {{ stats.home_team_abbrev }} - NHL Hockey Analytics Platform{% endblock %}
+
+{% block content %}
+<!-- Back link & Page header -->
+<div style="margin-bottom: 1.5rem;">
+    <a href="/" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-hover)'" onmouseout="this.style.color='var(--accent-color)'">
+        &larr; Back to Game Selector
+    </a>
+</div>
+
+<!-- Scoreboard Header -->
+<div class="scoreboard">
+    <div class="score-team">
+        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Away</span>
+        <span class="score-team-name" title="{{ stats.away_team_name }}">{{ stats.away_team_abbrev }}</span>
+        <span class="score-number">{{ stats.away_score }}</span>
+    </div>
+    
+    <div style="text-align: center;">
+        <div class="status-indicator status-connected" style="font-size: 0.8rem; padding: 0.25rem 0.75rem;">
+            {{ stats.game_status }}
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;" class="font-mono">
+            {{ stats.game_date.strftime("%B %d, %Y") }}
+        </div>
+    </div>
+    
+    <div class="score-team" style="flex-direction: row-reverse;">
+        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Home</span>
+        <span class="score-team-name" title="{{ stats.home_team_name }}">{{ stats.home_team_abbrev }}</span>
+        <span class="score-number">{{ stats.home_score }}</span>
+    </div>
+</div>
+
+<!-- Tabs Navigation -->
+<div class="tabs-container" style="margin-bottom: 2rem; display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+    <button class="tab-button active" onclick="switchTab(event, 'tab-overview')" style="background: none; border: none; color: var(--text-primary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Game Summary</button>
+    <button class="tab-button" onclick="switchTab(event, 'tab-shotmap')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Interactive Shot Map</button>
+</div>
+
+<!-- Tab 1: Game Summary -->
+<div id="tab-overview" class="tab-content">
+    <div class="grid-2">
+        <!-- Column 1: Team Statistics Comparison Card -->
+        <div class="card">
+            <h2 class="card-title">Team Statistics</h2>
+            
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                <span>{{ stats.away_team_abbrev }} (Away)</span>
+                <span>Metric</span>
+                <span>{{ stats.home_team_abbrev }} (Home)</span>
+            </div>
+            
+            <!-- SOG Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value">{{ stats.stats.away_sog }}</span>
+                <span style="color: var(--text-secondary);">Shots on Goal</span>
+                <span class="stat-value">{{ stats.stats.home_sog }}</span>
+            </div>
+            <div class="stat-bar-container">
+                {% set total_sog = stats.stats.away_sog + stats.stats.home_sog %}
+                {% if total_sog > 0 %}
+                <div class="stat-bar-away" style="width: {{ (stats.stats.away_sog / total_sog) * 100 }}%"></div>
+                <div class="stat-bar-home" style="width: {{ (stats.stats.home_sog / total_sog) * 100 }}%"></div>
+                {% else %}
+                <div class="stat-bar-away" style="width: 50%"></div>
+                <div class="stat-bar-home" style="width: 50%"></div>
+                {% endif %}
+            </div>
+
+            <!-- Goals Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value">{{ stats.away_score }}</span>
+                <span style="color: var(--text-secondary);">Goals</span>
+                <span class="stat-value">{{ stats.home_score }}</span>
+            </div>
+            <div class="stat-bar-container">
+                {% set total_score = stats.away_score + stats.home_score %}
+                {% if total_score > 0 %}
+                <div class="stat-bar-away" style="width: {{ (stats.away_score / total_score) * 100 }}%"></div>
+                <div class="stat-bar-home" style="width: {{ (stats.home_score / total_score) * 100 }}%"></div>
+                {% else %}
+                <div class="stat-bar-away" style="width: 50%"></div>
+                <div class="stat-bar-home" style="width: 50%"></div>
+                {% endif %}
+            </div>
+
+            <!-- PPG Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value">{{ stats.stats.away_ppg }}</span>
+                <span style="color: var(--text-secondary);">Power Play Goals</span>
+                <span class="stat-value">{{ stats.stats.home_ppg }}</span>
+            </div>
+            <div class="stat-bar-container">
+                {% set total_ppg = stats.stats.away_ppg + stats.stats.home_ppg %}
+                {% if total_ppg > 0 %}
+                <div class="stat-bar-away" style="width: {{ (stats.stats.away_ppg / total_ppg) * 100 }}%"></div>
+                <div class="stat-bar-home" style="width: {{ (stats.stats.home_ppg / total_ppg) * 100 }}%"></div>
+                {% else %}
+                <div class="stat-bar-away" style="width: 50%"></div>
+                <div class="stat-bar-home" style="width: 50%"></div>
+                {% endif %}
+            </div>
+
+            <!-- Shooting Pct Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value">{{ stats.stats.away_shooting_pct }}%</span>
+                <span style="color: var(--text-secondary);">Shooting %</span>
+                <span class="stat-value">{{ stats.stats.home_shooting_pct }}%</span>
+            </div>
+            <div class="stat-bar-container">
+                {% set total_spct = stats.stats.away_shooting_pct + stats.stats.home_shooting_pct %}
+                {% if total_spct > 0 %}
+                <div class="stat-bar-away" style="width: {{ (stats.stats.away_shooting_pct / total_spct) * 100 }}%"></div>
+                <div class="stat-bar-home" style="width: {{ (stats.stats.home_shooting_pct / total_spct) * 100 }}%"></div>
+                {% else %}
+                <div class="stat-bar-away" style="width: 50%"></div>
+                <div class="stat-bar-home" style="width: 50%"></div>
+                {% endif %}
+            </div>
+
+            <!-- Faceoff Pct Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value">{{ stats.stats.away_fo_pct }}%</span>
+                <span style="color: var(--text-secondary);">Faceoff Win %</span>
+                <span class="stat-value">{{ stats.stats.home_fo_pct }}%</span>
+            </div>
+            <div class="stat-bar-container">
+                {% set total_fo = stats.stats.away_fo_pct + stats.stats.home_fo_pct %}
+                {% if total_fo > 0 %}
+                <div class="stat-bar-away" style="width: {{ (stats.stats.away_fo_pct / total_fo) * 100 }}%"></div>
+                <div class="stat-bar-home" style="width: {{ (stats.stats.home_fo_pct / total_fo) * 100 }}%"></div>
+                {% else %}
+                <div class="stat-bar-away" style="width: 50%"></div>
+                <div class="stat-bar-home" style="width: 50%"></div>
+                {% endif %}
+            </div>
+
+            <!-- PIM Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value">{{ stats.stats.away_pim }}</span>
+                <span style="color: var(--text-secondary);">Penalty Minutes</span>
+                <span class="stat-value">{{ stats.stats.home_pim }}</span>
+            </div>
+            <div class="stat-bar-container">
+                {% set total_pim = stats.stats.away_pim + stats.stats.home_pim %}
+                {% if total_pim > 0 %}
+                <div class="stat-bar-away" style="width: {{ (stats.stats.away_pim / total_pim) * 100 }}%"></div>
+                <div class="stat-bar-home" style="width: {{ (stats.stats.home_pim / total_pim) * 100 }}%"></div>
+                {% else %}
+                <div class="stat-bar-away" style="width: 50%"></div>
+                <div class="stat-bar-home" style="width: 50%"></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Column 2: Game Chronological Timeline Card -->
+        <div class="card">
+            <h2 class="card-title">Scoring & Penalties Timeline</h2>
+            
+            {% if not stats.timeline %}
+            <p style="color: var(--text-muted); text-align: center; padding: 2rem;">No timeline events recorded for this game.</p>
+            {% else %}
+            
+            {% for period_label, events in stats.timeline.items() %}
+            <div class="timeline-period-group">
+                <h3 class="timeline-period-title">{{ period_label }}</h3>
+                
+                {% for event in events %}
+                <div class="timeline-item">
+                    <div class="timeline-time">{{ event.period_time }}</div>
+                    
+                    {% if event.event_type == 'goal' %}
+                    <div class="timeline-badge badge-goal">Goal</div>
+                    <div class="timeline-content">
+                        <span class="timeline-scorer">{{ event.scorer }}</span> 
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">({{ event.team_abbrev }})</span>
+                        <span style="font-size: 0.8rem; color: var(--accent-color); margin-left: 0.5rem; background: rgba(56, 189, 248, 0.05); padding: 0.1rem 0.3rem; border-radius: 3px;">
+                            {{ event.strength_state }}
+                        </span>
+                        <div class="timeline-assists">{{ event.assists }}</div>
+                    </div>
+                    <div class="timeline-score-tracker">{{ event.running_score }}</div>
+                    {% else %}
+                    <div class="timeline-badge badge-penalty">Penalty</div>
+                    <div class="timeline-content">
+                        <span class="timeline-scorer">{{ event.player }}</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">({{ event.team_abbrev }})</span>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            {{ event.duration }} Min &bull; {{ event.infraction }}
+                            {% if event.drawn_by %}
+                            <span style="color: var(--text-muted);"> (Drawn by: {{ event.drawn_by }})</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Tab 2: Interactive Shot Map -->
+<div id="tab-shotmap" class="tab-content" style="display: none;">
+    <div style="display: grid; grid-template-columns: 280px 1fr; gap: 1.5rem; align-items: start;">
+        <!-- Filters Sidebar -->
+        <div class="card" style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1.25rem;">
+            <h3 style="font-size: 1rem; font-weight: 600; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; color: var(--text-primary); margin: 0;">Map Filters</h3>
+            
+            <!-- Team Filter -->
+            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                <label for="filter-team" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Team</label>
+                <select id="filter-team" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px; font-family: var(--font-sans); cursor: pointer; width: 100%;">
+                    <option value="all">All Teams</option>
+                    <option value="{{ stats.away_team_abbrev }}">{{ stats.away_team_name }}</option>
+                    <option value="{{ stats.home_team_abbrev }}">{{ stats.home_team_name }}</option>
+                </select>
+            </div>
+
+            <!-- Player Filter -->
+            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                <label for="filter-player" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Player</label>
+                <select id="filter-player" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px; font-family: var(--font-sans); cursor: pointer; width: 100%;">
+                    <option value="all">All Players</option>
+                </select>
+            </div>
+
+            <!-- Period Filter -->
+            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                <label for="filter-period" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Period</label>
+                <select id="filter-period" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px; font-family: var(--font-sans); cursor: pointer; width: 100%;">
+                    <option value="all">All Periods</option>
+                    <option value="1">1st Period</option>
+                    <option value="2">2nd Period</option>
+                    <option value="3">3rd Period</option>
+                    <option value="4">Overtime</option>
+                </select>
+            </div>
+
+            <!-- Outcome Filter -->
+            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                <label for="filter-outcome" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Outcome</label>
+                <select id="filter-outcome" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px; font-family: var(--font-sans); cursor: pointer; width: 100%;">
+                    <option value="all">All Shot Attempts</option>
+                    <option value="Goal">Goals</option>
+                    <option value="sog">Shots on Goal</option>
+                    <option value="Saved">Saves</option>
+                    <option value="Missed">Misses</option>
+                    <option value="Blocked">Blocks</option>
+                </select>
+            </div>
+
+            <!-- Strength Filter -->
+            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                <label for="filter-strength" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Strength</label>
+                <select id="filter-strength" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px; font-family: var(--font-sans); cursor: pointer; width: 100%;">
+                    <option value="all">All Strengths</option>
+                    <option value="5v5">5v5 Even-strength</option>
+                    <option value="5v4">5v4 Power Play</option>
+                    <option value="4v5">4v5 Shorthanded</option>
+                </select>
+            </div>
+
+            <!-- Normalization Toggle -->
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <input type="checkbox" id="toggle-normalize" checked style="cursor: pointer; width: 16px; height: 16px; accent-color: var(--accent-color);">
+                <label for="toggle-normalize" style="font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-primary);">Normalize Attack (Right)</label>
+            </div>
+        </div>
+
+        <!-- Rink Plot Card -->
+        <div class="card" style="padding: 1rem; min-height: 520px; display: flex; flex-direction: column; justify-content: center; position: relative;">
+            <div id="shot-map-plot" style="width: 100%; height: 500px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+<script>
+    const GAME_ID = {{ stats.game_id }};
+</script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

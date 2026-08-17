@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Diagnostics - NHL Hockey Analytics Platform{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Platform Diagnostics</h1>
+<p class="page-subtitle">Project Foundation verification and health checks.</p>
+
+<div class="grid-2">
+    <!-- Application Config Card -->
+    <div class="card">
+        <h2 class="card-title">Flask Application Info</h2>
+        <table class="table-container">
+            <table>
+                <tbody>
+                    <tr>
+                        <td><strong>Environment</strong></td>
+                        <td class="font-mono">{{ config.FLASK_ENV or 'development' }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Debug Mode</strong></td>
+                        <td>
+                            {% if config.DEBUG %}
+                            <span class="status-indicator status-connected">Enabled</span>
+                            {% else %}
+                            <span class="status-indicator status-failed">Disabled</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Database Engine</strong></td>
+                        <td class="font-mono">SQLite (SQLAlchemy 2.0+)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Configuration Class</strong></td>
+                        <td class="font-mono">{{ config.__class__.__name__ }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </table>
+    </div>
+
+    <!-- Database Status Card -->
+    <div class="card">
+        <h2 class="card-title">Database Status</h2>
+        
+        <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+            <span>Connection Status:</span>
+            {% if db_status == 'Connected' %}
+            <span class="status-indicator status-connected">Connected</span>
+            {% else %}
+            <span class="status-indicator status-failed">Failed</span>
+            {% endif %}
+        </div>
+
+        {% if db_error %}
+        <div class="alert-box alert-danger">
+            <strong>Database Error:</strong> {{ db_error }}
+        </div>
+        {% endif %}
+
+        {% if db_status == 'Connected' %}
+        <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">Registered Database Tables</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Table Name</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="font-mono">team</td>
+                        <td>{% if 'team' in tables %}<span class="status-indicator status-connected">Exists</span>{% else %}<span class="status-indicator status-failed">Missing</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-mono">player</td>
+                        <td>{% if 'player' in tables %}<span class="status-indicator status-connected">Exists</span>{% else %}<span class="status-indicator status-failed">Missing</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-mono">game</td>
+                        <td>{% if 'game' in tables %}<span class="status-indicator status-connected">Exists</span>{% else %}<span class="status-indicator status-failed">Missing</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-mono">event</td>
+                        <td>{% if 'event' in tables %}<span class="status-indicator status-connected">Exists</span>{% else %}<span class="status-indicator status-failed">Missing</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-mono">shot</td>
+                        <td>{% if 'shot' in tables %}<span class="status-indicator status-connected">Exists</span>{% else %}<span class="status-indicator status-failed">Missing</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-mono">shift</td>
+                        <td>{% if 'shift' in tables %}<span class="status-indicator status-connected">Exists</span>{% else %}<span class="status-indicator status-failed">Missing</span>{% endif %}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% if tables|length == 0 %}
+        <div class="alert-box alert-info" style="margin-top: 1rem;">
+            No tables initialized yet. Please run the database initialization script:
+            <code class="font-mono" style="display: block; margin-top: 0.5rem; background: rgba(0,0,0,0.2); padding: 0.25rem 0.5rem; border-radius: 4px;">python scripts/initialise_database.py</code>
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Milestone 1 & 2 Capabilities</h2>
+    <p style="margin-bottom: 0.75rem;">The platform is successfully configured with SQLite and contains seeded and batch-ingested play-by-play events from the NHL API.</p>
+</div>
+{% endblock %}

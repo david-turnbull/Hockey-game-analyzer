@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Game Selector - NHL Hockey Analytics Platform{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Game Selection Dashboard</h1>
+<p class="page-subtitle">Select an NHL season and team to query and analyze game analytics.</p>
+
+{% if not seasons or not teams %}
+<div class="card">
+    <div class="alert-box alert-danger">
+        <strong>Database Empty:</strong> No team or game data found in the database.
+    </div>
+    <p>Please initialize the database and ingest games using the CLI tools:</p>
+    <pre class="font-mono" style="background: rgba(0, 0, 0, 0.2); padding: 1rem; border-radius: 4px; margin-top: 1rem;">
+# 1. Initialize DB tables
+python scripts/initialise_database.py
+
+# 2. Ingest some games (first 10 games of Calgary Flames 2023-2024)
+python scripts/ingest_season.py CGY 20232024 --limit 10
+    </pre>
+</div>
+{% else %}
+<div class="card" style="padding: 1.25rem;">
+    <div style="display: flex; gap: 2rem; align-items: center; flex-wrap: wrap;">
+        <!-- Season Filter -->
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <label for="season-select" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Season</label>
+            <select id="season-select" style="background-color: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem 1rem; border-radius: 4px; font-family: var(--font-sans); cursor: pointer; min-width: 150px;">
+                {% for season in seasons %}
+                <option value="{{ season }}">{{ season[:4] }}-{{ season[4:] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Team Filter -->
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <label for="team-select" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Team</label>
+            <select id="team-select" style="background-color: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem 1rem; border-radius: 4px; font-family: var(--font-sans); cursor: pointer; min-width: 250px;">
+                {% for team in teams %}
+                <option value="{{ team.team_id }}" {% if team.abbreviation == 'CGY' %}selected{% endif %}>{{ team.name }} ({{ team.abbreviation }})</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Games List Card -->
+<div class="card">
+    <h2 class="card-title" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+        <span>Available Games</span>
+        <span id="games-count" class="logo-badge" style="background: rgba(56, 189, 248, 0.1); color: var(--accent-color); font-weight: 500;">0 Games</span>
+    </h2>
+    
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Matchup</th>
+                    <th>Result</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody id="games-table-body">
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        Loading games...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{% if seasons and teams %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endif %}
+{% endblock %}
