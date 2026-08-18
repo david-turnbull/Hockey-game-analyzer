@@ -6,14 +6,14 @@ class Event(db.Model):
 
     # Primary key format: {game_id}_{event_idx}
     event_id = db.Column(db.String(100), primary_key=True)
-    game_id = db.Column(db.Integer, db.ForeignKey('game.game_id'), nullable=False)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.game_id'), nullable=False, index=True)
     period = db.Column(db.Integer, nullable=False)
     period_time = db.Column(db.String(5), nullable=False)  # e.g., '19:59'
-    elapsed_game_seconds = db.Column(db.Integer, nullable=False)  # overall game clock in seconds
-    event_type = db.Column(db.String(50), nullable=False)  # e.g., 'Shot', 'Goal', 'Penalty', 'Hit'
-    team_id = db.Column(db.Integer, db.ForeignKey('team.team_id'), nullable=True)
+    elapsed_game_seconds = db.Column(db.Integer, nullable=True)  # overall game clock in seconds, nullable for invalid clocks
+    event_type = db.Column(db.String(50), nullable=False, index=True)  # e.g., 'Shot', 'Goal', 'Penalty', 'Hit'
+    team_id = db.Column(db.Integer, db.ForeignKey('team.team_id'), nullable=True, index=True)
     
-    primary_player_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=True)
+    primary_player_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=True, index=True)
     secondary_player_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=True)
     assist1_player_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=True)
     assist2_player_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=True)
@@ -24,6 +24,19 @@ class Event(db.Model):
     x_coordinate = db.Column(db.Float, nullable=True)
     y_coordinate = db.Column(db.Float, nullable=True)
     strength_state = db.Column(db.String(20), nullable=True)  # e.g., '5v5', '5v4', 'PP', 'SH'
+    
+    # Milestone 5.5: Data Correctness & Hardening fields
+    period_type = db.Column(db.String(10), nullable=True)
+    raw_situation_code = db.Column(db.String(4), nullable=True)
+    home_skaters = db.Column(db.Integer, nullable=True)
+    away_skaters = db.Column(db.Integer, nullable=True)
+    team_strength_state = db.Column(db.String(10), nullable=True)
+    manpower_state = db.Column(db.String(20), nullable=True)
+
+    __table_args__ = (
+        db.Index('idx_event_game_type', 'game_id', 'event_type'),
+        db.Index('idx_event_game_team', 'game_id', 'team_id'),
+    )
 
     # Relationships
     game = db.relationship('Game', back_populates='events')

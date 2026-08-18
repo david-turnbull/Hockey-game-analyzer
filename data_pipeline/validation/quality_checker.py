@@ -75,6 +75,10 @@ class DataQualityChecker:
         if event.period < 1 or event.period > 10:
             self.add_warning("EVENT_WARN", f"Suspicious period number: {event.period}", event.event_id)
             
+        # Clock validation
+        if event.elapsed_game_seconds is None:
+            self.add_warning("EVENT_WARN", f"Malformed or missing clock value: {event.period_time}", event.event_id)
+
         # Coordinates check
         if event.x_coordinate is not None:
             if abs(event.x_coordinate) > 100.1:
@@ -91,6 +95,13 @@ class DataQualityChecker:
         if event.secondary_player_id and event.secondary_player_id not in known_player_ids:
             self.add_warning("EVENT_INTEGRITY", f"Secondary player {event.secondary_player_id} not in roster", event.event_id)
             
+        # Shot event shooter validation (fatal error)
+        if event.event_type in ['shot-on-goal', 'goal', 'missed-shot', 'blocked-shot']:
+            if not event.primary_player_id or event.primary_player_id not in known_player_ids:
+                self.add_warning("EVENT_REJECT", f"Shot event missing valid shooter ID", event.event_id)
+                self.rejected_records_count += 1
+                return False
+
         self.ingested_records_count += 1
         return True
 
@@ -107,18 +118,29 @@ class DataQualityChecker:
         if shot.angle is not None and (shot.angle < -90 or shot.angle > 180):
             self.add_warning("SHOT_WARN", f"Calculated angle suspicious: {shot.angle} deg", shot.shot_id)
             
+        # Shooter validation - missing shooter is fatal
+        if not shot.shooter_id:
+            self.add_warning("SHOT_REJECT", "Missing shooter ID for shot attempt", shot.shot_id)
+            self.rejected_records_count += 1
+            return False
+            
         if shot.shooter_id not in known_player_ids:
-            self.add_warning("SHOT_INTEGRITY", f"Shooter {shot.shooter_id} not in roster", shot.shot_id)
+            self.add_warning("SHOT_REJECT", f"Shooter {shot.shooter_id} not in roster", shot.shot_id)
+            self.rejected_records_count += 1
+            return False
             
         self.ingested_records_count += 1
         return True
 
-    def validate_shifts(self, shifts: list) -> list:
+    def validate_shifts(self, shifts: list, player_positions: dict = None) -> list:
         """
         Validates shift records, checks for negative durations,
         impossible shift lengths, and overlapping shifts per player.
         Returns a list of validated shifts (retaining only valid ones).
         """
+        if player_positions is None:
+            player_positions = {}
+            
         player_shifts = {}
         valid_shifts = []
         
@@ -133,28 +155,52 @@ class DataQualityChecker:
                 continue
                 
             self.seen_shift_ids.add(shift.shift_id)
+            
+            # Duration check
+            if shift.duration is None:
+                self.add_warning("SHIFT_WARN", "Missing or invalid shift duration", shift.shift_id)
                 
-            if shift.duration < 0:
+            # Negative duration check (fatal)
+            if shift.duration is not None and shift.duration < 0:
                 self.add_warning("SHIFT_REJECT", f"Negative shift duration: {shift.duration}s", shift.shift_id)
                 self.rejected_records_count += 1
                 continue
                 
-            if shift.duration > 300:  # Shifts longer than 5 minutes are highly suspicious
-                self.add_warning("SHIFT_WARN", f"Excessive shift duration: {shift.duration}s", shift.shift_id)
+            # Zero-duration shifts check
+            if shift.duration == 0 or (shift.start_time == shift.end_time and shift.start_time is not None):
+                self.add_warning("SHIFT_ANOMALY", "Zero-duration shift detected", shift.shift_id)
+                shift.is_anomaly = True
+                shift.anomaly_description = "Zero-duration shift"
+                valid_shifts.append(shift)
+                continue
+                
+            # Position-aware shift length validation
+            pos = player_positions.get(shift.player_id, "")
+            if pos == "G":
+                # Goalie-specific validation (only warn if goalie shift > 80 mins)
+                if shift.duration is not None and shift.duration > 4800:
+                    self.add_warning("SHIFT_WARN", f"Excessive goalie shift duration: {shift.duration}s", shift.shift_id)
+            else:
+                # Skater validation (warn if skater shift > 5 mins)
+                if shift.duration is not None and shift.duration > 300:
+                    self.add_warning("SHIFT_WARN", f"Excessive shift duration: {shift.duration}s", shift.shift_id)
                 
             valid_shifts.append(shift)
             
-            # Save for overlap checks
+            # Save for overlap checks (only if not an anomaly)
             player_shifts.setdefault(shift.player_id, []).append(shift)
             
         # Overlap checks per player
         for player_id, p_shifts in player_shifts.items():
             # Sort player shifts by start time
-            p_shifts.sort(key=lambda s: s.start_elapsed_seconds)
+            p_shifts.sort(key=lambda s: s.start_elapsed_seconds if s.start_elapsed_seconds is not None else -1)
             
             for i in range(len(p_shifts) - 1):
                 curr_shift = p_shifts[i]
                 next_shift = p_shifts[i + 1]
+                
+                if curr_shift.start_elapsed_seconds is None or next_shift.start_elapsed_seconds is None:
+                    continue
                 
                 # Check if current shift overlaps with next shift (within same period)
                 if curr_shift.period == next_shift.period:

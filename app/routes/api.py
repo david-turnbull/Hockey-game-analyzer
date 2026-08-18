@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, current_app
 from app.services.game_service import GameService
-from app.models import db, Shot, Event
+from app.models import db, Shot, Event, Player
 from sqlalchemy.orm import joinedload
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -64,7 +64,64 @@ def get_shots():
             "period": s.event.period,
             "period_time": s.event.period_time,
             "strength_state": s.strength_state,
-            "empty_net": s.empty_net
+            "empty_net": s.empty_net,
+            "xg": round(s.xg, 4) if s.xg is not None else 0.0
+        })
+        
+    return jsonify(formatted_shots)
+
+@api_bp.route('/game/<int:game_id>/player/<int:player_id>/shots')
+def get_player_shots(game_id, player_id):
+    """Returns a list of shot attempts taken (or faced, if goalie) by a player as JSON."""
+    current_app.logger.info(f"API query for shots of game_id={game_id}, player_id={player_id}")
+    
+    player = db.session.get(Player, player_id)
+    if not player:
+        return jsonify({"error": "Player not found"}), 404
+        
+    if player.position == 'G':
+        # Goalie: return shots faced
+        shots = db.session.query(Shot).join(Event).filter(
+            Event.game_id == game_id,
+            Shot.goalie_id == player_id
+        ).options(
+            joinedload(Shot.event).joinedload(Event.team),
+            joinedload(Shot.shooter),
+            joinedload(Shot.goalie)
+        ).all()
+    else:
+        # Skater: return shots taken
+        shots = db.session.query(Shot).join(Event).filter(
+            Event.game_id == game_id,
+            Shot.shooter_id == player_id
+        ).options(
+            joinedload(Shot.event).joinedload(Event.team),
+            joinedload(Shot.shooter),
+            joinedload(Shot.goalie)
+        ).all()
+        
+    formatted_shots = []
+    for s in shots:
+        formatted_shots.append({
+            "shot_id": s.shot_id,
+            "raw_x": s.event.x_coordinate,
+            "raw_y": s.event.y_coordinate,
+            "norm_x": s.x_coordinate,
+            "norm_y": s.y_coordinate,
+            "distance": s.distance,
+            "angle": s.angle,
+            "outcome": s.outcome,
+            "shot_type": s.shot_type,
+            "team_abbrev": s.event.team.abbreviation if s.event.team else "UNK",
+            "team_id": s.event.team_id,
+            "shooter_name": s.shooter.full_name if s.shooter else "Unknown",
+            "shooter_id": s.shooter_id,
+            "goalie_name": s.goalie.full_name if s.goalie else "None",
+            "period": s.event.period,
+            "period_time": s.event.period_time,
+            "strength_state": s.strength_state,
+            "empty_net": s.empty_net,
+            "xg": round(s.xg, 4) if s.xg is not None else 0.0
         })
         
     return jsonify(formatted_shots)

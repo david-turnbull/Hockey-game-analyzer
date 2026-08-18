@@ -6,16 +6,20 @@ from app.models import Team, Player, Game, Event, Shot, Shift
 logger = logging.getLogger(__name__)
 
 def parse_time_to_seconds(time_str: str) -> int:
-    """Converts a time string in MM:SS format to seconds."""
-    if not time_str or ':' not in time_str:
-        return 0
+    """Converts a time string in MM:SS format to seconds. Returns None if invalid."""
+    if not time_str or not isinstance(time_str, str) or ':' not in time_str:
+        return None
     try:
         parts = time_str.split(':')
+        if len(parts) != 2:
+            return None
         minutes = int(parts[0])
         seconds = int(parts[1])
+        if minutes < 0 or seconds < 0 or seconds >= 60:
+            return None
         return minutes * 60 + seconds
     except (ValueError, IndexError):
-        return 0
+        return None
 
 def normalize_coordinates(x: float, y: float, period: int, home_defending_side: str, is_home_team: bool) -> tuple:
     """
@@ -81,38 +85,97 @@ def calculate_shot_metrics(normalized_x: float, normalized_y: float) -> dict:
         "angle": round(angle, 2)
     }
 
-def parse_situation_code(situation_code: str, is_home_team: bool) -> tuple:
+def parse_situation_code_raw(situation_code: str) -> dict:
     """
-    Parses a 4-digit situationCode to determine strength state and empty net status.
+    Parses a 4-digit situationCode.
     Format: [Away Goalie Status, Away Skaters, Home Skaters, Home Goalie Status]
+    Returns a dict with raw integer values, or None values if parsing fails.
+    """
+    if not situation_code or len(situation_code) != 4 or not situation_code.isdigit():
+        return {
+            "away_goalie": None,
+            "away_skaters": None,
+            "home_skaters": None,
+            "home_goalie": None
+        }
+    
+    return {
+        "away_goalie": int(situation_code[0]),
+        "away_skaters": int(situation_code[1]),
+        "home_skaters": int(situation_code[2]),
+        "home_goalie": int(situation_code[3])
+    }
+
+def derive_event_manpower(period_type: str, raw_situation: dict, is_home_team: bool) -> tuple:
+    """
+    Derives team_strength_state and manpower_state from the event team's perspective.
     
     Returns:
-        strength_state (str): e.g. '5v5', '5v4', '4v5'
-        empty_net (bool): True if the defending goalie is pulled.
+        team_strength_state (str): e.g. '5v4', '4v5', '1v0', '5v5'
+        manpower_state (str): 'EV', 'PP', 'PK', 'EMPTY_NET_FOR', 'EMPTY_NET_AGAINST', 'SO', 'UNKNOWN'
     """
-    if not situation_code or len(situation_code) != 4:
-        return "5v5", False
+    if period_type == 'SO':
+        return '1v0', 'SO'
         
-    try:
-        away_goalie = int(situation_code[0])
-        away_skaters = int(situation_code[1])
-        home_skaters = int(situation_code[2])
-        home_goalie = int(situation_code[3])
+    away_goalie = raw_situation.get("away_goalie")
+    away_skaters = raw_situation.get("away_skaters")
+    home_skaters = raw_situation.get("home_skaters")
+    home_goalie = raw_situation.get("home_goalie")
+    
+    if (away_goalie is None or away_skaters is None or 
+        home_skaters is None or home_goalie is None):
+        return '5v5', 'UNKNOWN'
         
-        # Strength state is typically HomeSkatersvAwaySkaters
-        strength_state = f"{home_skaters}v{away_skaters}"
+    # Determine skaters for attacking and defending teams
+    if is_home_team:
+        # Home team is attacking
+        atk_skaters = home_skaters
+        atk_goalie = home_goalie
+        def_skaters = away_skaters
+        def_goalie = away_goalie
+    else:
+        # Away team is attacking
+        atk_skaters = away_skaters
+        atk_goalie = away_goalie
+        def_skaters = home_skaters
+        def_goalie = home_goalie
         
-        # Empty net is relative to the defending team (the opponent of the attacking team)
-        if is_home_team:
-            # Home attacks Away. Defending goalie is Away goalie.
-            empty_net = (away_goalie == 0)
+    # Derive team-strength state from the event team's perspective
+    team_strength_state = f"{atk_skaters}v{def_skaters}"
+    
+    # Classify manpower state
+    if def_goalie == 0:
+        manpower_state = 'EMPTY_NET_AGAINST'
+    elif atk_goalie == 0:
+        manpower_state = 'EMPTY_NET_FOR'
+    else:
+        if atk_skaters > def_skaters:
+            manpower_state = 'PP'
+        elif atk_skaters < def_skaters:
+            manpower_state = 'PK'
         else:
-            # Away attacks Home. Defending goalie is Home goalie.
-            empty_net = (home_goalie == 0)
+            manpower_state = 'EV'
             
-        return strength_state, empty_net
-    except ValueError:
+    return team_strength_state, manpower_state
+
+def parse_situation_code(situation_code: str, is_home_team: bool) -> tuple:
+    """
+    Backwards compatible parser for situationCode.
+    Returns:
+        strength_state (str): HomeSkatersvAwaySkaters (always Home vs Away)
+        empty_net (bool): True if defending goalie is pulled.
+    """
+    raw = parse_situation_code_raw(situation_code)
+    if raw["away_goalie"] is None:
         return "5v5", False
+    
+    strength_state = f"{raw['home_skaters']}v{raw['away_skaters']}"
+    if is_home_team:
+        empty_net = (raw["away_goalie"] == 0)
+    else:
+        empty_net = (raw["home_goalie"] == 0)
+        
+    return strength_state, empty_net
 
 class DataNormalizer:
     """Orchestrates transformation of raw JSON API data to database model collections."""
@@ -181,10 +244,23 @@ class DataNormalizer:
         event_idx = play.get("eventId")
         event_id = f"{game_id}_{event_idx}"
         
-        period = play["periodDescriptor"]["number"]
+        period_desc = play.get("periodDescriptor", {})
+        period = period_desc.get("number", 1)
+        period_type = period_desc.get("periodType")
+        if not period_type:
+            if period <= 3:
+                period_type = "REG"
+            elif period == 4:
+                period_type = "OT"
+            else:
+                period_type = "SO"
+                
         period_time = play["timeInPeriod"]
         seconds_in_period = parse_time_to_seconds(period_time)
-        elapsed_game_seconds = (period - 1) * 1200 + seconds_in_period
+        if seconds_in_period is not None:
+            elapsed_game_seconds = (period - 1) * 1200 + seconds_in_period
+        else:
+            elapsed_game_seconds = None
         
         event_type = play["typeDescKey"]
         
@@ -234,6 +310,12 @@ class DataNormalizer:
         )
         
         situation_code = play.get("situationCode")
+        raw_situation = parse_situation_code_raw(situation_code)
+        
+        # Calculate team-relative strength state and manpower state
+        team_strength_state, manpower_state = derive_event_manpower(period_type, raw_situation, is_home_team)
+        
+        # Calculate backward compatible strength_state
         strength_state, empty_net = parse_situation_code(situation_code, is_home_team)
         
         event = Event(
@@ -252,7 +334,13 @@ class DataNormalizer:
             penalty_description=penalty_description,
             x_coordinate=raw_x,
             y_coordinate=raw_y,
-            strength_state=strength_state
+            strength_state=strength_state,
+            period_type=period_type,
+            raw_situation_code=situation_code,
+            home_skaters=raw_situation.get("home_skaters"),
+            away_skaters=raw_situation.get("away_skaters"),
+            team_strength_state=team_strength_state,
+            manpower_state=manpower_state
         )
         
         shot = None
@@ -271,8 +359,19 @@ class DataNormalizer:
             outcome = outcome_mapping.get(event_type, 'Unknown')
             is_goal = (event_type == 'goal')
             
+            from app.services.xg_service import XGService
+            xg_val = XGService.calculate_shot_xg(
+                metrics["distance"],
+                metrics["angle"],
+                details.get("shotType"),
+                team_strength_state,
+                empty_net
+            )
+            
             shot = Shot(
                 shot_id=event_id,
+                game_id=game_id,
+                team_id=team_id,
                 shooter_id=primary_player_id,
                 goalie_id=secondary_player_id if event_type in ['shot-on-goal', 'goal', 'missed-shot'] else None,
                 shot_type=details.get("shotType"),
@@ -282,8 +381,9 @@ class DataNormalizer:
                 angle=metrics["angle"],
                 outcome=outcome,
                 goal=is_goal,
-                strength_state=strength_state,
-                empty_net=empty_net
+                strength_state=team_strength_state,
+                empty_net=empty_net,
+                xg=xg_val
             )
             
         return event, shot
@@ -301,11 +401,22 @@ class DataNormalizer:
         start_in_period = parse_time_to_seconds(start_time)
         end_in_period = parse_time_to_seconds(end_time)
         
-        start_elapsed_seconds = (period - 1) * 1200 + start_in_period
-        end_elapsed_seconds = (period - 1) * 1200 + end_in_period
-        
+        if start_in_period is not None:
+            start_elapsed_seconds = (period - 1) * 1200 + start_in_period
+        else:
+            start_elapsed_seconds = None
+            
+        if end_in_period is not None:
+            end_elapsed_seconds = (period - 1) * 1200 + end_in_period
+        else:
+            end_elapsed_seconds = None
+            
         player_id = shift_raw["playerId"]
-        shift_id = f"{game_id}_{player_id}_{period}_{start_elapsed_seconds}"
+        start_seconds_id = start_elapsed_seconds if start_elapsed_seconds is not None else "invalid"
+        shift_id = f"{game_id}_{player_id}_{period}_{start_seconds_id}"
+        
+        period_type = "REG" if period <= 3 else "OT"
+        team_id = shift_raw.get("teamId")
         
         return Shift(
             shift_id=shift_id,
@@ -316,5 +427,7 @@ class DataNormalizer:
             end_time=end_time,
             start_elapsed_seconds=start_elapsed_seconds,
             end_elapsed_seconds=end_elapsed_seconds,
-            duration=duration
+            duration=duration,
+            period_type=period_type,
+            team_id=team_id
         )

@@ -38,6 +38,7 @@
 <div class="tabs-container" style="margin-bottom: 2rem; display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
     <button class="tab-button active" onclick="switchTab(event, 'tab-overview')" style="background: none; border: none; color: var(--text-primary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Game Summary</button>
     <button class="tab-button" onclick="switchTab(event, 'tab-shotmap')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Interactive Shot Map</button>
+    <button class="tab-button" onclick="switchTab(event, 'tab-lines')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Line Combinations</button>
 </div>
 
 <!-- Tab 1: Game Summary -->
@@ -81,6 +82,23 @@
                 {% if total_score > 0 %}
                 <div class="stat-bar-away" style="width: {{ (stats.away_score / total_score) * 100 }}%"></div>
                 <div class="stat-bar-home" style="width: {{ (stats.home_score / total_score) * 100 }}%"></div>
+                {% else %}
+                <div class="stat-bar-away" style="width: 50%"></div>
+                <div class="stat-bar-home" style="width: 50%"></div>
+                {% endif %}
+            </div>
+
+            <!-- Expected Goals (xG) Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value font-mono">{{ stats.stats.away_xg }}</span>
+                <span style="color: var(--text-secondary);" title="Expected Goals (excluding shootouts)">Expected Goals (xG)</span>
+                <span class="stat-value font-mono">{{ stats.stats.home_xg }}</span>
+            </div>
+            <div class="stat-bar-container">
+                {% set total_xg = stats.stats.away_xg + stats.stats.home_xg %}
+                {% if total_xg > 0 %}
+                <div class="stat-bar-away" style="width: {{ (stats.stats.away_xg / total_xg) * 100 }}%"></div>
+                <div class="stat-bar-home" style="width: {{ (stats.stats.home_xg / total_xg) * 100 }}%"></div>
                 {% else %}
                 <div class="stat-bar-away" style="width: 50%"></div>
                 <div class="stat-bar-home" style="width: 50%"></div>
@@ -204,6 +222,167 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- Rosters Section -->
+    <div style="margin-top: 2rem;">
+        <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Game Rosters & Statistics</h2>
+        
+        <div class="grid-2">
+            <!-- Away Team Roster -->
+            <div class="card">
+                <h3 class="card-title">{{ stats.away_team_name }} ({{ stats.away_team_abbrev }}) Roster</h3>
+                
+                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 1.5rem 0 0.5rem 0;">Skaters</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                                <th style="padding: 0.5rem;">Player</th>
+                                <th style="padding: 0.5rem; text-align: center;">Pos</th>
+                                <th style="padding: 0.5rem; text-align: center;">G</th>
+                                <th style="padding: 0.5rem; text-align: center;">A</th>
+                                <th style="padding: 0.5rem; text-align: center;">PTS</th>
+                                <th style="padding: 0.5rem; text-align: center;">SOG</th>
+                                <th style="padding: 0.5rem; text-align: center;">Hits</th>
+                                <th style="padding: 0.5rem; text-align: center;">PIM</th>
+                                <th style="padding: 0.5rem; text-align: center;">TOI</th>
+                                <th style="padding: 0.5rem; text-align: center;">Shifts</th>
+                                <th style="padding: 0.5rem; text-align: center;" title="Corsi For % (Even Strength)">CF%</th>
+                                <th style="padding: 0.5rem; text-align: center;" title="Fenwick For % (Even Strength)">FF%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for skater in stats.rosters.away_skaters %}
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
+                                <td style="padding: 0.5rem;">
+                                    <a href="/game/{{ stats.game_id }}/player/{{ skater.player_id }}" style="color: var(--accent-color); text-decoration: none; font-weight: 500;">{{ skater.name }}</a>
+                                </td>
+                                <td style="padding: 0.5rem; text-align: center; color: var(--text-secondary);">{{ skater.position }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.goals }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.assists }}</td>
+                                <td style="padding: 0.5rem; text-align: center; font-weight: 600; color: var(--accent-color);">{{ skater.points }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.shots }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.hits }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.pim }}</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.toi }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.shifts_count }}</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.cf_pct }}%</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.ff_pct }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 2rem 0 0.5rem 0;">Goalies</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                                <th style="padding: 0.5rem;">Goalie</th>
+                                <th style="padding: 0.5rem; text-align: center;">TOI</th>
+                                <th style="padding: 0.5rem; text-align: center;">SA</th>
+                                <th style="padding: 0.5rem; text-align: center;">GA</th>
+                                <th style="padding: 0.5rem; text-align: center;">Saves</th>
+                                <th style="padding: 0.5rem; text-align: center;">SV%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for goalie in stats.rosters.away_goalies %}
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
+                                <td style="padding: 0.5rem;">
+                                    <a href="/game/{{ stats.game_id }}/player/{{ goalie.player_id }}" style="color: var(--accent-color); text-decoration: none; font-weight: 500;">{{ goalie.name }}</a>
+                                </td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ goalie.toi }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ goalie.shots_faced }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ goalie.goals_against }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ goalie.saves }}</td>
+                                <td style="padding: 0.5rem; text-align: center; font-weight: 600; color: var(--accent-color);">{{ goalie.save_pct }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Home Team Roster -->
+            <div class="card">
+                <h3 class="card-title">{{ stats.home_team_name }} ({{ stats.home_team_abbrev }}) Roster</h3>
+                
+                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 1.5rem 0 0.5rem 0;">Skaters</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                                <th style="padding: 0.5rem;">Player</th>
+                                <th style="padding: 0.5rem; text-align: center;">Pos</th>
+                                <th style="padding: 0.5rem; text-align: center;">G</th>
+                                <th style="padding: 0.5rem; text-align: center;">A</th>
+                                <th style="padding: 0.5rem; text-align: center;">PTS</th>
+                                <th style="padding: 0.5rem; text-align: center;">SOG</th>
+                                <th style="padding: 0.5rem; text-align: center;">Hits</th>
+                                <th style="padding: 0.5rem; text-align: center;">PIM</th>
+                                <th style="padding: 0.5rem; text-align: center;">TOI</th>
+                                <th style="padding: 0.5rem; text-align: center;">Shifts</th>
+                                <th style="padding: 0.5rem; text-align: center;" title="Corsi For % (Even Strength)">CF%</th>
+                                <th style="padding: 0.5rem; text-align: center;" title="Fenwick For % (Even Strength)">FF%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for skater in stats.rosters.home_skaters %}
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
+                                <td style="padding: 0.5rem;">
+                                    <a href="/game/{{ stats.game_id }}/player/{{ skater.player_id }}" style="color: var(--accent-color); text-decoration: none; font-weight: 500;">{{ skater.name }}</a>
+                                </td>
+                                <td style="padding: 0.5rem; text-align: center; color: var(--text-secondary);">{{ skater.position }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.goals }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.assists }}</td>
+                                <td style="padding: 0.5rem; text-align: center; font-weight: 600; color: var(--accent-color);">{{ skater.points }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.shots }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.hits }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.pim }}</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.toi }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ skater.shifts_count }}</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.cf_pct }}%</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.ff_pct }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 2rem 0 0.5rem 0;">Goalies</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                                <th style="padding: 0.5rem;">Goalie</th>
+                                <th style="padding: 0.5rem; text-align: center;">TOI</th>
+                                <th style="padding: 0.5rem; text-align: center;">SA</th>
+                                <th style="padding: 0.5rem; text-align: center;">GA</th>
+                                <th style="padding: 0.5rem; text-align: center;">Saves</th>
+                                <th style="padding: 0.5rem; text-align: center;">SV%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for goalie in stats.rosters.home_goalies %}
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
+                                <td style="padding: 0.5rem;">
+                                    <a href="/game/{{ stats.game_id }}/player/{{ goalie.player_id }}" style="color: var(--accent-color); text-decoration: none; font-weight: 500;">{{ goalie.name }}</a>
+                                </td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ goalie.toi }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ goalie.shots_faced }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ goalie.goals_against }}</td>
+                                <td style="padding: 0.5rem; text-align: center;">{{ goalie.saves }}</td>
+                                <td style="padding: 0.5rem; text-align: center; font-weight: 600; color: var(--accent-color);">{{ goalie.save_pct }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Tab 2: Interactive Shot Map -->
@@ -277,6 +456,157 @@
         <!-- Rink Plot Card -->
         <div class="card" style="padding: 1rem; min-height: 520px; display: flex; flex-direction: column; justify-content: center; position: relative;">
             <div id="shot-map-plot" style="width: 100%; height: 500px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab 3: Line Combinations -->
+<div id="tab-lines" class="tab-content" style="display: none;">
+    <div class="grid-2" style="align-items: start;">
+        <!-- Away Team Lines -->
+        <div class="card">
+            <h2 class="card-title">{{ stats.away_team_name }} ({{ stats.away_team_abbrev }}) Lineups</h2>
+            
+            <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 1.5rem 0 0.5rem 0;">Forward Lines</h3>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                            <th style="padding: 0.5rem;">Forwards</th>
+                            <th style="padding: 0.5rem; text-align: center;">TOI</th>
+                            <th style="padding: 0.5rem; text-align: center;">GF</th>
+                            <th style="padding: 0.5rem; text-align: center;">GA</th>
+                            <th style="padding: 0.5rem; text-align: center;">SF</th>
+                            <th style="padding: 0.5rem; text-align: center;">SA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if not stats.line_combinations.away.lines %}
+                        <tr>
+                            <td colspan="6" style="padding: 1rem; text-align: center; color: var(--text-muted);">No forward lines recorded.</td>
+                        </tr>
+                        {% else %}
+                        {% for line in stats.line_combinations.away.lines %}
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ line.players }}</td>
+                            <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ line.toi }}</td>
+                            <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ line.goals_for }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ line.goals_against }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ line.sog_for }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ line.sog_against }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 2rem 0 0.5rem 0;">Defensive Pairings</h3>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                            <th style="padding: 0.5rem;">Defensemen</th>
+                            <th style="padding: 0.5rem; text-align: center;">TOI</th>
+                            <th style="padding: 0.5rem; text-align: center;">GF</th>
+                            <th style="padding: 0.5rem; text-align: center;">GA</th>
+                            <th style="padding: 0.5rem; text-align: center;">SF</th>
+                            <th style="padding: 0.5rem; text-align: center;">SA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if not stats.line_combinations.away.pairings %}
+                        <tr>
+                            <td colspan="6" style="padding: 1rem; text-align: center; color: var(--text-muted);">No defensive pairings recorded.</td>
+                        </tr>
+                        {% else %}
+                        {% for pair in stats.line_combinations.away.pairings %}
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ pair.players }}</td>
+                            <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ pair.toi }}</td>
+                            <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ pair.goals_for }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ pair.goals_against }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ pair.sog_for }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ pair.sog_against }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Home Team Lines -->
+        <div class="card">
+            <h2 class="card-title">{{ stats.home_team_name }} ({{ stats.home_team_abbrev }}) Lineups</h2>
+            
+            <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 1.5rem 0 0.5rem 0;">Forward Lines</h3>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                            <th style="padding: 0.5rem;">Forwards</th>
+                            <th style="padding: 0.5rem; text-align: center;">TOI</th>
+                            <th style="padding: 0.5rem; text-align: center;">GF</th>
+                            <th style="padding: 0.5rem; text-align: center;">GA</th>
+                            <th style="padding: 0.5rem; text-align: center;">SF</th>
+                            <th style="padding: 0.5rem; text-align: center;">SA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if not stats.line_combinations.home.lines %}
+                        <tr>
+                            <td colspan="6" style="padding: 1rem; text-align: center; color: var(--text-muted);">No forward lines recorded.</td>
+                        </tr>
+                        {% else %}
+                        {% for line in stats.line_combinations.home.lines %}
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ line.players }}</td>
+                            <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ line.toi }}</td>
+                            <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ line.goals_for }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ line.goals_against }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ line.sog_for }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ line.sog_against }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 2rem 0 0.5rem 0;">Defensive Pairings</h3>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                            <th style="padding: 0.5rem;">Defensemen</th>
+                            <th style="padding: 0.5rem; text-align: center;">TOI</th>
+                            <th style="padding: 0.5rem; text-align: center;">GF</th>
+                            <th style="padding: 0.5rem; text-align: center;">GA</th>
+                            <th style="padding: 0.5rem; text-align: center;">SF</th>
+                            <th style="padding: 0.5rem; text-align: center;">SA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if not stats.line_combinations.home.pairings %}
+                        <tr>
+                            <td colspan="6" style="padding: 1rem; text-align: center; color: var(--text-muted);">No defensive pairings recorded.</td>
+                        </tr>
+                        {% else %}
+                        {% for pair in stats.line_combinations.home.pairings %}
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ pair.players }}</td>
+                            <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ pair.toi }}</td>
+                            <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ pair.goals_for }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ pair.goals_against }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ pair.sog_for }}</td>
+                            <td style="padding: 0.5rem; text-align: center;">{{ pair.sog_against }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>

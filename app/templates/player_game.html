@@ -1,0 +1,428 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ stats.name }} - Game Performance - NHL Hockey Analytics Platform{% endblock %}
+
+{% block content %}
+<!-- Back link -->
+<div style="margin-bottom: 1.5rem;">
+    <a href="/game/{{ stats.game_id }}" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-hover)'" onmouseout="this.style.color='var(--accent-color)'">
+        &larr; Back to Game Summary
+    </a>
+</div>
+
+<!-- Player Header -->
+<div class="scoreboard" style="padding: 1.5rem 2rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--bg-secondary); border: 2px solid var(--accent-color); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; color: var(--accent-color);">
+            {{ stats.position }}
+        </div>
+        <div>
+            <h1 style="font-size: 1.75rem; font-weight: 800; margin: 0; color: var(--text-primary);">{{ stats.name }}</h1>
+            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                {{ stats.team_name }} ({{ stats.team_abbrev }}) &bull; Shoots/Catches: {{ stats.shoots_catches or 'N/A' }}
+            </div>
+        </div>
+    </div>
+    
+    <div style="text-align: right;">
+        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 0.25rem;">Parent Game</span>
+        <a href="/game/{{ stats.game_id }}" style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); text-decoration: none; display: block;">
+            {{ stats.away_team_abbrev }} {{ stats.away_score }} @ {{ stats.home_team_abbrev }} {{ stats.home_score }}
+        </a>
+        <span style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; display: block;" class="font-mono">
+            {{ stats.game_date.strftime("%B %d, %Y") }}
+        </span>
+    </div>
+</div>
+
+<!-- Performance Summary Section -->
+<div style="margin-bottom: 2rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem;">Game Statistics Summary</h2>
+    
+    {% if stats.position == 'G' %}
+    <!-- Goalie Summary Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem;">
+        <div class="card" style="text-align: center; padding: 1.5rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Time on Ice</div>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;" class="font-mono">{{ stats.toi }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.5rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Shots Faced</div>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;">{{ stats.shots_faced }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.5rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Saves</div>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;">{{ stats.saves }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.5rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Goals Against</div>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;">{{ stats.goals_against }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.5rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Save Percentage</div>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">{{ stats.save_pct }}%</div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Skater Summary Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1.25rem;">
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Goals</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;">{{ stats.goals }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Assists</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;">{{ stats.assists }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Points</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;">{{ stats.points }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">SOG</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;">{{ stats.shots }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Hits</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;">{{ stats.hits }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">PIM</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;">{{ stats.pim }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">FO Win %</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;" class="font-mono">{{ stats.faceoff_pct }}%</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">TOI</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">{{ stats.toi }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Expected Goals (xG)</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">{{ stats.xg }}</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if stats.position != 'G' %}
+<!-- Possession Metrics (Even Strength) -->
+<div style="margin-bottom: 2rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem;">Possession Metrics (5v5 Even Strength)</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
+        <!-- Corsi Card -->
+        <div class="card" style="padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1rem; font-weight: 700; margin: 0; color: var(--text-primary);">Corsi (Shot Attempts)</h3>
+                <span style="font-size: 1.5rem; font-weight: 800; color: var(--accent-color);" class="font-mono">{{ stats.cf_pct }}% CF</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                <span>Corsi For: <strong>{{ stats.cf }}</strong></span>
+                <span>Corsi Against: <strong>{{ stats.ca }}</strong></span>
+            </div>
+            <div style="width: 100%; height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden; display: flex;">
+                <div style="width: {{ stats.cf_pct }}%; height: 100%; background: var(--accent-color);"></div>
+                <div style="width: {{ 100.0 - stats.cf_pct }}%; height: 100%; background: rgba(239, 68, 68, 0.4);"></div>
+            </div>
+        </div>
+
+        <!-- Fenwick Card -->
+        <div class="card" style="padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1rem; font-weight: 700; margin: 0; color: var(--text-primary);">Fenwick (Unblocked Attempts)</h3>
+                <span style="font-size: 1.5rem; font-weight: 800; color: var(--accent-color);" class="font-mono">{{ stats.ff_pct }}% FF</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                <span>Fenwick For: <strong>{{ stats.ff }}</strong></span>
+                <span>Fenwick Against: <strong>{{ stats.fa }}</strong></span>
+            </div>
+            <div style="width: 100%; height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden; display: flex;">
+                <div style="width: {{ stats.ff_pct }}%; height: 100%; background: var(--accent-color);"></div>
+                <div style="width: {{ 100.0 - stats.ff_pct }}%; height: 100%; background: rgba(239, 68, 68, 0.4);"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- Shot Map & Shift Timeline Grid -->
+<div class="grid-2" style="margin-bottom: 2rem; align-items: start;">
+    <!-- Column 1: Player Shot Map -->
+    <div class="card" style="display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0; color: var(--text-primary);">
+                {% if stats.position == 'G' %}Shots Faced Map{% else %}Individual Shot Attempts{% endif %}
+            </h3>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <input type="checkbox" id="normalize-shots" checked style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--accent-color);">
+                <label for="normalize-shots" style="font-size: 0.75rem; cursor: pointer; color: var(--text-secondary); font-weight: 600;">Normalize Right</label>
+            </div>
+        </div>
+        <div style="min-height: 380px; display: flex; justify-content: center; align-items: center; position: relative; background: #0b0f19; border-radius: 4px; overflow: hidden;">
+            <div id="player-shot-map-plot" style="width: 100%; height: 380px;"></div>
+        </div>
+    </div>
+
+    <!-- Column 2: Shift Chart -->
+    <div class="card" style="display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem;">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0; color: var(--text-primary);">Shift Visualizer</h3>
+        </div>
+        <div style="min-height: 380px; display: flex; justify-content: center; align-items: center; position: relative; background: #0b0f19; border-radius: 4px; overflow: hidden;">
+            <div id="player-shifts-plot" style="width: 100%; height: 380px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Player Event Timeline -->
+<div class="card" style="margin-bottom: 2rem; padding: 1.5rem;">
+    <h3 class="card-title" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1.5rem;">Personal Event Timeline</h3>
+    
+    {% if not stats.timeline %}
+    <p style="color: var(--text-muted); text-align: center; padding: 2rem;">No game events recorded involving this player.</p>
+    {% else %}
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+        {% for event in stats.timeline %}
+        <div style="display: flex; align-items: center; gap: 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 0.75rem;">
+            <div style="font-size: 0.85rem; color: var(--text-muted); width: 60px;" class="font-mono">
+                P{{ event.period }} - {{ event.period_time }}
+            </div>
+            
+            {% if event.event_type == 'goal' %}
+            <span class="timeline-badge badge-goal">Goal</span>
+            {% elif event.event_type == 'penalty' %}
+            <span class="timeline-badge badge-penalty">Penalty</span>
+            {% elif event.event_type == 'shot-on-goal' or event.event_type == 'missed-shot' or event.event_type == 'blocked-shot' %}
+            <span class="timeline-badge" style="background: rgba(56, 189, 248, 0.1); color: var(--accent-color);">Shot</span>
+            {% elif event.event_type == 'hit' %}
+            <span class="timeline-badge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">Hit</span>
+            {% elif event.event_type == 'faceoff' %}
+            <span class="timeline-badge" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">Faceoff</span>
+            {% else %}
+            <span class="timeline-badge" style="background: rgba(148, 163, 184, 0.1); color: var(--text-secondary);">Play</span>
+            {% endif %}
+            
+            <div style="font-size: 0.9rem; color: var(--text-primary); flex-grow: 1;">
+                {{ event.description }}
+            </div>
+            
+            <div style="font-size: 0.75rem; color: var(--text-muted); background: var(--bg-secondary); padding: 0.15rem 0.4rem; border-radius: 4px;" class="font-mono">
+                {{ event.team_abbrev }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+<script>
+    const GAME_ID = {{ stats.game_id }};
+    const PLAYER_ID = {{ stats.player_id }};
+    const IS_GOALIE = {{ 'true' if stats.position == 'G' else 'false' }};
+    
+    document.addEventListener("DOMContentLoaded", () => {
+        const normalizeToggle = document.getElementById("normalize-shots");
+        let playerShots = [];
+
+        // 1. Fetch player shot data
+        async function loadShots() {
+            try {
+                const response = await fetch(`/api/game/${GAME_ID}/player/${PLAYER_ID}/shots`);
+                if (response.ok) {
+                    playerShots = await response.json();
+                    renderShotMap();
+                }
+            } catch (err) {
+                console.error("Failed to load player shots", err);
+            }
+        }
+
+        // 2. Render Plotly Shot Map
+        function renderShotMap() {
+            const normalize = normalizeToggle.checked;
+            const plotContainer = document.getElementById("player-shot-map-plot");
+
+            // Split into categories
+            const goals = playerShots.filter(s => s.outcome === "Goal");
+            const saves = playerShots.filter(s => s.outcome === "Saved");
+            const misses = playerShots.filter(s => s.outcome === "Missed");
+            const blocks = playerShots.filter(s => s.outcome === "Blocked");
+
+            const getCoords = (list) => {
+                return {
+                    x: list.map(s => normalize ? s.norm_x : s.raw_x),
+                    y: list.map(s => normalize ? s.norm_y : s.raw_y),
+                    text: list.map(s => {
+                        const goalieText = s.goalie_name !== "None" ? `<br>Goalie: ${s.goalie_name}` : "";
+                        const xgText = s.xg !== undefined && s.xg !== null ? `<br>xG: ${s.xg.toFixed(4)}` : "";
+                        return `<b>${s.outcome.toUpperCase()}</b><br>Shooter: ${s.shooter_name}` +
+                               `${goalieText}<br>Shot: ${s.shot_type}` +
+                               `<br>Dist: ${Math.round(s.distance)} ft &nbsp; Angle: ${Math.round(s.angle)}°` +
+                               `<br>P${s.period} - ${s.period_time} &nbsp; Strength: ${s.strength_state}` +
+                               `${xgText}`;
+                    })
+                };
+            };
+
+            const gCoords = getCoords(goals);
+            const sCoords = getCoords(saves);
+            const mCoords = getCoords(misses);
+            const bCoords = getCoords(blocks);
+
+            const traces = [
+                {
+                    x: gCoords.x, y: gCoords.y, text: gCoords.text,
+                    mode: 'markers', name: 'Goal', hoverinfo: 'text',
+                    marker: { symbol: 'star', size: 12, color: '#10b981', line: { width: 1, color: '#ffffff' } }
+                },
+                {
+                    x: sCoords.x, y: sCoords.y, text: sCoords.text,
+                    mode: 'markers', name: 'Save', hoverinfo: 'text',
+                    marker: { symbol: 'circle', size: 8, color: '#38bdf8' }
+                },
+                {
+                    x: mCoords.x, y: mCoords.y, text: mCoords.text,
+                    mode: 'markers', name: 'Miss', hoverinfo: 'text',
+                    marker: { symbol: 'diamond', size: 8, color: '#f59e0b' }
+                },
+                {
+                    x: bCoords.x, y: bCoords.y, text: bCoords.text,
+                    mode: 'markers', name: 'Blocked', hoverinfo: 'text',
+                    marker: { symbol: 'x', size: 8, color: '#ef4444' }
+                }
+            ];
+
+            const shapes = [];
+            // Outer rink boundary
+            shapes.push({
+                type: 'rect', x0: -100, y0: -42.5, x1: 100, y1: 42.5,
+                line: { color: 'rgba(255, 255, 255, 0.2)', width: 2 }
+            });
+
+            if (!normalize) {
+                // Full rink red/blue lines
+                shapes.push({ type: 'line', x0: 0, y0: -42.5, x1: 0, y1: 42.5, line: { color: 'rgba(239, 68, 68, 0.4)', width: 3 } });
+                shapes.push({ type: 'line', x0: -25, y0: -42.5, x1: -25, y1: 42.5, line: { color: 'rgba(56, 189, 248, 0.4)', width: 3 } });
+                shapes.push({ type: 'line', x0: 25, y0: -42.5, x1: 25, y1: 42.5, line: { color: 'rgba(56, 189, 248, 0.4)', width: 3 } });
+                shapes.push({ type: 'circle', x0: -15, y0: -15, x1: 15, y1: 15, line: { color: 'rgba(56, 189, 248, 0.3)', width: 1.5 } });
+                shapes.push({ type: 'line', x0: -89, y0: -42.5, x1: -89, y1: 42.5, line: { color: 'rgba(239, 68, 68, 0.3)', width: 1.5 } });
+                shapes.push({ type: 'path', path: 'M -89 -4 A 4 4 0 0 1 -89 4 Z', line: { color: 'rgba(56, 189, 248, 0.3)', width: 1 }, fillcolor: 'rgba(56, 189, 248, 0.05)' });
+                shapes.push({ type: 'rect', x0: -92, y0: -3, x1: -89, y1: 3, line: { color: 'rgba(255, 255, 255, 0.3)', width: 1 } });
+            } else {
+                shapes.push({ type: 'line', x0: 0, y0: -42.5, x1: 0, y1: 42.5, line: { color: 'rgba(255, 255, 255, 0.2)', width: 1.5 } });
+            }
+
+            // Right net crease & line
+            shapes.push({ type: 'line', x0: 89, y0: -42.5, x1: 89, y1: 42.5, line: { color: 'rgba(239, 68, 68, 0.4)', width: 1.5 } });
+            shapes.push({ type: 'path', path: 'M 89 -4 A 4 4 0 0 0 89 4 Z', line: { color: 'rgba(56, 189, 248, 0.3)', width: 1 }, fillcolor: 'rgba(56, 189, 248, 0.05)' });
+            shapes.push({ type: 'rect', x0: 89, y0: -3, x1: 92, y1: 3, line: { color: 'rgba(255, 255, 255, 0.3)', width: 1 } });
+
+            const drawFaceoff = (cx, cy) => {
+                shapes.push({ type: 'circle', x0: cx - 15, y0: cy - 15, x1: cx + 15, y1: cy + 15, line: { color: 'rgba(239, 68, 68, 0.25)', width: 1.5 } });
+                shapes.push({ type: 'circle', x0: cx - 0.75, y0: cy - 0.75, x1: cx + 0.75, y1: cy + 0.75, fillcolor: 'rgba(239, 68, 68, 0.5)', line: { width: 0 } });
+            };
+            drawFaceoff(69, 22);
+            drawFaceoff(69, -22);
+            if (!normalize) {
+                drawFaceoff(-69, 22);
+                drawFaceoff(-69, -22);
+            }
+
+            const layout = {
+                plot_bgcolor: '#0f172a',
+                paper_bgcolor: '#0b0f19',
+                shapes: shapes,
+                xaxis: { range: normalize ? [0, 100] : [-100, 100], showgrid: false, zeroline: false, showticklabels: false, fixedrange: true },
+                yaxis: { range: [-42.5, 42.5], showgrid: false, zeroline: false, showticklabels: false, scaleanchor: 'x', scaleratio: 1, fixedrange: true },
+                margin: { l: 10, r: 10, t: 20, b: 10 },
+                legend: { font: { color: '#cbd5e1' }, orientation: 'h', x: 0.5, xanchor: 'center', y: -0.05 }
+            };
+
+            Plotly.newPlot(plotContainer, traces, layout, { responsive: true, displayModeBar: false });
+        }
+
+        // 3. Render Shift Gantt Chart
+        function renderShifts() {
+            const plotContainer = document.getElementById("player-shifts-plot");
+            const shifts = {{ stats.shifts_chart | tojson }};
+            
+            if (shifts.length === 0) {
+                plotContainer.innerHTML = `<p style="color: var(--text-muted); margin-top: 8rem; text-align: center; width: 100%;">No shifts recorded for this player.</p>`;
+                return;
+            }
+
+            const yLabels = [];
+            const bases = [];
+            const widths = [];
+            const hoverTexts = [];
+
+            shifts.forEach(s => {
+                let pLabel = `Period ${s.period}`;
+                if (s.period_type === 'OT') pLabel = "Overtime";
+                if (s.period_type === 'SO') pLabel = "Shootout";
+
+                yLabels.push(pLabel);
+                bases.push(s.start_seconds);
+                widths.push(s.duration || 0);
+
+                const startMin = Math.floor(s.start_seconds / 60);
+                const startSec = s.start_seconds % 60;
+                const endMin = Math.floor(s.end_seconds / 60);
+                const endSec = s.end_seconds % 60;
+                
+                let desc = `Shift: ${startMin}:${startSec.toString().padStart(2, '0')} - ${endMin}:${endSec.toString().padStart(2, '0')}`;
+                if (s.is_anomaly) desc += ` (Anomaly)`;
+                hoverTexts.push(`${desc}<br>Duration: ${s.duration}s`);
+            });
+
+            const trace = {
+                x: widths,
+                y: yLabels,
+                base: bases,
+                type: 'bar',
+                orientation: 'h',
+                hoverinfo: 'text',
+                hovertext: hoverTexts,
+                marker: {
+                    color: '#38bdf8',
+                    opacity: 0.85,
+                    line: { width: 1, color: '#f8fafc' }
+                }
+            };
+
+            const layout = {
+                plot_bgcolor: '#0f172a',
+                paper_bgcolor: '#0b0f19',
+                xaxis: {
+                    title: { text: "Time in Period (Minutes)", font: { color: '#cbd5e1', size: 10 } },
+                    tickmode: 'array',
+                    tickvals: [0, 300, 600, 900, 1200],
+                    ticktext: ["0:00", "5:00", "10:00", "15:00", "20:00"],
+                    font: { color: '#94a3b8' },
+                    gridcolor: 'rgba(255,255,255,0.05)',
+                    range: [0, 1200],
+                    fixedrange: true
+                },
+                yaxis: {
+                    font: { color: '#94a3b8' },
+                    gridcolor: 'rgba(255,255,255,0.05)',
+                    autorange: 'reversed',
+                    fixedrange: true
+                },
+                margin: { l: 80, r: 20, t: 20, b: 40 }
+            };
+
+            Plotly.newPlot(plotContainer, [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        // Init
+        normalizeToggle.addEventListener("change", renderShotMap);
+        loadShots();
+        renderShifts();
+    });
+</script>
+{% endblock %}

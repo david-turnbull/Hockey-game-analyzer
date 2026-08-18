@@ -5,7 +5,7 @@ class Shot(db.Model):
     __tablename__ = 'shot'
 
     shot_id = db.Column(db.String(100), db.ForeignKey('event.event_id'), primary_key=True)
-    shooter_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=False)
+    shooter_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=False, index=True)
     goalie_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=True)
     shot_type = db.Column(db.String(50))  # e.g., Slap, Wrist, Snap, Backhand, Tip-In
     
@@ -20,6 +20,15 @@ class Shot(db.Model):
     strength_state = db.Column(db.String(20))
     empty_net = db.Column(db.Boolean, default=False)
     xg = db.Column(db.Float, nullable=True)  # Expected goals prediction (when model is built)
+    
+    # Milestone 5.5: Data Correctness & Hardening fields
+    game_id = db.Column(db.Integer, db.ForeignKey('game.game_id'), nullable=True, index=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.team_id'), nullable=True, index=True)
+
+    __table_args__ = (
+        db.Index('idx_shot_game_team', 'game_id', 'team_id'),
+        db.Index('idx_shot_game_shooter', 'game_id', 'shooter_id'),
+    )
 
     # Relationships
     event = db.relationship('Event', back_populates='shot')

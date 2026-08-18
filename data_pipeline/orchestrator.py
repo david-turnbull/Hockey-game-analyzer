@@ -107,7 +107,7 @@ class PipelineOrchestrator:
                 valid_shots.append(shot)
                 
         # Validate shifts
-        valid_shifts = checker.validate_shifts(shifts_list)
+        valid_shifts = checker.validate_shifts(shifts_list, {p.player_id: p.position for p in players_list})
         
         summary = checker.get_summary()
         

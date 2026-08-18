@@ -235,10 +235,12 @@ async function initShotMap() {
                 text: list.map(s => {
                     const goalDetail = s.outcome === "Goal" ? `<b>GOAL!</b><br>` : "";
                     const goalieText = s.goalie_name !== "None" ? `<br>Goalie: ${s.goalie_name}` : "";
+                    const xgText = s.xg !== undefined && s.xg !== null ? `<br>xG: ${s.xg.toFixed(4)}` : "";
                     return `${goalDetail}Shooter: ${s.shooter_name} (${s.team_abbrev})` +
                            `${goalieText}<br>Shot: ${s.shot_type}` +
                            `<br>Dist: ${Math.round(s.distance)} ft &nbsp; Angle: ${Math.round(s.angle)}°` +
-                           `<br>P${s.period} - ${s.period_time} &nbsp; Strength: ${s.strength_state}`;
+                           `<br>P${s.period} - ${s.period_time} &nbsp; Strength: ${s.strength_state}` +
+                           `${xgText}`;
                 })
             };
         };
