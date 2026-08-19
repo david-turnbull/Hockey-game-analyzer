@@ -1,5 +1,5 @@
 from sqlalchemy import or_
-from app.models import db, Game, Player, Event, Shot, Shift, GamePlayer
+from app.models import db, Game, Player, Event, Shot, Shift, GamePlayer, Team
 from app.services.possession_service import PossessionService
 
 class PlayerGameService:
@@ -28,9 +28,39 @@ class PlayerGameService:
             is_home_player = (gp.team_id == game.home_team_id)
             position = gp.position or player.position
         else:
-            player_team = home_team if player.current_team_id == game.home_team_id else away_team
-            is_home_player = (player.current_team_id == game.home_team_id)
-            position = player.position
+            # 2. Fallback to valid shift team
+            first_shift = Shift.query.filter(
+                Shift.game_id == game_id,
+                Shift.player_id == player_id,
+                Shift.is_anomaly == False,
+                Shift.duration > 0
+            ).first()
+            if first_shift:
+                team_id = first_shift.team_id
+                player_team = db.session.get(Team, team_id)
+                is_home_player = (team_id == game.home_team_id)
+                position = player.position
+            else:
+                # 3. Fallback to valid game-specific event/team evidence
+                first_event = Event.query.filter(
+                    Event.game_id == game_id,
+                    or_(
+                        Event.primary_player_id == player_id,
+                        Event.secondary_player_id == player_id,
+                        Event.assist1_player_id == player_id,
+                        Event.assist2_player_id == player_id
+                    )
+                ).first()
+                if first_event:
+                    team_id = first_event.team_id
+                    player_team = db.session.get(Team, team_id)
+                    is_home_player = (team_id == game.home_team_id)
+                    position = player.position
+                else:
+                    # 4. Unknown / unresolved
+                    player_team = None
+                    is_home_player = False
+                    position = player.position
             
         # Fetch shifts
         shifts = Shift.query.filter(
@@ -38,12 +68,15 @@ class PlayerGameService:
             Shift.player_id == player_id
         ).order_by(Shift.period.asc(), Shift.start_elapsed_seconds.asc()).all()
         
-        # Calculate TOI and Shift metrics
-        shift_count = len(shifts)
-        toi_seconds = sum(s.duration for s in shifts if s.duration is not None and not s.is_anomaly)
+        # Calculate TOI and Shift metrics using centralized OnIceService validity rules
+        from app.services.on_ice_service import OnIceService
+        valid_shifts = [s for s in shifts if OnIceService.is_valid_shift(s)]
+        valid_shift_count = len(valid_shifts)
+        raw_shift_count = len(shifts)
+        toi_seconds = sum(s.duration for s in valid_shifts)
         
-        # Average shift length
-        avg_shift_seconds = int(toi_seconds / shift_count) if shift_count > 0 else 0
+        # Average shift length using only valid shifts
+        avg_shift_seconds = int(toi_seconds / valid_shift_count) if valid_shift_count > 0 else 0
         
         # Format TOI helper
         def format_toi(total_seconds):
@@ -136,8 +169,8 @@ class PlayerGameService:
             "name": player.full_name,
             "position": position,
             "shoots_catches": player.shoots_catches,
-            "team_name": player_team.name if player_team else "",
-            "team_abbrev": player_team.abbreviation if player_team else "",
+            "team_name": player_team.name if player_team else "Unknown",
+            "team_abbrev": player_team.abbreviation if player_team else "UNK",
             "team_id": player_team.team_id if player_team else None,
             "is_home": is_home_player,
             "game_id": game.game_id,
@@ -148,7 +181,8 @@ class PlayerGameService:
             "home_team_abbrev": home_team.abbreviation,
             "away_team_abbrev": away_team.abbreviation,
             "toi": toi_str,
-            "shifts_count": shift_count,
+            "shifts_count": valid_shift_count,
+            "raw_shifts_count": raw_shift_count,
             "avg_shift": avg_shift_str,
             "timeline": timeline,
             # Shift chart data

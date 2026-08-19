@@ -1,6 +1,26 @@
 # NHL Hockey Analytics Platform (Hockey-Ops)
 
-A professional, portfolio-quality internal hockey operations analytics platform designed for analysts, scouts, and coaching staff. This platform enables ingestion and transformation of NHL API play-by-play and shift data to perform in-depth event and player performance analysis, with interactive shot maps, shift charts, true 5v5 possession statistics, and line combination analysis.
+[![Run Automated Tests](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml)
+
+**Branch Status:** v1.0 Release Candidate
+
+---
+
+### What it is
+An NHL post-game analysis platform.
+
+### Who it is for
+Hockey fans and analysts interested in understanding more than the traditional box score.
+
+### What it does
+- **Shot analysis** (spatial tracking and interactive shot mapping)
+- **Player game analysis** (detailed stats, shift visualizer, and event logs)
+- **Shift reconstruction** (re-aligning shift charts with play-by-play timelines)
+- **5v5 possession** (Corsi and Fenwick metrics isolated specifically to true 5v5 play)
+- **Forward lines** (trios aggregation, TOI, and on-ice goals/shots)
+- **Defence pairings** (defenseman duos aggregation, TOI, and on-ice goals/shots)
+- **Game-event timelines** (chronological scoring and penalty log)
+- **Experimental xG** (expected goals model utilizing spatial features)
 
 ---
 
@@ -9,25 +29,13 @@ A professional, portfolio-quality internal hockey operations analytics platform 
 Below is the high-level architecture and data flow diagram of the platform.
 
 ```mermaid
-graph TD
-    NHL_API[NHL Web Stats API] -->|Raw JSON Ingestion| Ingestion[ingest/nhl_api.py]
-    Ingestion -->|Local Cache| Cache[(data/raw/ JSON Cache)]
-    Cache -->|Load JSON| Transform[transform/normalizer.py]
-    Transform -->|Create Entities| Validation[validation/quality_checker.py]
-    Validation -->|Run Quality Checks| Load[loaders/db_loader.py]
-    Load -->|Transaction Safe Load| DB[(SQLite Database)]
-    
-    DB -->|ORM Queries| Services[app/services Layer]
-    Services --> GameSvc[game_service.py]
-    Services --> PlayerGameSvc[player_game_service.py]
-    Services --> PossessionSvc[possession_service.py]
-    Services --> OnIceSvc[on_ice_service.py]
-    Services --> LineSvc[line_service.py]
-    Services --> xGSvc[xg_service.py]
-
-    GameSvc -->|Get Overview & Timeline| Controllers[app/routes Layer]
-    PlayerGameSvc -->|Get Player Stats & Shifts| Controllers
-    Controllers -->|Render Templates| UI[Interactive Analytics Web UI]
+flowchart TD
+    A[NHL API] --> B[Raw JSON Cache]
+    B --> C[Transform + Validate]
+    C --> D[SQLite / SQLAlchemy]
+    D --> E[Service Layer]
+    E --> F[Flask Routes / API]
+    F --> G[Analytics UI]
 ```
 
 ---
@@ -47,25 +55,27 @@ graph TD
 
 ## Visual Presentation (Dashboards)
 
+*Note: Screenshots of the user interface are currently pending generation and will be placed in the `docs/screenshots/` directory once finalized.*
+
 ### 1. Game Selector UI
 Allows users to select an ingested season, team, and game from a responsive drop-down interface.
-*(Placeholder: `docs/screenshots/game_selector.png`)*
+- Required Screenshot: `docs/screenshots/game_selector.png`
 
 ### 2. Game Overview Dashboard
 Displays aggregated team boxscore metrics (Faceoffs, Shots, PIM, Power Plays, Prototype xG), chronological goals and penalty timelines, and team comparison charts.
-*(Placeholder: `docs/screenshots/game_overview.png`)*
+- Required Screenshot: `docs/screenshots/game_overview.png`
 
 ### 3. Interactive Shot Map
 Draws shot coordinates normalized so that the attacking direction is always from left to right (facing the net at `x = 89`). Filters by team, shot outcome, and strength state.
-*(Placeholder: `docs/screenshots/shot_map.png`)*
+- Required Screenshot: `docs/screenshots/shot_map.png`
 
 ### 4. Player Game Page
 Highlights individual skater/goalie performance stats, a chronological player event log, an interactive individual shot map, and a second-by-second shift timeline visualization.
-*(Placeholder: `docs/screenshots/player_game.png`)*
+- Required Screenshot: `docs/screenshots/player_game.png`
 
 ### 5. Line Combinations & Possession
 Groups home and away skaters into forward trios and defense pairings, tracking collective time on ice, goals for/against, and shots for/against.
-*(Placeholder: `docs/screenshots/line_combinations.png`)*
+- Required Screenshot: `docs/screenshots/line_combinations.png`
 
 ---
 
@@ -148,16 +158,26 @@ Open [http://127.0.0.1:5000/](http://127.0.0.1:5000/) in your web browser to use
 
 ---
 
-## Testing & Diagnostics
+## Testing & Continuous Integration
 
-### Run the Test Suite
-Execute the pytest suite covering normalization, quality checks, Refactoring, shift touched boundaries, and xG formulas:
+### Automated Test Suite
+The codebase includes comprehensive unit and regression tests written using `pytest`. These cover pipeline normalization, data quality checkers, shift time boundaries, line combinations, possession metrics, and expected goals math.
+
+To run the tests locally:
 ```powershell
 pytest
 ```
 
+### Continuous Integration (CI)
+The project utilizes GitHub Actions for continuous integration. The CI workflow is defined in `.github/workflows/tests.yml` and is configured to trigger automatically on:
+- Pushes to the `main` or `master` branches.
+- Pushes directly to the `v1.0` release candidate branch.
+- Pull requests targeting `main`, `master`, or `v1.0`.
+
+Each CI run spawns a clean Ubuntu environment, installs Python 3.12, builds project dependencies from `requirements.txt`, and executes `pytest` automatically to validate the code changes before merging.
+
 ### Run Database Integrity Diagnostics
-Assess database consistency, orphan rows, and shift/roster mismatches:
+You can also run a specialized script to verify database constraints, search for duplicate roster entries, missing GamePlayer mappings, or timing anomalies:
 ```powershell
 python scripts/database_diagnostics.py
 ```

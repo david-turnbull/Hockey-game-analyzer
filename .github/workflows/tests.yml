@@ -2,9 +2,9 @@ name: Run Automated Tests
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, v1.0 ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, v1.0 ]
 
 jobs:
   test:

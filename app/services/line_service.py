@@ -32,13 +32,9 @@ class LineService:
         is_forward = lambda p_id: player_meta.get(p_id, {}).get("position") in ['C', 'LW', 'RW', 'F']
         is_defenseman = lambda p_id: player_meta.get(p_id, {}).get("position") in ['D', 'LD', 'RD']
 
-        # 3. Fetch shifts (excluding anomalies)
+        # 3. Fetch shifts
         shifts = Shift.query.filter(
-            Shift.game_id == game_id,
-            Shift.is_anomaly == False,
-            Shift.duration > 0,
-            Shift.start_elapsed_seconds.isnot(None),
-            Shift.end_elapsed_seconds.isnot(None)
+            Shift.game_id == game_id
         ).all()
 
         # Determine total game length (max shift end time)
@@ -47,29 +43,19 @@ class LineService:
             if s.end_elapsed_seconds is not None and s.end_elapsed_seconds > max_time:
                 max_time = s.end_elapsed_seconds
 
-        # 4. Populate second-by-second active players list using half-open intervals [start, end)
-        home_skaters_on_ice = [set() for _ in range(max_time + 2)]
-        away_skaters_on_ice = [set() for _ in range(max_time + 2)]
+        # 4. Populate second-by-second active players list using OnIceService
+        from app.services.on_ice_service import OnIceService
+        home_players_timeline, away_players_timeline = OnIceService.build_active_players_timeline(
+            shifts, max_time, home_team_id
+        )
 
-        for s in shifts:
-            p_pos = player_meta.get(s.player_id, {}).get("position")
-            if p_pos == 'G':
-                continue
+        home_skaters_on_ice = []
+        for players in home_players_timeline:
+            home_skaters_on_ice.append({p for p in players if player_meta.get(p, {}).get("position") != 'G'})
 
-            start = s.start_elapsed_seconds
-            end = s.end_elapsed_seconds
-            if start is None or end is None:
-                continue
-
-            start = max(0, start)
-            end = min(max_time, end)
-
-            # Half-open interval convention: range(start, end) is exclusive of end, matching [start, end)
-            for t in range(start, end):
-                if s.team_id == home_team_id:
-                    home_skaters_on_ice[t].add(s.player_id)
-                else:
-                    away_skaters_on_ice[t].add(s.player_id)
+        away_skaters_on_ice = []
+        for players in away_players_timeline:
+            away_skaters_on_ice.append({p for p in players if player_meta.get(p, {}).get("position") != 'G'})
 
         # 5. Initialize aggregation dictionaries
         home_lines = {}  # tuple -> seconds

@@ -266,8 +266,8 @@
                                 <td style="padding: 0.5rem; text-align: center;">{{ skater.pim }}</td>
                                 <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.toi }}</td>
                                 <td style="padding: 0.5rem; text-align: center;">{{ skater.shifts_count }}</td>
-                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.cf_pct }}%</td>
-                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.ff_pct }}%</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{% if skater.cf_pct is not none %}{{ skater.cf_pct }}%{% else %}N/A{% endif %}</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{% if skater.ff_pct is not none %}{{ skater.ff_pct }}%{% else %}N/A{% endif %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -343,8 +343,8 @@
                                 <td style="padding: 0.5rem; text-align: center;">{{ skater.pim }}</td>
                                 <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.toi }}</td>
                                 <td style="padding: 0.5rem; text-align: center;">{{ skater.shifts_count }}</td>
-                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.cf_pct }}%</td>
-                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.ff_pct }}%</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{% if skater.cf_pct is not none %}{{ skater.cf_pct }}%{% else %}N/A{% endif %}</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{% if skater.ff_pct is not none %}{{ skater.ff_pct }}%{% else %}N/A{% endif %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

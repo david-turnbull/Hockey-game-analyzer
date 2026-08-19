@@ -161,8 +161,8 @@ class PossessionService:
             ff = stats["ff"]
             fa = stats["fa"]
 
-            cf_pct = round((cf / (cf + ca) * 100), 1) if (cf + ca) > 0 else 50.0
-            ff_pct = round((ff / (ff + fa) * 100), 1) if (ff + fa) > 0 else 50.0
+            cf_pct = round((cf / (cf + ca) * 100), 1) if (cf + ca) > 0 else None
+            ff_pct = round((ff / (ff + fa) * 100), 1) if (ff + fa) > 0 else None
 
             player_percentages[p_id] = {
                 "cf": cf,

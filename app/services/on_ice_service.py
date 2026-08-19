@@ -40,6 +40,18 @@ class OnIceService:
         return results
 
     @staticmethod
+    def is_valid_shift(s) -> bool:
+        """
+        Authoritative check for shift validity.
+        A shift is valid if it has valid timestamps, is not anomalous, and has a positive duration.
+        """
+        if s.start_elapsed_seconds is None or s.end_elapsed_seconds is None:
+            return False
+        if s.is_anomaly or s.duration is None or s.duration <= 0:
+            return False
+        return True
+
+    @staticmethod
     def filter_active_shifts(shifts: list, elapsed_seconds: int, team_id: int = None) -> list:
         """
         In-memory filtering of a pre-loaded shift collection for a specific second.
@@ -51,14 +63,37 @@ class OnIceService:
 
         active = []
         for s in shifts:
-            if s.start_elapsed_seconds is None or s.end_elapsed_seconds is None:
-                continue
-            if s.is_anomaly or s.duration == 0 or s.duration is None:
+            if not OnIceService.is_valid_shift(s):
                 continue
             if s.start_elapsed_seconds <= elapsed_seconds < s.end_elapsed_seconds:
                 if team_id is None or s.team_id == team_id:
                     active.append(s)
         return active
+
+    @staticmethod
+    def build_active_players_timeline(shifts: list, max_time: int, home_team_id: int) -> tuple:
+        """
+        Builds second-by-second active player collections for both teams, pre-calculating
+        them in a single pass to optimize bulk analysis (like line combinations).
+        All rules (valid shifts and half-open [start, end) intervals) are owned here.
+        """
+        home_players = [set() for _ in range(max_time + 2)]
+        away_players = [set() for _ in range(max_time + 2)]
+        
+        for s in shifts:
+            if not OnIceService.is_valid_shift(s):
+                continue
+                
+            start = max(0, s.start_elapsed_seconds)
+            end = min(max_time, s.end_elapsed_seconds)
+            
+            for t in range(start, end):
+                if s.team_id == home_team_id:
+                    home_players[t].add(s.player_id)
+                else:
+                    away_players[t].add(s.player_id)
+                    
+        return home_players, away_players
 
     @staticmethod
     def get_skaters_on_ice(game_id: int, elapsed_seconds: int, team_id: int = None) -> list:

@@ -40,6 +40,21 @@ def run_diagnostics():
             ~GamePlayer.team_id.in_(list(team_ids))
         ).count() if (game_ids and player_ids and team_ids) else GamePlayer.query.count()
 
+        # Missing GamePlayer relationships: Player appears in game shifts or events, but has no GamePlayer row
+        players_in_shifts = db.session.query(Shift.game_id, Shift.player_id).filter(Shift.game_id.isnot(None), Shift.player_id.isnot(None)).distinct()
+        active_player_games = set(players_in_shifts.all())
+
+        for p_field in [Event.primary_player_id, Event.secondary_player_id, Event.assist1_player_id, Event.assist2_player_id]:
+            pairs = db.session.query(Event.game_id, p_field).filter(Event.game_id.isnot(None), p_field.isnot(None)).distinct().all()
+            for game_id, player_id in pairs:
+                active_player_games.add((game_id, player_id))
+
+        missing_game_player_relations = 0
+        for g_id, p_id in active_player_games:
+            exists = db.session.query(GamePlayer).filter_by(game_id=g_id, player_id=p_id).first()
+            if not exists:
+                missing_game_player_relations += 1
+
         invalid_evt_primary = db.session.query(Event).filter(Event.primary_player_id.isnot(None), ~Event.primary_player_id.in_(list(player_ids))).count() if player_ids else 0
         invalid_evt_secondary = db.session.query(Event).filter(Event.secondary_player_id.isnot(None), ~Event.secondary_player_id.in_(list(player_ids))).count() if player_ids else 0
         invalid_evt_assist1 = db.session.query(Event).filter(Event.assist1_player_id.isnot(None), ~Event.assist1_player_id.in_(list(player_ids))).count() if player_ids else 0
@@ -77,7 +92,7 @@ def run_diagnostics():
         
         integrity_issues_sum = (orphan_events_count + orphan_shots_count + orphan_shifts_count + 
                                 orphan_game_players + invalid_player_refs + negative_duration_shifts + 
-                                shots_without_shooters + shift_team_mismatches)
+                                shots_without_shooters + shift_team_mismatches + missing_game_player_relations)
         warnings_sum = zero_duration_shifts + unknown_period_types + invalid_manpower_states + events_with_invalid_clocks
         
         if integrity_issues_sum > 0:
@@ -103,6 +118,7 @@ def run_diagnostics():
         print(f"Orphan shots: {orphan_shots_count:>12}")
         print(f"Orphan shifts: {orphan_shifts_count:>11}")
         print(f"Orphan game rosters: {orphan_game_players:>6}")
+        print(f"Missing GamePlayer relations: {missing_game_player_relations:>1}")
         print(f"Invalid player references: {invalid_player_refs:>2}")
         print(f"Negative-duration shifts: {negative_duration_shifts:>3}")
         print(f"Shots without shooters: {shots_without_shooters:>4}")
