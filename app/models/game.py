@@ -20,6 +20,7 @@ class Game(db.Model):
     
     events = db.relationship('Event', back_populates='game', lazy='dynamic', cascade='all, delete-orphan')
     shifts = db.relationship('Shift', back_populates='game', lazy='dynamic', cascade='all, delete-orphan')
+    roster_entries = db.relationship('GamePlayer', back_populates='game', lazy='dynamic', cascade='all, delete-orphan')
 
     def __repr__(self):
         return f"<Game {self.game_id}: {self.away_team_id} @ {self.home_team_id} ({self.season})>"

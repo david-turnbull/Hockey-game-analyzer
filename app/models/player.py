@@ -13,6 +13,7 @@ class Player(db.Model):
 
     # Relationships
     current_team = db.relationship('Team', back_populates='players')
+    game_rosters = db.relationship('GamePlayer', back_populates='player', lazy='dynamic')
     
     # Explicitly specify foreign_keys in Shot relationships to distinguish shooter/goalie
     shots_taken = db.relationship('Shot', foreign_keys='Shot.shooter_id', back_populates='shooter', lazy='dynamic')

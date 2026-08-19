@@ -1,7 +1,7 @@
 import math
 import logging
 from datetime import datetime
-from app.models import Team, Player, Game, Event, Shot, Shift
+from app.models import Team, Player, Game, Event, Shot, Shift, GamePlayer
 
 logger = logging.getLogger(__name__)
 
@@ -430,4 +430,13 @@ class DataNormalizer:
             duration=duration,
             period_type=period_type,
             team_id=team_id
+        )
+
+    def transform_game_player(self, game_id: int, player_id: int, team_id: int, position: str = None) -> GamePlayer:
+        """Constructs a GamePlayer model instance representing a player's roster assignment for a game."""
+        return GamePlayer(
+            game_id=game_id,
+            player_id=player_id,
+            team_id=team_id,
+            position=position
         )

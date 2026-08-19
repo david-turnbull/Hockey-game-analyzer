@@ -1,89 +1,181 @@
 # NHL Hockey Analytics Platform (Hockey-Ops)
 
-A professional, portfolio-quality internal hockey operations analytics platform designed for analysts, scouts, and coaching staff. This platform enables the selection of NHL seasons, teams, and games to perform in-depth event and player performance analysis, with an interactive shot map, shift visualization, and analytical research capabilities.
+A professional, portfolio-quality internal hockey operations analytics platform designed for analysts, scouts, and coaching staff. This platform enables ingestion and transformation of NHL API play-by-play and shift data to perform in-depth event and player performance analysis, with interactive shot maps, shift charts, true 5v5 possession statistics, and line combination analysis.
 
 ---
 
-## Technical Stack
+## Architecture & Data Flow
 
-- **Backend**: Python 3.11+, Flask (Application Factory, Blueprints)
-- **Database**: SQLite (for development), SQLAlchemy ORM (SQLAlchemy 2.0+)
-- **Frontend**: HTML5, CSS3 (Vanilla design, dark theme, custom responsive grid), Jinja2 Templates
-- **Testing**: pytest
+Below is the high-level architecture and data flow diagram of the platform.
 
----
+```mermaid
+graph TD
+    NHL_API[NHL Web Stats API] -->|Raw JSON Ingestion| Ingestion[ingest/nhl_api.py]
+    Ingestion -->|Local Cache| Cache[(data/raw/ JSON Cache)]
+    Cache -->|Load JSON| Transform[transform/normalizer.py]
+    Transform -->|Create Entities| Validation[validation/quality_checker.py]
+    Validation -->|Run Quality Checks| Load[loaders/db_loader.py]
+    Load -->|Transaction Safe Load| DB[(SQLite Database)]
+    
+    DB -->|ORM Queries| Services[app/services Layer]
+    Services --> GameSvc[game_service.py]
+    Services --> PlayerGameSvc[player_game_service.py]
+    Services --> PossessionSvc[possession_service.py]
+    Services --> OnIceSvc[on_ice_service.py]
+    Services --> LineSvc[line_service.py]
+    Services --> xGSvc[xg_service.py]
 
-## Directory Structure
-
-```
-hockey-analytics-platform/
-├── app/                      # Main Flask application packages
-│   ├── __init__.py           # Application Factory
-│   ├── config.py             # Environment configurations
-│   ├── models/               # SQLAlchemy ORM models
-│   ├── routes/               # Flask blueprints
-│   ├── static/               # CSS, JS, and image assets
-│   └── templates/            # Jinja2 HTML templates
-├── data_pipeline/            # Data Ingestion and Transformation
-├── scripts/                  # Command-line utility scripts
-│   └── initialise_database.py
-├── tests/                    # Pytest test suite
-├── requirements.txt          # Third-party python dependencies
-└── run.py                    # Entry point to run the application
+    GameSvc -->|Get Overview & Timeline| Controllers[app/routes Layer]
+    PlayerGameSvc -->|Get Player Stats & Shifts| Controllers
+    Controllers -->|Render Templates| UI[Interactive Analytics Web UI]
 ```
 
 ---
 
-## Installation & Setup
+## Features & Capabilities
 
-### 1. Prerequisites
-- Python 3.11 or higher installed on your system.
+- **NHL API Ingestion:** Downloads play-by-play and shift charts from official NHL APIs and caches raw responses locally for complete offline reproducibility.
+- **Normalized Relational Schema:** Transforms nested API feeds into a structured SQLite database containing tables for Teams, Players, Games, Events, Shots, Shifts, and Game Rosters.
+- **Game Overview & Timelines:** Renders boxscore stats, team comparisons, and chronological timelines of goals and penalties.
+- **Interactive Shot Maps:** Visualizes shot locations on a normalized ice rink map with tooltips displaying outcome, distance, shooter, goalie, and prototype xG values.
+- **True 5v5 Possession:** Computes player-specific Corsi and Fenwick metrics isolated specifically to true 5-on-5 play.
+- **Shift-Based TOI Analysis:** Standardizes shift timing calculations to half-open intervals `[start, end)` to resolve touch boundaries without double-counting.
+- **Line Combination Engine:** Automatically aggregates skaters into forward lines (trios) and defensive pairings (duos), tracking their collective ice time and on-ice goals/shots.
+- **Prototype Expected Goals (xG):** Estimates individual shot probabilities using mathematical distance, angle, shot type, and manpower adjustments.
 
-### 2. Environment Configuration
-Clone the repository and navigate into the workspace. Create and activate a virtual environment:
+---
 
-#### Windows (PowerShell)
+## Visual Presentation (Dashboards)
+
+### 1. Game Selector UI
+Allows users to select an ingested season, team, and game from a responsive drop-down interface.
+*(Placeholder: `docs/screenshots/game_selector.png`)*
+
+### 2. Game Overview Dashboard
+Displays aggregated team boxscore metrics (Faceoffs, Shots, PIM, Power Plays, Prototype xG), chronological goals and penalty timelines, and team comparison charts.
+*(Placeholder: `docs/screenshots/game_overview.png`)*
+
+### 3. Interactive Shot Map
+Draws shot coordinates normalized so that the attacking direction is always from left to right (facing the net at `x = 89`). Filters by team, shot outcome, and strength state.
+*(Placeholder: `docs/screenshots/shot_map.png`)*
+
+### 4. Player Game Page
+Highlights individual skater/goalie performance stats, a chronological player event log, an interactive individual shot map, and a second-by-second shift timeline visualization.
+*(Placeholder: `docs/screenshots/player_game.png`)*
+
+### 5. Line Combinations & Possession
+Groups home and away skaters into forward trios and defense pairings, tracking collective time on ice, goals for/against, and shots for/against.
+*(Placeholder: `docs/screenshots/line_combinations.png`)*
+
+---
+
+## Analytical Definitions
+
+- **Corsi (Shot Attempts):** Measures possession by counting all shot attempts (Goals + Saves + Misses + Blocks). Represents the volume of play directed toward the opponent's net.
+- **Fenwick (Unblocked Shot Attempts):** Measures possession by counting unblocked shot attempts (Goals + Saves + Misses). Often used as a predictor of scoring and sustained pressure.
+- **Corsi / Fenwick For Percentage (CF% / FF%):** The percentage of total shot attempts (for both teams) taken by a player's team while they are on the ice. Formula: `CF% = CF / (CF + CA) * 100`.
+- **True 5v5:** Situation where both teams have exactly 5 skaters and 1 goalie on the ice. The platform excludes 4v4, 3v3, power play, penalty kill, empty-net (goalie pulled), and shootouts from true 5v5 calculations.
+- **Time On Ice (TOI):** Cumulative active seconds spent on the ice. Standardized to half-open intervals `[start, end)` (i.e. `start <= t < end`), meaning a player is active at their shift start second and inactive at their shift end second.
+- **Prototype Expected Goals (xG):** Heuristic probability representing the likelihood of a shot attempt scoring, based on distance, angle, shot type, and manpower adjustments.
+
+---
+
+## Prototype xG Heuristic Formula
+
+The Expected Goals (xG) metric is a **non-statistical prototype heuristic** using hand-selected log-odds coefficients to estimate shot probability. It is not a machine-learning model trained on historical outcomes.
+
+### Formula
+$$log\\_odds = \beta_0 + (\beta_{dist} \times distance) + (\beta_{angle} \times |angle|) + shot\\_type\\_adj + strength\\_state\\_adj$$
+
+$$xG = \frac{1}{1 + e^{-log\\_odds}}$$
+
+### Coefficients and Adjustments
+- **Baseline Constant ($\beta_0$):** `-1.9` (corresponds to a baseline ~13% conversion probability).
+- **Distance Coefficient ($\beta_{dist}$):** `-0.035` per foot decay (farther shots are harder to score).
+- **Angle Coefficient ($\beta_{angle}$):** `-0.015` per degree decay (wider angles from the center line are harder to score).
+- **Shot Type Adjustments:**
+  - Tip-In / Deflection: `+0.4` log-odds (redirects close to net are highly dangerous).
+  - Backhand: `+0.1` log-odds (unpredictable releases).
+  - Slap Shot: `-0.2` log-odds (typically taken from far distances).
+- **Strength Adjustments:**
+  - Attacking Power Play (e.g. PP, 5v4, 5v3): `+0.15` log-odds (increased time and space).
+  - Attacking Shorthanded (e.g. SH, 4v5, 3v5): `-0.15` log-odds (lower support, rushed shots).
+
+### Empty Net Override
+If the defending team's goalie is pulled (`empty_net` is True):
+$$xG = \max(0.1, 1.0 - (distance \times 0.005))$$
+*(Linear decay ranging from 99% near the net to 10% from the opposite end of the rink)*
+
+---
+
+## Data Source & Preservation
+
+- **API Endpoints:** Ingests live data from the NHL Gamecenter API (`api-web.nhle.com/v1/gamecenter/{game_id}/play-by-play`) and stats shift chart API (`api.nhle.com/stats/rest/en/shiftcharts`).
+- **Raw Response Preservation:** All fetched JSON responses are stored locally in the `data/raw/` directory, serving as reproducible fixtures.
+- **Heuristics & Normalization:** Skater counts and goalie statuses are extracted from the API's `situationCode` values (e.g., `1551` where digits represent Away Goalie, Away Skaters, Home Skaters, Home Goalie).
+- *Disclaimer: This platform is for educational and analytical research purposes. It is not endorsed by or affiliated with the National Hockey League (NHL).*
+
+---
+
+## Setup & Running Instructions
+
+### 1. Installation
+Clone the repository and set up a Python 3.12 virtual environment:
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-```
-
-#### macOS / Linux
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Install the dependencies:
-```bash
 pip install -r requirements.txt
 ```
 
-### 3. Database Initialization
-Run the schema creation and database seeding utility script to create the local SQLite database (`hockey.db`) with appropriate tables and initial seeding records:
-```bash
+### 2. Database Initialization & Seeding
+Create the database tables and seed local team/player structures:
+```powershell
 python scripts/initialise_database.py
 ```
 
----
+### 3. Ingest NHL Game Data
+Ingest a game (for example, Calgary Flames game `2023020007`) using cached JSON or downloading fresh data:
+```powershell
+python scripts/ingest_game.py 2023020007
+```
 
-## Running the Application
-
-To start the Flask development server:
-```bash
+### 4. Running the Web Server
+Launch the Flask development server:
+```powershell
 python run.py
 ```
-By default, the server will start at [http://127.0.0.1:5000/](http://127.0.0.1:5000/). Open this address in your browser to view the Diagnostics dashboard.
+Open [http://127.0.0.1:5000/](http://127.0.0.1:5000/) in your web browser to use the dashboards.
 
 ---
 
-## Running the Tests
+## Testing & Diagnostics
 
-To run the full suite of automated tests using pytest:
-```bash
-python -m pytest
+### Run the Test Suite
+Execute the pytest suite covering normalization, quality checks, Refactoring, shift touched boundaries, and xG formulas:
+```powershell
+pytest
 ```
-To run tests with code coverage:
-```bash
-python -m pytest --cov=app tests/
+
+### Run Database Integrity Diagnostics
+Assess database consistency, orphan rows, and shift/roster mismatches:
+```powershell
+python scripts/database_diagnostics.py
 ```
+
+---
+
+## Limitations
+
+- **Public API Timing Discrepancies:** NHL public shift charts are recorded in whole seconds, causing occasional minor shift overlaps or misalignment with play-by-play events.
+- **On-Ice Reconstruction:** On-ice player presence at any given second is reconstructed from shift start and end times, assuming no delays in official records.
+- **Prototype xG Coefficients:** The coefficients for xG calculations are hand-selected based on domain expertise, rather than statistically fitted to historical shot outcomes.
+- **Single-Season Validation:** Validated primarily on the 2023-2024 regular season. Performance on historical data or changes in NHL API formats may vary.
+- **Development Deployment:** Running on a local SQLite database and Flask built-in development server; not yet configured for production scaling or cloud environments.
+
+---
+
+## Roadmap
+
+- **v1.0 (Current Release):** Correct analytical logic, standardize shift change boundaries, modularize service layer, and introduce database diagnostics.
+- **v1.x (Scaling Phase):** Build schedulers for full-season ingestion, run ingestion runtime profiling, and perform database indexing/performance tuning.
+- **v2.0 (ML Integration):** Gather full-season shot outcome datasets, train a logistic regression or XGBoost expected goals (xG) model, evaluate metrics (ROC-AUC, log loss, calibration curves), and introduce advanced on-ice analytics (e.g. teammate/opponent adjustments).

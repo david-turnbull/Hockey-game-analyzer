@@ -1,7 +1,7 @@
 import pytest
 from datetime import date
-from app.models import Game, Team, Player, Shift, Event, Shot
-from app.services.game_service import GameService
+from app.models import Game, Team, Player, Shift, Event, Shot, GamePlayer
+from app.services.line_service import LineService
 
 def test_line_combinations_logic(app, db):
     """
@@ -52,6 +52,18 @@ def test_line_combinations_logic(app, db):
     db.session.add_all([s_f1, s_f2, s_f3, s_d1, s_d2, s_g])
     db.session.commit()
     
+    # Seed GamePlayer roster records
+    gps = [
+        GamePlayer(game_id=800, player_id=101, team_id=1, position="LW"),
+        GamePlayer(game_id=800, player_id=102, team_id=1, position="C"),
+        GamePlayer(game_id=800, player_id=103, team_id=1, position="RW"),
+        GamePlayer(game_id=800, player_id=104, team_id=1, position="D"),
+        GamePlayer(game_id=800, player_id=105, team_id=1, position="D"),
+        GamePlayer(game_id=800, player_id=106, team_id=1, position="G"),
+    ]
+    db.session.add_all(gps)
+    db.session.commit()
+    
     # 5. Add a shot and a goal event at 50 seconds (while line and pairing are on ice)
     # Event 1: Goal by Home team at 50s
     e1 = Event(event_id="e_g1", game_id=800, period=1, period_time="00:50", elapsed_game_seconds=50, event_type="goal", team_id=1, primary_player_id=101, manpower_state="EV")
@@ -62,7 +74,7 @@ def test_line_combinations_logic(app, db):
     db.session.commit()
     
     # 6. Run line combinations engine
-    combos = GameService.get_line_combinations(800)
+    combos = LineService.get_line_combinations(800)
     
     assert combos is not None
     assert "home" in combos
