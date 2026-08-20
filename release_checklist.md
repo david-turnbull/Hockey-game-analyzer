@@ -8,7 +8,7 @@ This checklist documents the release criteria that must be verified before taggi
   - [x] At least one complete game's API data can be ingested and loaded cleanly (`python scripts/ingest_game.py 2023020007`).
 
 - [x] **Database Integrity Diagnostics**
-  - [x] Running the integrity checker results in a `PASS` or `PASS WITH WARNINGS` with zero fatal integrity issues:
+  - [x] Running the integrity checker results in a `PASS` or `PASS WITH WARNINGS` with zero fatal integrity issues (verified by `tests/test_diagnostics.py`):
     ```bash
     python scripts/database_diagnostics.py
     ```
@@ -18,11 +18,11 @@ This checklist documents the release criteria that must be verified before taggi
 
 - [x] **Functional & Analytical Correctness**
   - [x] **Historical Roster Attribution is Authoritative:** Querying historical games resolves a player's team accurately relative to that game date, independent of subsequent trades (verified by `tests/test_historical_attribution.py`).
-  - [x] **No Silent Historical Fallback to `current_team_id`:** Safe fallback hierarchy (shifts, events, unresolved) is used to determine player team in case GamePlayer is missing. No silent current team fallback is used.
+  - [x] **No Silent Historical Fallback to `current_team_id`:** Safe fallback hierarchy (shifts, events, unresolved) is used to determine player team in case GamePlayer is missing. No silent current team fallback is used (verified by `tests/test_historical_fallback.py`).
   - [x] **True 5v5 Possession:** CF, CA, FF, FA metrics in `"5v5"` mode contain only true 5v5 events (excluding 4v4, 3v3, power play, penalty kill, empty-net, shootouts) (verified by `tests/test_possession_strengths.py`).
   - [x] **Half-Open Shift Semantics are Consistent:** Shift change boundary detection uses half-open interval semantics `[start, end)` (verified by `tests/test_shift_boundaries.py`).
-  - [x] **Authoritative On-Ice Service:** All calculations (possession, line combinations, etc.) delegate shift matching to the centralized `OnIceService` rules.
-  - [x] **LineService Delegates On-Ice Logic Appropriately:** `LineService` uses `OnIceService.build_active_players_timeline` to fetch timelines.
+  - [x] **Authoritative On-Ice Service:** All calculations (possession, line combinations, etc.) delegate shift matching to the centralized `OnIceService` rules (verified by `tests/test_line_service_on_ice.py`).
+  - [x] **LineService Delegates On-Ice Logic Appropriately:** `LineService` uses `OnIceService.build_active_players_timeline` to fetch timelines (verified by `tests/test_line_service_on_ice.py`).
   - [x] **Player TOI/Average-Shift Calculations Use Valid Shifts:** Average shift duration divides valid TOI by the count of *valid* shifts, excluding anomalies (verified by `tests/test_avg_shift_calculation.py`).
 
 - [x] **User Interface Verification**

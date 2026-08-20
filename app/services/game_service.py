@@ -333,8 +333,8 @@ class GameService:
                     away_goalies_list.append(stats)
             else:
                 p_poss = possession.get(p_id, {})
-                stats["cf_pct"] = p_poss.get("cf_pct", 50.0)
-                stats["ff_pct"] = p_poss.get("ff_pct", 50.0)
+                stats["cf_pct"] = p_poss.get("cf_pct", None)
+                stats["ff_pct"] = p_poss.get("ff_pct", None)
                 if stats["team_id"] == game.home_team_id:
                     home_skaters_list.append(stats)
                 else:

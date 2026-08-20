@@ -31,9 +31,9 @@ Below is the high-level architecture and data flow diagram of the platform.
 ```mermaid
 flowchart TD
     A[NHL API] --> B[Raw JSON Cache]
-    B --> C[Transform + Validate]
+    B --> C[Transform and Validate]
     C --> D[SQLite / SQLAlchemy]
-    D --> E[Service Layer]
+    D --> E["Service Layer<br>(GameService, PlayerGameService, PossessionService,<br>OnIceService, LineService, XGService)"]
     E --> F[Flask Routes / API]
     F --> G[Analytics UI]
 ```
@@ -196,6 +196,6 @@ python scripts/database_diagnostics.py
 
 ## Roadmap
 
-- **v1.0 (Current Release):** Correct analytical logic, standardize shift change boundaries, modularize service layer, and introduce database diagnostics.
+- **v1.0 Release Candidate:** Correct analytical logic, standardize shift change boundaries, modularize service layer, and introduce database diagnostics.
 - **v1.x (Scaling Phase):** Build schedulers for full-season ingestion, run ingestion runtime profiling, and perform database indexing/performance tuning.
 - **v2.0 (ML Integration):** Gather full-season shot outcome datasets, train a logistic regression or XGBoost expected goals (xG) model, evaluate metrics (ROC-AUC, log loss, calibration curves), and introduce advanced on-ice analytics (e.g. teammate/opponent adjustments).

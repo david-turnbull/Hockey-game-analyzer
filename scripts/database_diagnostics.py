@@ -77,6 +77,11 @@ def run_diagnostics():
             (Shift.game_id == GamePlayer.game_id) & (Shift.player_id == GamePlayer.player_id)
         ).filter(Shift.team_id != GamePlayer.team_id).count()
 
+        # Duplicate GamePlayer records (should be 0 because (game_id, player_id) is composite PK)
+        duplicate_game_players = db.session.query(
+            GamePlayer.game_id, GamePlayer.player_id
+        ).group_by(GamePlayer.game_id, GamePlayer.player_id).having(db.func.count() > 1).count()
+
         unknown_period_types_evt = db.session.query(Event).filter((Event.period_type.is_(None)) | (~Event.period_type.in_(['REG', 'OT', 'SO']))).count()
         unknown_period_types_shift = db.session.query(Shift).filter((Shift.period_type.is_(None)) | (~Shift.period_type.in_(['REG', 'OT', 'SO']))).count()
         unknown_period_types = unknown_period_types_evt + unknown_period_types_shift
@@ -92,7 +97,8 @@ def run_diagnostics():
         
         integrity_issues_sum = (orphan_events_count + orphan_shots_count + orphan_shifts_count + 
                                 orphan_game_players + invalid_player_refs + negative_duration_shifts + 
-                                shots_without_shooters + shift_team_mismatches + missing_game_player_relations)
+                                shots_without_shooters + shift_team_mismatches + missing_game_player_relations +
+                                duplicate_game_players)
         warnings_sum = zero_duration_shifts + unknown_period_types + invalid_manpower_states + events_with_invalid_clocks
         
         if integrity_issues_sum > 0:
@@ -107,29 +113,28 @@ def run_diagnostics():
         print(f"Games: {games_count:>14,}")
         print(f"Teams: {teams_count:>14,}")
         print(f"Players: {players_count:>12,}")
+        print(f"GamePlayer records: {game_players_count:>5,}")
         print(f"Events: {events_count:>13,}")
-        print(f"Shots: {shots_count:>14,}")
+        print(f"Shot attempts: {shots_count:>7,}")
         print(f"Shifts: {shifts_count:>13,}")
-        print(f"Game Rosters: {game_players_count:>8,}")
         print()
         print("Integrity")
         print("---------")
         print(f"Orphan events: {orphan_events_count:>10}")
-        print(f"Orphan shots: {orphan_shots_count:>12}")
-        print(f"Orphan shifts: {orphan_shifts_count:>11}")
-        print(f"Orphan game rosters: {orphan_game_players:>6}")
-        print(f"Missing GamePlayer relations: {missing_game_player_relations:>1}")
-        print(f"Invalid player references: {invalid_player_refs:>2}")
+        print(f"Orphan shots: {orphan_shots_count:>13}")
+        print(f"Orphan shifts: {orphan_shifts_count:>12}")
+        print(f"Orphan GamePlayer records: {orphan_game_players:>4}")
+        print(f"Duplicate GamePlayer records: {duplicate_game_players:>1}")
+        print(f"Historical team mismatches: {shift_team_mismatches:>2}")
+        print(f"Zero-duration shifts: {zero_duration_shifts:>6}")
         print(f"Negative-duration shifts: {negative_duration_shifts:>3}")
-        print(f"Shots without shooters: {shots_without_shooters:>4}")
-        print(f"Shift/Roster team mismatches: {shift_team_mismatches:>1}")
+        print(f"Shots missing required shooters: {shots_without_shooters:>1}")
         print()
         print("Warnings")
         print("--------")
-        print(f"Zero-duration shifts: {zero_duration_shifts:>6}")
+        print(f"Invalid manpower states: {invalid_manpower_states:>2}")
         print(f"Unknown period types: {unknown_period_types:>6}")
-        print(f"Unknown situations: {invalid_manpower_states:>7}")
-        print(f"Events with invalid clocks: {events_with_invalid_clocks:>3}")
+        print(f"Other warnings: {events_with_invalid_clocks:>11}")
         print()
         print(f"Result: {result_status}")
 

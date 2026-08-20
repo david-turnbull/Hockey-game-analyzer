@@ -282,7 +282,7 @@ class PlayerGameService:
             
             # Get possession metrics from PossessionService (mode="5v5")
             possession = PossessionService.calculate_possession_stats(game_id, mode="5v5")
-            p_poss = possession.get(player_id, {"cf": 0, "ca": 0, "cf_pct": 50.0, "ff": 0, "fa": 0, "ff_pct": 50.0})
+            p_poss = possession.get(player_id, {"cf": 0, "ca": 0, "cf_pct": None, "ff": 0, "fa": 0, "ff_pct": None})
             
             # Calculate player Expected Goals (xG)
             player_xg_val = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
@@ -304,10 +304,10 @@ class PlayerGameService:
                 "faceoff_pct": faceoff_pct,
                 "cf": p_poss.get("cf", 0),
                 "ca": p_poss.get("ca", 0),
-                "cf_pct": p_poss.get("cf_pct", 50.0),
+                "cf_pct": p_poss.get("cf_pct", None),
                 "ff": p_poss.get("ff", 0),
                 "fa": p_poss.get("fa", 0),
-                "ff_pct": p_poss.get("ff_pct", 50.0),
+                "ff_pct": p_poss.get("ff_pct", None),
                 "xg": player_xg
             })
             
