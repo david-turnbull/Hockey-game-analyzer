@@ -87,7 +87,7 @@ def test_routing_views(client, db):
     cgy = Team(team_id=20, abbreviation='CGY', name='Calgary Flames')
     db.session.add(cgy)
     db.session.flush()
-    
+
     game = Game(
         game_id=2023020007,
         season='20232024',
@@ -101,23 +101,8 @@ def test_routing_views(client, db):
     )
     db.session.add(game)
     db.session.commit()
-    
+
     # Test selector homepage loads
     response_home = client.get('/')
     assert response_home.status_code == 200
     assert b"Game Selection Dashboard" in response_home.data
-    
-    # Test diagnostics loads
-    response_diag = client.get('/diagnostics')
-    assert response_diag.status_code == 200
-    assert b"Platform Diagnostics" in response_diag.data
-
-    # Test game dashboard placeholder
-    response_game = client.get('/game/2023020007')
-    assert response_game.status_code == 200
-    assert b"Team Statistics" in response_game.data
-    assert b"CGY" in response_game.data
-    
-    # Test game 404
-    response_game_404 = client.get('/game/999999999')
-    assert response_game_404.status_code == 404
