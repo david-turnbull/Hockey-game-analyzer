@@ -17,7 +17,9 @@
         </div>
         <nav class="nav-links">
             <a href="/" class="{% if request.path == '/' %}active{% endif %}">Game Selector</a>
-            <a href="/diagnostics" class="{% if request.path == '/diagnostics' %}active{% endif %}">Diagnostics</a>
+                {% if config.get("ENABLE_DIAGNOSTICS", False) %}
+                    <a href="/diagnostics" class="{% if request.path == '/diagnostics' %}active{% endif %}">Diagnostics</a>
+                {% endif %}
             <a href="#" style="opacity: 0.5; cursor: not-allowed;">Player Profiles</a>
             <a href="#" style="opacity: 0.5; cursor: not-allowed;">Prototype xG Model</a>
         </nav>
