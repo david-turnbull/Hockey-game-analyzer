@@ -20,7 +20,7 @@ def test_game_service_queries(app, db):
         away_team_id=wpg.team_id,
         home_score=3,
         away_score=5,
-        game_status='Final'
+        game_status='OFF'
     )
     db.session.add(game)
     db.session.commit()
@@ -38,6 +38,8 @@ def test_game_service_queries(app, db):
     cgy_games = GameService.get_games_list(cgy.team_id, '20232024')
     assert len(cgy_games) == 1
     cgy_game = cgy_games[0]
+    assert cgy_game["game_status"] == "OFF"
+    assert cgy_game["game_status_display"] == "Final"
     assert cgy_game["game_id"] == 2023020007
     assert cgy_game["opponent_abbrev"] == 'WPG'
     assert cgy_game["home_team_abbrev"] == 'CGY'
@@ -62,7 +64,7 @@ def test_api_games_endpoint(client, db):
         away_team_id=wpg.team_id,
         home_score=3,
         away_score=5,
-        game_status='Final'
+        game_status='OFF'
     )
     db.session.add(game)
     db.session.commit()

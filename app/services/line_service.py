@@ -1,5 +1,6 @@
 from sqlalchemy import or_
 from app.models import db, Game, Shift, Event, GamePlayer
+from app.services.on_ice_service import OnIceService
 
 class LineService:
     """Service for computing forward line combinations and defensive pairings, including TOI and on-ice stats."""
@@ -52,18 +53,61 @@ class LineService:
                 max_time = s.end_elapsed_seconds
 
         # 4. Populate second-by-second active players list using OnIceService
-        from app.services.on_ice_service import OnIceService
         home_players_timeline, away_players_timeline = OnIceService.build_active_players_timeline(
             shifts, max_time, home_team_id
         )
 
-        home_skaters_on_ice = []
-        for players in home_players_timeline:
-            home_skaters_on_ice.append({p for p in players if player_meta.get(p, {}).get("position") != 'G'})
+        def get_true_5v5_combinations(t):
+            """
+            Return the forward line and defensive pairing for both teams
+            only when both teams have a complete true-5v5 unit:
 
-        away_skaters_on_ice = []
-        for players in away_players_timeline:
-            away_skaters_on_ice.append({p for p in players if player_meta.get(p, {}).get("position") != 'G'})
+            3 forwards + 2 defensemen + 1 goalie.
+            """
+            if t < 0 or t >= max_time:
+                return None
+
+            h_players = home_players_timeline[t]
+            a_players = away_players_timeline[t]
+
+            h_skaters = {
+                p for p in h_players
+                if player_meta.get(p, {}).get("position") != "G"
+            }
+            a_skaters = {
+                p for p in a_players
+                if player_meta.get(p, {}).get("position") != "G"
+            }
+
+            h_goalies = [
+                p for p in h_players
+                if player_meta.get(p, {}).get("position") == "G"
+            ]
+            a_goalies = [
+                p for p in a_players
+                if player_meta.get(p, {}).get("position") == "G"
+            ]
+
+            h_fwds = tuple(sorted(p for p in h_skaters if is_forward(p)))
+            h_def = tuple(sorted(p for p in h_skaters if is_defenseman(p)))
+            a_fwds = tuple(sorted(p for p in a_skaters if is_forward(p)))
+            a_def = tuple(sorted(p for p in a_skaters if is_defenseman(p)))
+
+            valid_5v5 = (
+                len(h_skaters) == 5
+                and len(a_skaters) == 5
+                and len(h_fwds) == 3
+                and len(h_def) == 2
+                and len(a_fwds) == 3
+                and len(a_def) == 2
+                and len(h_goalies) == 1
+                and len(a_goalies) == 1
+            )
+
+            if not valid_5v5:
+                return None
+
+            return h_fwds, h_def, a_fwds, a_def
 
         # 5. Initialize aggregation dictionaries
         home_lines = {}  # tuple -> seconds
@@ -73,40 +117,18 @@ class LineService:
 
         # Accumulate TOI second-by-second
         for t in range(max_time):
-            h_skaters = home_skaters_on_ice[t]
-            a_skaters = away_skaters_on_ice[t]
+            combinations = get_true_5v5_combinations(t)
 
-            h_fwds = sorted(p for p in h_skaters if is_forward(p))
-            h_def = sorted(p for p in h_skaters if is_defenseman(p))
-
-            a_fwds = sorted(p for p in a_skaters if is_forward(p))
-            a_def = sorted(p for p in a_skaters if is_defenseman(p))
-
-            # Only count standard 5v5 structure:
-            # 3 forwards + 2 defence for BOTH teams.
-            valid_5v5 = (
-                len(h_skaters) == 5
-                and len(a_skaters) == 5
-                and len(h_fwds) == 3
-                and len(h_def) == 2
-                and len(a_fwds) == 3
-                and len(a_def) == 2
-            )
-
-            if not valid_5v5:
+            if combinations is None:
                 continue
 
-            home_line = tuple(h_fwds)
-            away_line = tuple(a_fwds)
+            h_fwds, h_def, a_fwds, a_def = combinations
 
-            home_pair = tuple(h_def)
-            away_pair = tuple(a_def)
+            home_lines[h_fwds] = home_lines.get(h_fwds, 0) + 1
+            away_lines[a_fwds] = away_lines.get(a_fwds, 0) + 1
 
-            home_lines[home_line] = home_lines.get(home_line, 0) + 1
-            away_lines[away_line] = away_lines.get(away_line, 0) + 1
-
-            home_pairings[home_pair] = home_pairings.get(home_pair, 0) + 1
-            away_pairings[away_pair] = away_pairings.get(away_pair, 0) + 1
+            home_pairings[h_def] = home_pairings.get(h_def, 0) + 1
+            away_pairings[a_def] = away_pairings.get(a_def, 0) + 1
 
         # 6. Fetch shot and goal events (excluding shootouts)
         shot_event_types = ['shot-on-goal', 'goal', 'missed-shot', 'blocked-shot']
@@ -127,7 +149,7 @@ class LineService:
 
         for event in events:
             t = event.elapsed_game_seconds
-            if t is None or t < 0 or t > max_time:
+            if t is None or t < 0 or t >= max_time:
                 continue
 
             shot_team_id = event.team_id
@@ -135,13 +157,12 @@ class LineService:
             is_sog = event.event_type in ['shot-on-goal', 'goal']
 
             # Active combinations on ice at second t
-            h_skaters = home_skaters_on_ice[t]
-            h_fwds = tuple(sorted([p for p in h_skaters if is_forward(p)]))
-            h_def = tuple(sorted([p for p in h_skaters if is_defenseman(p)]))
+            combinations = get_true_5v5_combinations(t)
 
-            a_skaters = away_skaters_on_ice[t]
-            a_fwds = tuple(sorted([p for p in a_skaters if is_forward(p)]))
-            a_def = tuple(sorted([p for p in a_skaters if is_defenseman(p)]))
+            if combinations is None:
+                continue
+
+            h_fwds, h_def, a_fwds, a_def = combinations
 
             def add_event_stats(stats_dict, key, is_for):
                 if len(key) not in [2, 3]:
