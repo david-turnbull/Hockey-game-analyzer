@@ -7,7 +7,7 @@
 ---
 
 ### What it is
-An NHL post-game analysis platform.
+Built as an independent hockey-operations portfolio project, Hockey Game Analyzer transforms raw NHL play-by-play and shift data into reproducible game, player and lineup analysis. The platform includes an ETL pipeline, relational hockey data model, on-ice reconstruction, true 5v5 possession metrics, line/pairing analysis, interactive spatial visualization, automated regression testing and CI.
 
 ### Who it is for
 Hockey fans and analysts interested in understanding more than the traditional box score.

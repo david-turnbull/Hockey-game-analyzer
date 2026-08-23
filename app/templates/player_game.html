@@ -94,10 +94,22 @@
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">FO Win %</div>
             <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;" class="font-mono">{{ stats.faceoff_pct }}%</div>
         </div>
-        <div class="card" style="text-align: center; padding: 1.25rem;">
-            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Shifts</div>
-            <div style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">
-                {{ stats.shifts_count }}{% if stats.raw_shifts_count != stats.shifts_count %} <span style="font-size: 0.95rem; color: var(--text-muted); font-weight: 400;">(of {{ stats.raw_shifts_count }})</span>{% endif %}
+        <div class="card"
+            style="text-align: center; padding: 1.25rem;"
+            {% if stats.raw_shifts_count != stats.shifts_count %}
+            title="{{ stats.raw_shifts_count }} shift records were received from the NHL source; {{ stats.raw_shifts_count - stats.shifts_count }} anomalous record{% if stats.raw_shifts_count - stats.shifts_count != 1 %}s{% endif %} {% if stats.raw_shifts_count - stats.shifts_count == 1 %}was{% else %}were{% endif %} excluded from calculated statistics."
+            {% endif %}>
+
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                Shifts
+                {% if stats.raw_shifts_count != stats.shifts_count %}
+                <span style="cursor: help; margin-left: 0.25rem;">ⓘ</span>
+                {% endif %}
+            </div>
+
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;"
+                class="font-mono">
+                {{ stats.shifts_count }}
             </div>
         </div>
         <div class="card" style="text-align: center; padding: 1.25rem;">

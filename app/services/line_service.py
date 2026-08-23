@@ -29,8 +29,16 @@ class LineService:
             }
 
         # Helper to classify positions
-        is_forward = lambda p_id: player_meta.get(p_id, {}).get("position") in ['C', 'LW', 'RW', 'F']
-        is_defenseman = lambda p_id: player_meta.get(p_id, {}).get("position") in ['D', 'LD', 'RD']
+        FORWARD_POSITIONS = {'C', 'L', 'R', 'LW', 'RW', 'F'}
+        DEFENSE_POSITIONS = {'D', 'LD', 'RD'}
+
+        def is_forward(player_id):
+            position = player_meta.get(player_id, {}).get("position")
+            return position in FORWARD_POSITIONS
+
+        def is_defenseman(player_id):
+            position = player_meta.get(player_id, {}).get("position")
+            return position in DEFENSE_POSITIONS
 
         # 3. Fetch shifts
         shifts = Shift.query.filter(
@@ -64,30 +72,41 @@ class LineService:
         away_pairings = {}
 
         # Accumulate TOI second-by-second
-        for t in range(0, max_time):
-            # Home
+        for t in range(max_time):
             h_skaters = home_skaters_on_ice[t]
-            h_fwds = sorted([p for p in h_skaters if is_forward(p)])
-            h_def = sorted([p for p in h_skaters if is_defenseman(p)])
-
-            if len(h_fwds) == 3:
-                line_tup = tuple(h_fwds)
-                home_lines[line_tup] = home_lines.get(line_tup, 0) + 1
-            if len(h_def) == 2:
-                pair_tup = tuple(h_def)
-                home_pairings[pair_tup] = home_pairings.get(pair_tup, 0) + 1
-
-            # Away
             a_skaters = away_skaters_on_ice[t]
-            a_fwds = sorted([p for p in a_skaters if is_forward(p)])
-            a_def = sorted([p for p in a_skaters if is_defenseman(p)])
 
-            if len(a_fwds) == 3:
-                line_tup = tuple(a_fwds)
-                away_lines[line_tup] = away_lines.get(line_tup, 0) + 1
-            if len(a_def) == 2:
-                pair_tup = tuple(a_def)
-                away_pairings[pair_tup] = away_pairings.get(pair_tup, 0) + 1
+            h_fwds = sorted(p for p in h_skaters if is_forward(p))
+            h_def = sorted(p for p in h_skaters if is_defenseman(p))
+
+            a_fwds = sorted(p for p in a_skaters if is_forward(p))
+            a_def = sorted(p for p in a_skaters if is_defenseman(p))
+
+            # Only count standard 5v5 structure:
+            # 3 forwards + 2 defence for BOTH teams.
+            valid_5v5 = (
+                len(h_skaters) == 5
+                and len(a_skaters) == 5
+                and len(h_fwds) == 3
+                and len(h_def) == 2
+                and len(a_fwds) == 3
+                and len(a_def) == 2
+            )
+
+            if not valid_5v5:
+                continue
+
+            home_line = tuple(h_fwds)
+            away_line = tuple(a_fwds)
+
+            home_pair = tuple(h_def)
+            away_pair = tuple(a_def)
+
+            home_lines[home_line] = home_lines.get(home_line, 0) + 1
+            away_lines[away_line] = away_lines.get(away_line, 0) + 1
+
+            home_pairings[home_pair] = home_pairings.get(home_pair, 0) + 1
+            away_pairings[away_pair] = away_pairings.get(away_pair, 0) + 1
 
         # 6. Fetch shot and goal events (excluding shootouts)
         shot_event_types = ['shot-on-goal', 'goal', 'missed-shot', 'blocked-shot']
@@ -148,17 +167,27 @@ class LineService:
             add_event_stats(away_line_stats, a_fwds, is_away_shot)
             add_event_stats(away_pair_stats, a_def, is_away_shot)
 
-        def compile_results(toi_dict, stats_dict, expected_len):
+        def compile_results(toi_dict, stats_dict, expected_len, min_toi_seconds=0):
             list_out = []
+
             for players_tup, seconds in toi_dict.items():
                 if len(players_tup) != expected_len:
                     continue
-                names = [player_meta.get(p_id, {}).get("name", "Unknown") for p_id in players_tup]
+
+                if seconds < min_toi_seconds:
+                    continue
+
+                names = [
+                    player_meta.get(p_id, {}).get("name", "Unknown")
+                    for p_id in players_tup
+                ]
+
                 mins = seconds // 60
                 secs = seconds % 60
                 toi_str = f"{mins:02d}:{secs:02d}"
 
                 s = stats_dict.get(players_tup, init_stats())
+
                 list_out.append({
                     "player_ids": list(players_tup),
                     "players": ", ".join(names),
@@ -167,23 +196,48 @@ class LineService:
                     "goals_for": s["goals_for"],
                     "goals_against": s["goals_against"],
                     "sog_for": s["sog_for"],
-                    "sog_against": s["sog_against"]
+                    "sog_against": s["sog_against"],
                 })
+
             list_out.sort(key=lambda x: -x["toi_seconds"])
+
             return list_out
 
-        home_fwds_list = compile_results(home_lines, home_line_stats, 3)
-        home_def_list = compile_results(home_pairings, home_pair_stats, 2)
-        away_fwds_list = compile_results(away_lines, away_line_stats, 3)
-        away_def_list = compile_results(away_pairings, away_pair_stats, 2)
+        MIN_FORWARD_LINE_TOI = 60
+
+        home_fwds_list = compile_results(
+            home_lines,
+            home_line_stats,
+            3,
+            min_toi_seconds=MIN_FORWARD_LINE_TOI
+        )
+
+        away_fwds_list = compile_results(
+            away_lines,
+            away_line_stats,
+            3,
+            min_toi_seconds=MIN_FORWARD_LINE_TOI
+        )
+
+        home_def_list = compile_results(
+            home_pairings,
+            home_pair_stats,
+            2
+        )
+
+        away_def_list = compile_results(
+            away_pairings,
+            away_pair_stats,
+            2
+        )
 
         return {
             "home": {
-                "lines": home_fwds_list[:4],
-                "pairings": home_def_list[:3]
+                "lines": home_fwds_list,
+                "pairings": home_def_list[:5]
             },
             "away": {
-                "lines": away_fwds_list[:4],
-                "pairings": away_def_list[:3]
+                "lines": away_fwds_list,
+                "pairings": away_def_list[:5]
             }
         }
