@@ -12,26 +12,49 @@
 
 <!-- Scoreboard Header -->
 <div class="scoreboard">
-    <div class="score-team">
-        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Away</span>
-        <span class="score-team-name" title="{{ stats.away_team_name }}">{{ stats.away_team_abbrev }}</span>
-        <span class="score-number">{{ stats.away_score }}</span>
+
+    <!-- Away Team -->
+    <div class="score-team score-team-away">
+        <span class="score-side-label">Away</span>
+        <span
+            class="score-team-name"
+            title="{{ stats.away_team_name }}"
+        >
+            {{ stats.away_team_abbrev }}
+        </span>
+        <span class="score-number">
+            {{ stats.away_score }}
+        </span>
     </div>
-    
-    <div style="text-align: center;">
-        <div class="status-indicator status-connected" style="font-size: 0.8rem; padding: 0.25rem 0.75rem;">
-            {{ stats.game_status }}
+
+    <!-- Game Status -->
+    <div class="scoreboard-center">
+        <div
+            id="game-status"
+            class="status-indicator {{ stats.game_status_class }}"
+        >
+            {{ stats.game_status_display }}
         </div>
-        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;" class="font-mono">
+
+        <div class="scoreboard-date font-mono">
             {{ stats.game_date.strftime("%B %d, %Y") }}
         </div>
     </div>
-    
-    <div class="score-team" style="flex-direction: row-reverse;">
-        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Home</span>
-        <span class="score-team-name" title="{{ stats.home_team_name }}">{{ stats.home_team_abbrev }}</span>
-        <span class="score-number">{{ stats.home_score }}</span>
+
+    <!-- Home Team -->
+    <div class="score-team score-team-home">
+        <span class="score-number">
+            {{ stats.home_score }}
+        </span>
+        <span
+            class="score-team-name"
+            title="{{ stats.home_team_name }}"
+        >
+            {{ stats.home_team_abbrev }}
+        </span>
+        <span class="score-side-label">Home</span>
     </div>
+
 </div>
 
 <!-- Tabs Navigation -->
@@ -91,7 +114,7 @@
             <!-- Expected Goals (xG) Stat -->
             <div class="stat-label-row">
                 <span class="stat-value font-mono">{{ stats.stats.away_xg }}</span>
-                <span style="color: var(--text-secondary);" title="Expected Goals (excluding shootouts)">Expected Goals (xG)</span>
+                <span style="color: var(--text-secondary);" title="Prototype Expected Goals (excluding shootouts)">Prototype Expected Goals (xG)</span>
                 <span class="stat-value font-mono">{{ stats.stats.home_xg }}</span>
             </div>
             <div class="stat-bar-container">
@@ -247,8 +270,8 @@
                                 <th style="padding: 0.5rem; text-align: center;">PIM</th>
                                 <th style="padding: 0.5rem; text-align: center;">TOI</th>
                                 <th style="padding: 0.5rem; text-align: center;">Shifts</th>
-                                <th style="padding: 0.5rem; text-align: center;" title="Corsi For % (Even Strength)">CF%</th>
-                                <th style="padding: 0.5rem; text-align: center;" title="Fenwick For % (Even Strength)">FF%</th>
+                                <th style="padding: 0.5rem; text-align: center;" title="5v5 Corsi For %">CF%</th>
+                                <th style="padding: 0.5rem; text-align: center;" title="5v5 Fenwick For %">FF%</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -266,8 +289,8 @@
                                 <td style="padding: 0.5rem; text-align: center;">{{ skater.pim }}</td>
                                 <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.toi }}</td>
                                 <td style="padding: 0.5rem; text-align: center;">{{ skater.shifts_count }}</td>
-                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.cf_pct }}%</td>
-                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.ff_pct }}%</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{% if skater.cf_pct is not none %}{{ skater.cf_pct }}%{% else %}N/A{% endif %}</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{% if skater.ff_pct is not none %}{{ skater.ff_pct }}%{% else %}N/A{% endif %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -324,8 +347,8 @@
                                 <th style="padding: 0.5rem; text-align: center;">PIM</th>
                                 <th style="padding: 0.5rem; text-align: center;">TOI</th>
                                 <th style="padding: 0.5rem; text-align: center;">Shifts</th>
-                                <th style="padding: 0.5rem; text-align: center;" title="Corsi For % (Even Strength)">CF%</th>
-                                <th style="padding: 0.5rem; text-align: center;" title="Fenwick For % (Even Strength)">FF%</th>
+                                <th style="padding: 0.5rem; text-align: center;" title="5v5 Corsi For %">CF%</th>
+                                <th style="padding: 0.5rem; text-align: center;" title="5v5 Fenwick For %">FF%</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -343,8 +366,8 @@
                                 <td style="padding: 0.5rem; text-align: center;">{{ skater.pim }}</td>
                                 <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.toi }}</td>
                                 <td style="padding: 0.5rem; text-align: center;">{{ skater.shifts_count }}</td>
-                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.cf_pct }}%</td>
-                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ skater.ff_pct }}%</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{% if skater.cf_pct is not none %}{{ skater.cf_pct }}%{% else %}N/A{% endif %}</td>
+                                <td style="padding: 0.5rem; text-align: center;" class="font-mono">{% if skater.ff_pct is not none %}{{ skater.ff_pct }}%{% else %}N/A{% endif %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -467,23 +490,23 @@
         <div class="card">
             <h2 class="card-title">{{ stats.away_team_name }} ({{ stats.away_team_abbrev }}) Lineups</h2>
             
-            <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 1.5rem 0 0.5rem 0;">Forward Lines</h3>
+            <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 1.5rem 0 0.5rem 0;">5v5 Forward Combinations</h3>
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
                     <thead>
                         <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
                             <th style="padding: 0.5rem;">Forwards</th>
                             <th style="padding: 0.5rem; text-align: center;">TOI</th>
-                            <th style="padding: 0.5rem; text-align: center;">GF</th>
-                            <th style="padding: 0.5rem; text-align: center;">GA</th>
-                            <th style="padding: 0.5rem; text-align: center;">SF</th>
-                            <th style="padding: 0.5rem; text-align: center;">SA</th>
+                            <th style="padding: 0.5rem; text-align: center;">5v5 GF</th>
+                            <th style="padding: 0.5rem; text-align: center;">5v5 GA</th>
+                            <th style="padding: 0.5rem; text-align: center;">5v5 SF</th>
+                            <th style="padding: 0.5rem; text-align: center;">5v5 SA</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% if not stats.line_combinations.away.lines %}
                         <tr>
-                            <td colspan="6" style="padding: 1rem; text-align: center; color: var(--text-muted);">No forward lines recorded.</td>
+                            <td colspan="6" style="padding: 1rem; text-align: center; color: var(--text-muted);">No forward combinations recorded.</td>
                         </tr>
                         {% else %}
                         {% for line in stats.line_combinations.away.lines %}
@@ -508,10 +531,10 @@
                         <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
                             <th style="padding: 0.5rem;">Defensemen</th>
                             <th style="padding: 0.5rem; text-align: center;">TOI</th>
-                            <th style="padding: 0.5rem; text-align: center;">GF</th>
-                            <th style="padding: 0.5rem; text-align: center;">GA</th>
-                            <th style="padding: 0.5rem; text-align: center;">SF</th>
-                            <th style="padding: 0.5rem; text-align: center;">SA</th>
+                            <th style="padding: 0.5rem; text-align: center;">5v5 GF</th>
+                            <th style="padding: 0.5rem; text-align: center;">5v5 GA</th>
+                            <th style="padding: 0.5rem; text-align: center;">5v5 SF</th>
+                            <th style="padding: 0.5rem; text-align: center;">5v5 SA</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -540,7 +563,7 @@
         <div class="card">
             <h2 class="card-title">{{ stats.home_team_name }} ({{ stats.home_team_abbrev }}) Lineups</h2>
             
-            <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 1.5rem 0 0.5rem 0;">Forward Lines</h3>
+            <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 1.5rem 0 0.5rem 0;">5v5 Forward Combinations</h3>
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
                     <thead>
@@ -556,7 +579,7 @@
                     <tbody>
                         {% if not stats.line_combinations.home.lines %}
                         <tr>
-                            <td colspan="6" style="padding: 1rem; text-align: center; color: var(--text-muted);">No forward lines recorded.</td>
+                            <td colspan="6" style="padding: 1rem; text-align: center; color: var(--text-muted);">No forward combinations recorded.</td>
                         </tr>
                         {% else %}
                         {% for line in stats.line_combinations.home.lines %}

@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, abort
 from app.services.game_service import GameService
+from app.services.player_game_service import PlayerGameService
 
 games_bp = Blueprint('games', __name__, url_prefix='/game')
 
@@ -14,7 +15,7 @@ def game_dashboard(game_id):
 @games_bp.route('/<int:game_id>/player/<int:player_id>')
 def player_game_dashboard(game_id, player_id):
     """View for the detailed player individual game dashboard."""
-    player_stats = GameService.get_player_game_stats(game_id, player_id)
+    player_stats = PlayerGameService.get_player_game_stats(game_id, player_id)
     if not player_stats:
         abort(404)
     return render_template('player_game.html', stats=player_stats)

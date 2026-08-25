@@ -1,7 +1,7 @@
 import pytest
 from datetime import date
 from app.models import Game, Team, Player, Shift, Event, Shot
-from app.services.game_service import GameService
+from app.services.possession_service import PossessionService
 
 def test_possession_metrics_logic(app, db):
     """
@@ -78,7 +78,7 @@ def test_possession_metrics_logic(app, db):
     db.session.commit()
     
     # 2. Run calculations
-    pos = GameService.calculate_possession_stats(500)
+    pos = PossessionService.calculate_possession_stats(500, mode="EV")
     
     # Assertions
     # h1 (Home Skater 1):

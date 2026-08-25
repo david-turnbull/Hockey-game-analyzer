@@ -6,6 +6,34 @@ class XGService:
         """
         Calculates the expected goals (xG) probability for a shot attempt.
         Returns a float between 0.0 and 1.0 (rounded to 4 decimal places).
+
+        This is a prototype heuristic xG model using hand-selected coefficients,
+        rather than a statistically trained ML model.
+
+        Formula:
+            log_odds = beta_0 + (beta_dist * distance) + (beta_angle * abs(angle))
+                       + shot_type_adjustment + strength_state_adjustment
+
+            probability = 1 / (1 + exp(-log_odds))
+
+        Coefficients:
+            beta_0 (Baseline log-odds): -1.9 (representing ~13% average conversion)
+            beta_dist (Distance decay): -0.035 per foot
+            beta_angle (Angle decay): -0.015 per degree (from net center)
+
+        Adjustments:
+            Shot Types:
+                - Tip-In, Deflection, Tip: +0.4 log-odds (higher danger)
+                - Backhand: +0.1 log-odds
+                - Slap Shot: -0.2 log-odds (lower danger from distance)
+            Strength States:
+                - Power Play (e.g. PP, 5v4, 5v3): +0.15 log-odds
+                - Shorthanded (e.g. SH, 4v5, 3v5): -0.15 log-odds
+
+        Empty Net Override:
+            If empty_net is True:
+                probability = max(0.1, 1.0 - (distance * 0.005))
+                (Linear decay from 99% near net to 10% from own side)
         """
         # Baseline constant (approximate log-odds of a typical shot scoring)
         # Average NHL shooting percentage is about 9-10% (log-odds = -2.2)

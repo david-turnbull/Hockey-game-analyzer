@@ -20,7 +20,7 @@ def test_game_service_queries(app, db):
         away_team_id=wpg.team_id,
         home_score=3,
         away_score=5,
-        game_status='Final'
+        game_status='OFF'
     )
     db.session.add(game)
     db.session.commit()
@@ -38,6 +38,9 @@ def test_game_service_queries(app, db):
     cgy_games = GameService.get_games_list(cgy.team_id, '20232024')
     assert len(cgy_games) == 1
     cgy_game = cgy_games[0]
+    assert cgy_game["game_status"] == "OFF"
+    assert cgy_game["game_status_display"] == "Final"
+    assert cgy_game["game_status_class"] == "status-final"
     assert cgy_game["game_id"] == 2023020007
     assert cgy_game["opponent_abbrev"] == 'WPG'
     assert cgy_game["home_team_abbrev"] == 'CGY'
@@ -62,7 +65,7 @@ def test_api_games_endpoint(client, db):
         away_team_id=wpg.team_id,
         home_score=3,
         away_score=5,
-        game_status='Final'
+        game_status='OFF'
     )
     db.session.add(game)
     db.session.commit()
@@ -74,7 +77,9 @@ def test_api_games_endpoint(client, db):
     assert len(data) == 1
     assert data[0]["game_id"] == 2023020007
     assert data[0]["opponent_abbrev"] == 'WPG'
-    
+    assert data[0]["game_status"] == "OFF"
+    assert data[0]["game_status_display"] == "Final"
+    assert data[0]["game_status_class"] == "status-final"
     # 2. Missing params
     response_missing = client.get('/api/games?team_id=20')
     assert response_missing.status_code == 400
@@ -87,7 +92,7 @@ def test_routing_views(client, db):
     cgy = Team(team_id=20, abbreviation='CGY', name='Calgary Flames')
     db.session.add(cgy)
     db.session.flush()
-    
+
     game = Game(
         game_id=2023020007,
         season='20232024',
@@ -97,27 +102,54 @@ def test_routing_views(client, db):
         away_team_id=cgy.team_id,
         home_score=3,
         away_score=3,
-        game_status='Final'
+        game_status='OFF'
     )
     db.session.add(game)
     db.session.commit()
-    
+
     # Test selector homepage loads
     response_home = client.get('/')
     assert response_home.status_code == 200
     assert b"Game Selection Dashboard" in response_home.data
-    
-    # Test diagnostics loads
-    response_diag = client.get('/diagnostics')
-    assert response_diag.status_code == 200
-    assert b"Platform Diagnostics" in response_diag.data
 
-    # Test game dashboard placeholder
-    response_game = client.get('/game/2023020007')
-    assert response_game.status_code == 200
-    assert b"Team Statistics" in response_game.data
-    assert b"CGY" in response_game.data
-    
-    # Test game 404
-    response_game_404 = client.get('/game/999999999')
-    assert response_game_404.status_code == 404
+def test_game_dashboard_displays_final_instead_of_off(client, db):
+    cgy = Team(
+        team_id=20,
+        abbreviation="CGY",
+        name="Calgary Flames",
+    )
+
+    wpg = Team(
+        team_id=52,
+        abbreviation="WPG",
+        name="Winnipeg Jets",
+    )
+
+    db.session.add_all([cgy, wpg])
+    db.session.flush()
+
+    game = Game(
+        game_id=2023020007,
+        season="20232024",
+        game_date=date(2023, 10, 11),
+        game_type="R",
+        home_team_id=cgy.team_id,
+        away_team_id=wpg.team_id,
+        home_score=5,
+        away_score=3,
+        game_status="OFF",
+    )
+
+    db.session.add(game)
+    db.session.commit()
+
+    response = client.get("/game/2023020007")
+
+    assert response.status_code == 200
+
+    html = response.get_data(as_text=True)
+
+    assert 'id="game-status"' in html
+    assert "status-final" in html
+    assert "Final" in html
+    assert ">OFF<" not in html

@@ -93,9 +93,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 // Status
                 const tdStatus = document.createElement("td");
-                const statusClass = game.game_status.toLowerCase() === 'final' || game.game_status.toLowerCase() === 'off' 
-                                    ? 'status-connected' : 'status-failed';
-                tdStatus.innerHTML = `<span class="status-indicator ${statusClass}">${game.game_status}</span>`;
+
+                const statusClass =
+                    game.game_status_class || "status-unknown";
+
+                const statusLabel =
+                    game.game_status_display || "Unknown";
+
+                tdStatus.innerHTML =
+                    `<span class="status-indicator ${statusClass}">${statusLabel}</span>`;
                 tr.appendChild(tdStatus);
 
                 // Action

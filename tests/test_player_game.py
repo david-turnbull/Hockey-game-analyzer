@@ -1,7 +1,8 @@
 import pytest
 from datetime import date
-from app.models import Game, Team, Player, Shift, Event, Shot
+from app.models import Game, Team, Player, Shift, Event, Shot, GamePlayer
 from app.services.game_service import GameService
+from app.services.player_game_service import PlayerGameService
 
 def test_player_game_stats_and_routes(app, db, client):
     """
@@ -42,6 +43,14 @@ def test_player_game_stats_and_routes(app, db, client):
     db.session.add_all([s1, s2, sg])
     db.session.commit()
     
+    # Seed GamePlayer roster records
+    gps = [
+        GamePlayer(game_id=100, player_id=10, team_id=1, position="C"),
+        GamePlayer(game_id=100, player_id=20, team_id=1, position="G"),
+    ]
+    db.session.add_all(gps)
+    db.session.commit()
+    
     # Create shot (skater takes it, goalie faces it)
     e1 = Event(event_id="e1", game_id=100, period=1, period_time="05:00", elapsed_game_seconds=300, event_type="shot-on-goal", team_id=1, primary_player_id=10)
     db.session.add(e1)
@@ -51,8 +60,8 @@ def test_player_game_stats_and_routes(app, db, client):
     db.session.add(shot)
     db.session.commit()
     
-    # 2. Test GameService skater calculations
-    skater_stats = GameService.get_player_game_stats(100, 10)
+    # 2. Test PlayerGameService skater calculations
+    skater_stats = PlayerGameService.get_player_game_stats(100, 10)
     assert skater_stats is not None
     assert skater_stats["name"] == "John Skater"
     assert skater_stats["position"] == "C"
@@ -63,8 +72,8 @@ def test_player_game_stats_and_routes(app, db, client):
     assert skater_stats["goals"] == 0
     assert len(skater_stats["shifts_chart"]) == 2
     
-    # 3. Test GameService goalie calculations
-    goalie_stats = GameService.get_player_game_stats(100, 20)
+    # 3. Test PlayerGameService goalie calculations
+    goalie_stats = PlayerGameService.get_player_game_stats(100, 20)
     assert goalie_stats is not None
     assert goalie_stats["name"] == "Marc Goalie"
     assert goalie_stats["position"] == "G"

@@ -58,9 +58,54 @@ class PipelineOrchestrator:
             teams_list = [home_team_model, away_team_model]
             
             # Players
+            from app.models import Player
             players_list = []
             for spot in pbp_raw.get("rosterSpots", []):
                 players_list.append(self.normalizer.transform_player(spot))
+
+            # Supplying evidence from shifts if missing
+            existing_player_ids = {p.player_id for p in players_list}
+            for shift_raw in shifts_raw.get("data", []):
+                pid = shift_raw.get("playerId")
+                if pid and pid not in existing_player_ids:
+                    p = Player(
+                        player_id=pid,
+                        first_name=shift_raw.get("firstName", "Unknown"),
+                        last_name=shift_raw.get("lastName", f"Player {pid}"),
+                        position=shift_raw.get("positionCode"),
+                        current_team_id=shift_raw.get("teamId")
+                    )
+                    players_list.append(p)
+                    existing_player_ids.add(pid)
+
+            # Build GamePlayer records
+            game_players_list = []
+            roster_map = {}
+            
+            # First, from rosterSpots
+            for spot in pbp_raw.get("rosterSpots", []):
+                pid = spot["playerId"]
+                tid = spot.get("teamId")
+                pos = spot.get("positionCode")
+                if pid and tid:
+                    roster_map[pid] = tid
+                    game_players_list.append(self.normalizer.transform_game_player(game_id, pid, tid, pos))
+
+            # Next, from shifts (to check for missing roster spots)
+            for shift_raw in shifts_raw.get("data", []):
+                pid = shift_raw.get("playerId")
+                tid = shift_raw.get("teamId")
+                pos = shift_raw.get("positionCode")
+                if pid and tid and pid not in roster_map:
+                    roster_map[pid] = tid
+                    game_players_list.append(self.normalizer.transform_game_player(game_id, pid, tid, pos))
+
+            # Finally, fallback for any player in players_list not yet mapped
+            for p in players_list:
+                if p.player_id not in roster_map:
+                    tid = p.current_team_id or home_team_raw["id"]
+                    roster_map[p.player_id] = tid
+                    game_players_list.append(self.normalizer.transform_game_player(game_id, p.player_id, tid, p.position))
             
             # Events & Shots
             events_list = []
@@ -117,7 +162,7 @@ class PipelineOrchestrator:
             return False, summary
             
         success = self.loader.load_game_data(
-            game_model, teams_list, players_list, valid_events, valid_shots, valid_shifts
+            game_model, teams_list, players_list, valid_events, valid_shots, valid_shifts, game_players_list
         )
         
         return success, summary

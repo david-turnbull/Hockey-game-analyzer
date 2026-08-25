@@ -1,6 +1,6 @@
 import logging
 from sqlalchemy import delete
-from app.models import db, Team, Player, Game, Event, Shot, Shift
+from app.models import db, Team, Player, Game, Event, Shot, Shift, GamePlayer
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +10,7 @@ class DatabaseLoader:
     def __init__(self, session=None):
         self.session = session or db.session
 
-    def load_game_data(self, game: Game, teams: list, players: list, events: list, shots: list, shifts: list) -> bool:
+    def load_game_data(self, game: Game, teams: list, players: list, events: list, shots: list, shifts: list, game_players: list = None) -> bool:
         """
         Loads all structured models for a game into the database.
         Clears existing events, shots, and shifts for the game_id to maintain idempotency.
@@ -53,6 +53,9 @@ class DatabaseLoader:
             # Delete old shifts
             self.session.execute(delete(Shift).where(Shift.game_id == game_id))
             
+            # Delete old game_players
+            self.session.execute(delete(GamePlayer).where(GamePlayer.game_id == game_id))
+            
             # Delete old shots (linked to events of this game)
             # SQLite supports delete with where in subquery
             self.session.execute(
@@ -90,6 +93,11 @@ class DatabaseLoader:
 
             for shift in shifts:
                 self.session.add(shift)
+            self.session.flush()
+
+            if game_players:
+                for gp in game_players:
+                    self.session.add(gp)
 
             # 5. Commit all changes
             self.session.commit()
@@ -104,6 +112,7 @@ class DatabaseLoader:
         """Clears all records associated with a game ID."""
         try:
             self.session.execute(delete(Shift).where(Shift.game_id == game_id))
+            self.session.execute(delete(GamePlayer).where(GamePlayer.game_id == game_id))
             self.session.execute(
                 delete(Shot).where(Shot.shot_id.in_(
                     self.session.query(Event.event_id).filter(Event.game_id == game_id)

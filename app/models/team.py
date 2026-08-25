@@ -10,6 +10,7 @@ class Team(db.Model):
 
     # Relationships
     players = db.relationship('Player', back_populates='current_team', lazy='select')
+    game_rosters = db.relationship('GamePlayer', back_populates='team', lazy='dynamic')
     
     # We specify foreign_keys explicitly in Game relationships to distinguish home/away
     home_games = db.relationship('Game', foreign_keys='Game.home_team_id', back_populates='home_team', lazy='dynamic')

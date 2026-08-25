@@ -94,12 +94,30 @@
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">FO Win %</div>
             <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;" class="font-mono">{{ stats.faceoff_pct }}%</div>
         </div>
+        <div class="card"
+            style="text-align: center; padding: 1.25rem;"
+            {% if stats.raw_shifts_count != stats.shifts_count %}
+            title="{{ stats.raw_shifts_count }} shift records were received from the NHL source; {{ stats.raw_shifts_count - stats.shifts_count }} anomalous record{% if stats.raw_shifts_count - stats.shifts_count != 1 %}s{% endif %} {% if stats.raw_shifts_count - stats.shifts_count == 1 %}was{% else %}were{% endif %} excluded from calculated statistics."
+            {% endif %}>
+
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                Shifts
+                {% if stats.raw_shifts_count != stats.shifts_count %}
+                <span style="cursor: help; margin-left: 0.25rem;">ⓘ</span>
+                {% endif %}
+            </div>
+
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;"
+                class="font-mono">
+                {{ stats.shifts_count }}
+            </div>
+        </div>
         <div class="card" style="text-align: center; padding: 1.25rem;">
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">TOI</div>
             <div style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">{{ stats.toi }}</div>
         </div>
         <div class="card" style="text-align: center; padding: 1.25rem;">
-            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Expected Goals (xG)</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Prototype Expected Goals (xG)</div>
             <div style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">{{ stats.xg }}</div>
         </div>
     </div>
@@ -115,15 +133,23 @@
         <div class="card" style="padding: 1.5rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="font-size: 1rem; font-weight: 700; margin: 0; color: var(--text-primary);">Corsi (Shot Attempts)</h3>
+                {% if stats.cf_pct is not none %}
                 <span style="font-size: 1.5rem; font-weight: 800; color: var(--accent-color);" class="font-mono">{{ stats.cf_pct }}% CF</span>
+                {% else %}
+                <span style="font-size: 1.5rem; font-weight: 800; color: var(--text-muted);" class="font-mono">N/A</span>
+                {% endif %}
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
                 <span>Corsi For: <strong>{{ stats.cf }}</strong></span>
                 <span>Corsi Against: <strong>{{ stats.ca }}</strong></span>
             </div>
             <div style="width: 100%; height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden; display: flex;">
+                {% if stats.cf_pct is not none %}
                 <div style="width: {{ stats.cf_pct }}%; height: 100%; background: var(--accent-color);"></div>
                 <div style="width: {{ 100.0 - stats.cf_pct }}%; height: 100%; background: rgba(239, 68, 68, 0.4);"></div>
+                {% else %}
+                <div style="width: 100%; height: 100%; background: var(--border-color);"></div>
+                {% endif %}
             </div>
         </div>
 
@@ -131,15 +157,23 @@
         <div class="card" style="padding: 1.5rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="font-size: 1rem; font-weight: 700; margin: 0; color: var(--text-primary);">Fenwick (Unblocked Attempts)</h3>
+                {% if stats.ff_pct is not none %}
                 <span style="font-size: 1.5rem; font-weight: 800; color: var(--accent-color);" class="font-mono">{{ stats.ff_pct }}% FF</span>
+                {% else %}
+                <span style="font-size: 1.5rem; font-weight: 800; color: var(--text-muted);" class="font-mono">N/A</span>
+                {% endif %}
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
                 <span>Fenwick For: <strong>{{ stats.ff }}</strong></span>
                 <span>Fenwick Against: <strong>{{ stats.fa }}</strong></span>
             </div>
             <div style="width: 100%; height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden; display: flex;">
+                {% if stats.ff_pct is not none %}
                 <div style="width: {{ stats.ff_pct }}%; height: 100%; background: var(--accent-color);"></div>
                 <div style="width: {{ 100.0 - stats.ff_pct }}%; height: 100%; background: rgba(239, 68, 68, 0.4);"></div>
+                {% else %}
+                <div style="width: 100%; height: 100%; background: var(--border-color);"></div>
+                {% endif %}
             </div>
         </div>
     </div>

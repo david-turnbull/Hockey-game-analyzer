@@ -3,6 +3,7 @@ from datetime import date
 from app.models import Game, Team, Player, Event, Shot
 from app.services.xg_service import XGService
 from app.services.game_service import GameService
+from app.services.player_game_service import PlayerGameService
 
 def test_xg_service_logic():
     """
@@ -45,7 +46,7 @@ def test_xg_game_integration(app, db, client):
     skater = Player(player_id=10, first_name="John", last_name="Skater", position="C", current_team_id=1)
     db.session.add(skater)
     db.session.commit()
-    
+    # Create game
     game = Game(
         game_id=900,
         season="20232024",
@@ -58,6 +59,12 @@ def test_xg_game_integration(app, db, client):
         game_status="Final"
     )
     db.session.add(game)
+    db.session.commit()
+    
+    # Seed GamePlayer roster record
+    from app.models import GamePlayer
+    gp = GamePlayer(game_id=900, player_id=10, team_id=1, position="C")
+    db.session.add(gp)
     db.session.commit()
     
     # Create shot with set xG
@@ -79,7 +86,7 @@ def test_xg_game_integration(app, db, client):
     assert overview["stats"]["home_xg"] == 0.18
     
     # Test service player details sum
-    player_stats = GameService.get_player_game_stats(900, 10)
+    player_stats = PlayerGameService.get_player_game_stats(900, 10)
     assert player_stats is not None
     assert player_stats["xg"] == 0.18
     

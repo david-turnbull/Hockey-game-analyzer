@@ -155,7 +155,37 @@ main {
     background-color: rgba(239, 68, 68, 0.1);
     color: var(--danger);
 }
+/* Hockey game status styles */
 
+.status-final {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.status-live {
+    background-color: rgba(56, 189, 248, 0.12);
+    color: var(--accent-color);
+}
+
+.status-upcoming {
+    background-color: rgba(148, 163, 184, 0.12);
+    color: var(--text-secondary);
+}
+
+.status-postponed {
+    background-color: rgba(245, 158, 11, 0.12);
+    color: var(--warning);
+}
+
+.status-suspended {
+    background-color: rgba(239, 68, 68, 0.12);
+    color: var(--danger);
+}
+
+.status-unknown {
+    background-color: rgba(100, 116, 139, 0.12);
+    color: var(--text-muted);
+}
 /* Data Tables */
 .table-container {
     overflow-x: auto;
@@ -234,14 +264,18 @@ tr:hover td {
 }
 
 /* Scoreboard Header */
+
 .scoreboard {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
+    gap: 2rem;
+
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 1.25rem 2rem;
+
+    padding: 1.5rem 2rem;
     margin-bottom: 2rem;
 }
 
@@ -249,6 +283,40 @@ tr:hover td {
     display: flex;
     align-items: center;
     gap: 1.5rem;
+    min-width: 0;
+}
+
+.score-team-away {
+    justify-self: start;
+}
+
+.score-team-home {
+    justify-self: end;
+    justify-content: flex-end;
+}
+
+.scoreboard-center {
+    justify-self: center;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.scoreboard-center .status-indicator {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.75rem;
+}
+
+.scoreboard-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+.score-side-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 600;
 }
 
 .score-team-name {
@@ -262,6 +330,48 @@ tr:hover td {
     font-weight: 800;
     font-family: var(--font-mono);
     color: var(--accent-color);
+}
+
+
+@media (max-width: 768px) {
+    .scoreboard {
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        padding: 1.25rem;
+    }
+
+    .scoreboard-center {
+        grid-column: 1 / -1;
+        grid-row: 1;
+    }
+
+    .score-team-away {
+        grid-column: 1;
+        grid-row: 2;
+        justify-self: start;
+    }
+
+    .score-team-home {
+        grid-column: 2;
+        grid-row: 2;
+        justify-self: end;
+    }
+
+    .score-team {
+        gap: 0.75rem;
+    }
+
+    .score-number {
+        font-size: 2rem;
+    }
+
+    .score-team-name {
+        font-size: 1.2rem;
+    }
+
+    .score-side-label {
+        display: none;
+    }
 }
 
 /* Stat Comparison Bars */

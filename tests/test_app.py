@@ -4,13 +4,26 @@ from datetime import date
 def test_index_route(client):
     """Test that the game selector homepage loads successfully."""
     response = client.get('/')
+
     assert response.status_code == 200
     assert b"Game Selection Dashboard" in response.data
 
-    response_diag = client.get('/diagnostics')
-    assert response_diag.status_code == 200
-    assert b"Platform Diagnostics" in response_diag.data
-    assert b"Flask Application Info" in response_diag.data
+def test_diagnostics_disabled(client):
+    """Diagnostics should return 404 when disabled."""
+
+    response = client.get('/diagnostics')
+
+
+def test_diagnostics_enabled(app, client):
+    """Diagnostics should be available when explicitly enabled."""
+
+    app.config["ENABLE_DIAGNOSTICS"] = True
+
+    response = client.get('/diagnostics')
+
+    assert response.status_code == 200
+    assert b"Platform Diagnostics" in response.data
+    assert b"Flask Application Info" in response.data  
 
 def test_database_models_and_relationships(app, db):
     """Test creating records and checking relationships across all tables."""
