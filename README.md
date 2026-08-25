@@ -2,200 +2,503 @@
 
 [![Run Automated Tests](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml)
 
-**Branch Status:** v1.0 Release Candidate
+**Release target:** `v1.0.0`
+
+Hockey Game Analyzer is an independent hockey-operations analytics platform that transforms raw NHL play-by-play and shift data into reproducible game, player, lineup, possession, and spatial analysis.
+
+The project is designed as both a hockey analytics tool and a portfolio demonstration of data ingestion, relational modelling, analytical service design, testing, visualization, and reproducible sports analysis.
 
 ---
 
-### What it is
-Built as an independent hockey-operations portfolio project, Hockey Game Analyzer transforms raw NHL play-by-play and shift data into reproducible game, player and lineup analysis. The platform includes an ETL pipeline, relational hockey data model, on-ice reconstruction, true 5v5 possession metrics, line/pairing analysis, interactive spatial visualization, automated regression testing and CI.
+## What the platform does
 
-### Who it is for
-Hockey fans and analysts interested in understanding more than the traditional box score.
+- **Game analysis** — team boxscore comparisons, scoring/penalty timelines, and game-level dashboards.
+- **Interactive shot mapping** — spatial visualization of goals, saves, misses, and blocked attempts with game/player filters.
+- **Player game analysis** — player-specific boxscore statistics, possession metrics, shot maps, shift data, and prototype xG.
+- **Shift reconstruction** — aligns NHL shift-chart data with play-by-play timing using consistent half-open interval semantics.
+- **True 5v5 possession** — Corsi and Fenwick calculations restricted to complete 5v5 play.
+- **5v5 forward combinations** — observed forward trios with shared TOI and on-ice GF/GA/SF/SA.
+- **Defensive pairings** — defenseman duos with shared TOI and on-ice GF/GA/SF/SA.
+- **Prototype expected goals (xG)** — transparent heuristic shot-quality estimates using distance, angle, shot type, and manpower context.
+- **Full-season ingestion** — ingest a team's regular-season schedule using the same validated game pipeline.
+- **Automated regression testing and CI** — analytical edge cases and historical attribution are covered by `pytest` and GitHub Actions.
 
-### What it does
-- **Shot analysis** (spatial tracking and interactive shot mapping)
-- **Player game analysis** (detailed stats, shift visualizer, and event logs)
-- **Shift reconstruction** (re-aligning shift charts with play-by-play timelines)
-- **5v5 possession** (Corsi and Fenwick metrics isolated specifically to true 5v5 play)
-- **Forward lines** (trios aggregation, TOI, and on-ice goals/shots)
-- **Defence pairings** (defenseman duos aggregation, TOI, and on-ice goals/shots)
-- **Game-event timelines** (chronological scoring and penalty log)
-- **Experimental xG** (expected goals model utilizing spatial features)
+---
+
+## Screenshots
+
+### Game Selection Dashboard
+
+Select an ingested season and team, then open any available game for analysis.
+
+![Game Selection Dashboard](docs/screenshots/01_game_selector.png)
+
+### Game Summary
+
+Game-level team statistics, scoring and penalty timeline, final score, and user-friendly game status.
+
+![Game Summary](docs/screenshots/02_game_summary.png)
+
+### Interactive Shot Map
+
+Explore all shot attempts by team, player, period, outcome, and strength state.
+
+![Interactive Shot Map](docs/screenshots/03_interactive_shot_map.png)
+
+### 5v5 Forward Combinations & Defensive Pairings
+
+Observed 5v5 forward trios are shown when they record at least 1:00 of shared true-5v5 TOI. Defensive pairings are reported separately.
+
+![5v5 Forward Combinations](docs/screenshots/04_line_combinations.png)
+
+### Player Game Page
+
+Player-level game statistics, TOI, possession metrics, and prototype expected goals.
+
+![Player Game Page](docs/screenshots/05_player_game_page.png)
+
+### Player Shot & Shift Visualization
+
+Individual shot attempts and period-by-period shift deployment.
+
+![Shift Visualizer](docs/screenshots/06_shift_visualizer.png)
 
 ---
 
 ## Architecture & Data Flow
 
-Below is the high-level architecture and data flow diagram of the platform.
-
 ```mermaid
 flowchart TD
     A[NHL API] --> B[Raw JSON Cache]
-    B --> C[Transform and Validate]
+    B --> C[Transform & Validate]
     C --> D[SQLite / SQLAlchemy]
-    D --> E["Service Layer<br>(GameService, PlayerGameService, PossessionService,<br>OnIceService, LineService, XGService)"]
-    E --> F[Flask Routes / API]
+    D --> E["Service Layer<br/>GameService<br/>PlayerGameService<br/>PossessionService<br/>OnIceService<br/>LineService<br/>XGService"]
+    E --> F[Flask Routes / JSON API]
     F --> G[Analytics UI]
 ```
+
+The application intentionally separates ingestion, persistence, analytics, and presentation. Raw NHL status values and source records are preserved internally, while user-friendly presentation logic is handled separately.
 
 ---
 
 ## Features & Capabilities
 
-- **NHL API Ingestion:** Downloads play-by-play and shift charts from official NHL APIs and caches raw responses locally for complete offline reproducibility.
-- **Normalized Relational Schema:** Transforms nested API feeds into a structured SQLite database containing tables for Teams, Players, Games, Events, Shots, Shifts, and Game Rosters.
-- **Game Overview & Timelines:** Renders boxscore stats, team comparisons, and chronological timelines of goals and penalties.
-- **Interactive Shot Maps:** Visualizes shot locations on a normalized ice rink map with tooltips displaying outcome, distance, shooter, goalie, and prototype xG values.
-- **True 5v5 Possession:** Computes player-specific Corsi and Fenwick metrics isolated specifically to true 5-on-5 play.
-- **Shift-Based TOI Analysis:** Standardizes shift timing calculations to half-open intervals `[start, end)` to resolve touch boundaries without double-counting.
-- **Line Combination Engine:** Automatically aggregates skaters into forward lines (trios) and defensive pairings (duos), tracking their collective ice time and on-ice goals/shots.
-- **Prototype Expected Goals (xG):** Estimates individual shot probabilities using mathematical distance, angle, shot type, and manpower adjustments.
+### NHL API ingestion
 
----
+The ingestion pipeline downloads NHL play-by-play and shift-chart data, caches the raw responses locally, transforms the feeds into relational records, validates the resulting data, and loads it into SQLite.
 
-## Visual Presentation (Dashboards)
+Core entities include:
 
-*Note: Screenshots of the user interface are currently pending generation and will be placed in the `docs/screenshots/` directory once finalized.*
+- Teams
+- Players
+- Games
+- Game rosters (`GamePlayer`)
+- Events
+- Shots
+- Shifts
 
-### 1. Game Selector UI
-Allows users to select an ingested season, team, and game from a responsive drop-down interface.
-- Required Screenshot: `docs/screenshots/game_selector.png`
+Historical game-roster attribution is treated as authoritative so players remain associated with the correct team for the game being analyzed, even after later trades.
 
-### 2. Game Overview Dashboard
-Displays aggregated team boxscore metrics (Faceoffs, Shots, PIM, Power Plays, Prototype xG), chronological goals and penalty timelines, and team comparison charts.
-- Required Screenshot: `docs/screenshots/game_overview.png`
+### Game overview and event timeline
 
-### 3. Interactive Shot Map
-Draws shot coordinates normalized so that the attacking direction is always from left to right (facing the net at `x = 89`). Filters by team, shot outcome, and strength state.
-- Required Screenshot: `docs/screenshots/shot_map.png`
+Each analyzed game includes:
 
-### 4. Player Game Page
-Highlights individual skater/goalie performance stats, a chronological player event log, an interactive individual shot map, and a second-by-second shift timeline visualization.
-- Required Screenshot: `docs/screenshots/player_game.png`
+- final score and status
+- shots on goal
+- goals
+- shooting percentage
+- faceoff percentage
+- penalty minutes
+- power-play goals
+- prototype xG
+- chronological goals and penalties
 
-### 5. Line Combinations & Possession
-Groups home and away skaters into forward trios and defense pairings, tracking collective time on ice, goals for/against, and shots for/against.
-- Required Screenshot: `docs/screenshots/line_combinations.png`
+### Interactive shot maps
+
+Shot attempts can be filtered by:
+
+- team
+- player
+- period
+- outcome
+- strength state
+
+The rink can also normalize attack direction to make spatial comparisons easier.
+
+### True 5v5 possession
+
+Corsi and Fenwick calculations use reconstructed on-ice state and explicitly exclude non-5v5 situations.
+
+Player-level possession outputs include:
+
+- CF / CA
+- CF%
+- FF / FA
+- FF%
+
+### 5v5 forward combinations
+
+The line-combination service reconstructs observed forward trios from shift data.
+
+For a second to count as true 5v5:
+
+- both teams must have exactly five skaters
+- each side must contain exactly three recognized forwards
+- each side must contain exactly two recognized defensemen
+- empty-net and malformed manpower states are excluded
+
+Forward combinations below **60 seconds** of shared 5v5 TOI are filtered out. This removes transient line-change combinations while retaining meaningful in-game line juggling.
+
+### Defensive pairings
+
+Defenseman duos are reconstructed from the same on-ice timeline and reported with:
+
+- TOI
+- GF
+- GA
+- SF
+- SA
+
+### Player game analysis
+
+Player pages include:
+
+- goals
+- assists
+- points
+- shots on goal
+- hits
+- penalty minutes
+- faceoff win percentage where applicable
+- valid shifts
+- TOI
+- prototype xG
+- 5v5 Corsi/Fenwick
+- individual shot visualization
+- shift visualization
 
 ---
 
 ## Analytical Definitions
 
-- **Corsi (Shot Attempts):** Measures possession by counting all shot attempts (Goals + Saves + Misses + Blocks). Represents the volume of play directed toward the opponent's net.
-- **Fenwick (Unblocked Shot Attempts):** Measures possession by counting unblocked shot attempts (Goals + Saves + Misses). Often used as a predictor of scoring and sustained pressure.
-- **Corsi / Fenwick For Percentage (CF% / FF%):** The percentage of total shot attempts (for both teams) taken by a player's team while they are on the ice. Formula: `CF% = CF / (CF + CA) * 100`.
-- **True 5v5:** Situation where both teams have exactly 5 skaters and 1 goalie on the ice. The platform excludes 4v4, 3v3, power play, penalty kill, empty-net (goalie pulled), and shootouts from true 5v5 calculations.
-- **Time On Ice (TOI):** Cumulative active seconds spent on the ice. Standardized to half-open intervals `[start, end)` (i.e. `start <= t < end`), meaning a player is active at their shift start second and inactive at their shift end second.
-- **Prototype Expected Goals (xG):** Heuristic probability representing the likelihood of a shot attempt scoring, based on distance, angle, shot type, and manpower adjustments.
+### Corsi
+
+Corsi measures all shot attempts:
+
+- goals
+- saved shots
+- missed shots
+- blocked shots
+
+For percentage:
+
+```text
+CF% = CF / (CF + CA) × 100
+```
+
+### Fenwick
+
+Fenwick measures unblocked shot attempts:
+
+- goals
+- saved shots
+- missed shots
+
+For percentage:
+
+```text
+FF% = FF / (FF + FA) × 100
+```
+
+### True 5v5
+
+A true-5v5 second requires complete five-skater deployment for both teams. Power plays, penalty kills, 4v4, 3v3, empty-net situations, and shootouts are excluded.
+
+### Time on Ice
+
+Shift matching uses half-open intervals:
+
+```text
+[start, end)
+```
+
+A player is active at the shift start second and inactive at the shift end second. This avoids double-counting players at exact shift-change boundaries.
 
 ---
 
-## Prototype xG Heuristic Formula
+## Prototype Expected Goals (xG)
 
-The Expected Goals (xG) metric is a **non-statistical prototype heuristic** using hand-selected log-odds coefficients to estimate shot probability. It is not a machine-learning model trained on historical outcomes.
+The current xG implementation is a **transparent heuristic prototype**, not a statistically fitted or machine-learning model.
 
-### Formula
-$$log\\_odds = \beta_0 + (\beta_{dist} \times distance) + (\beta_{angle} \times |angle|) + shot\\_type\\_adj + strength\\_state\\_adj$$
+It uses a logistic-style probability function:
 
-$$xG = \frac{1}{1 + e^{-log\\_odds}}$$
+\[
+\text{log-odds}
+=
+\beta_0
++
+\beta_{dist}(\text{distance})
++
+\beta_{angle}|\text{angle}|
++
+\text{shot-type adjustment}
++
+\text{strength adjustment}
+\]
 
-### Coefficients and Adjustments
-- **Baseline Constant ($\beta_0$):** `-1.9` (corresponds to a baseline ~13% conversion probability).
-- **Distance Coefficient ($\beta_{dist}$):** `-0.035` per foot decay (farther shots are harder to score).
-- **Angle Coefficient ($\beta_{angle}$):** `-0.015` per degree decay (wider angles from the center line are harder to score).
-- **Shot Type Adjustments:**
-  - Tip-In / Deflection: `+0.4` log-odds (redirects close to net are highly dangerous).
-  - Backhand: `+0.1` log-odds (unpredictable releases).
-  - Slap Shot: `-0.2` log-odds (typically taken from far distances).
-- **Strength Adjustments:**
-  - Attacking Power Play (e.g. PP, 5v4, 5v3): `+0.15` log-odds (increased time and space).
-  - Attacking Shorthanded (e.g. SH, 4v5, 3v5): `-0.15` log-odds (lower support, rushed shots).
+\[
+xG = \frac{1}{1 + e^{-\text{log-odds}}}
+\]
 
-### Empty Net Override
-If the defending team's goalie is pulled (`empty_net` is True):
-$$xG = \max(0.1, 1.0 - (distance \times 0.005))$$
-*(Linear decay ranging from 99% near the net to 10% from the opposite end of the rink)*
+Current hand-selected coefficients include:
+
+- baseline constant: `-1.9`
+- distance coefficient: `-0.035` per foot
+- angle coefficient: `-0.015` per degree
+
+Shot-type adjustments:
+
+- Tip-In / Deflection: `+0.40`
+- Backhand: `+0.10`
+- Slap Shot: `-0.20`
+
+Strength adjustments:
+
+- attacking power play: `+0.15`
+- attacking shorthanded: `-0.15`
+
+For empty-net attempts, the prototype uses a separate distance-based override.
+
+The purpose of the current implementation is to provide an explainable shot-quality prototype while the project develops the historical dataset required for a properly trained and validated xG model.
 
 ---
 
 ## Data Source & Preservation
 
-- **API Endpoints:** Ingests live data from the NHL Gamecenter API (`api-web.nhle.com/v1/gamecenter/{game_id}/play-by-play`) and stats shift chart API (`api.nhle.com/stats/rest/en/shiftcharts`).
-- **Raw Response Preservation:** All fetched JSON responses are stored locally in the `data/raw/` directory, serving as reproducible fixtures.
-- **Heuristics & Normalization:** Skater counts and goalie statuses are extracted from the API's `situationCode` values (e.g., `1551` where digits represent Away Goalie, Away Skaters, Home Skaters, Home Goalie).
-- *Disclaimer: This platform is for educational and analytical research purposes. It is not endorsed by or affiliated with the National Hockey League (NHL).*
+The project uses NHL public data endpoints, including:
+
+- NHL Gamecenter play-by-play
+- NHL shift-chart data
+
+Raw responses are cached under `data/raw/` so ingestion can be reproduced without repeatedly downloading the same source records.
+
+The application preserves source values where practical. For example, the NHL game-state value `OFF` remains stored internally while the UI displays the user-friendly status `Final`.
+
+> **Disclaimer:** This project is an independent educational and analytical project. It is not endorsed by, sponsored by, or affiliated with the National Hockey League or any NHL club.
 
 ---
 
-## Setup & Running Instructions
+## Setup
 
-### 1. Installation
-Clone the repository and set up a Python 3.12 virtual environment:
+### Requirements
+
+- Python 3.12
+- `pip`
+- SQLite
+
+### 1. Clone the repository
+
+```powershell
+git clone https://github.com/david-turnbull/Hockey-game-analyzer.git
+cd Hockey-game-analyzer
+git checkout v1.0
+```
+
+### 2. Create a virtual environment
+
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
+```
+
+macOS / Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```powershell
 pip install -r requirements.txt
 ```
 
-### 2. Database Initialization & Seeding
-Create the database tables and seed local team/player structures:
+### 4. Initialize the database
+
 ```powershell
 python scripts/initialise_database.py
 ```
 
-### 3. Ingest NHL Game Data
-Ingest a game (for example, Calgary Flames game `2023020007`) using cached JSON or downloading fresh data:
+---
+
+## Data Ingestion
+
+### Ingest one game
+
 ```powershell
 python scripts/ingest_game.py 2023020007
 ```
 
-### 4. Running the Web Server
-Launch the Flask development server:
+### Ingest part of a season
+
+Useful for testing the pipeline before running a full season:
+
 ```powershell
-python run.py
+python scripts/ingest_season.py CGY 20232024 --limit 5
 ```
-Open [http://127.0.0.1:5000/](http://127.0.0.1:5000/) in your web browser to use the dashboards.
+
+### Ingest a full team season
+
+```powershell
+python scripts/ingest_season.py CGY 20232024
+```
+
+Season values use the NHL `YYYYYYYY` convention:
+
+```text
+2023-24 → 20232024
+2024-25 → 20242025
+```
+
+If a fresh download is specifically required instead of using the local raw cache:
+
+```powershell
+python scripts/ingest_season.py CGY 20232024 --refresh
+```
 
 ---
 
-## Testing & Continuous Integration
+## Run the Web Application
 
-### Automated Test Suite
-The codebase includes comprehensive unit and regression tests written using `pytest`. These cover pipeline normalization, data quality checkers, shift time boundaries, line combinations, possession metrics, and expected goals math.
+```powershell
+python run.py
+```
 
-To run the tests locally:
+Then open:
+
+```text
+http://127.0.0.1:5000/
+```
+
+---
+
+## Testing
+
+Run the complete test suite:
+
 ```powershell
 pytest
 ```
 
-### Continuous Integration (CI)
-The project utilizes GitHub Actions for continuous integration. The CI workflow is defined in `.github/workflows/tests.yml` and is configured to trigger automatically on:
-- Pushes to the `main` or `master` branches.
-- Pushes directly to the `v1.0` release candidate branch.
-- Pull requests targeting `main`, `master`, or `v1.0`.
+The suite includes unit and regression coverage for areas such as:
 
-Each CI run spawns a clean Ubuntu environment, installs Python 3.12, builds project dependencies from `requirements.txt`, and executes `pytest` automatically to validate the code changes before merging.
+- ingestion normalization
+- historical roster attribution
+- data quality checks
+- shift-change boundaries
+- half-open `[start, end)` semantics
+- true 5v5 possession
+- on-ice reconstruction
+- forward-combination detection
+- 59-second exclusion / 60-second inclusion
+- game-status display mapping
+- average-shift calculations
+- prototype xG mathematics
 
-### Run Database Integrity Diagnostics
-You can also run a specialized script to verify database constraints, search for duplicate roster entries, missing GamePlayer mappings, or timing anomalies:
+The repository also uses GitHub Actions to execute the test suite in a clean Python environment.
+
+Do not rely on a hard-coded test count; the suite is expected to grow as regressions are discovered and fixed.
+
+---
+
+## Database Diagnostics
+
+Run the integrity checker with:
+
 ```powershell
 python scripts/database_diagnostics.py
 ```
 
+Diagnostics include checks for:
+
+- orphan roster records
+- missing `GamePlayer` relationships
+- shift/team mismatches
+- timing anomalies
+- database integrity issues
+
+Diagnostics are intended for development and verification and are hidden from the normal public UI unless explicitly enabled.
+
 ---
 
-## Limitations
+## Known Limitations
 
-- **Public API Timing Discrepancies:** NHL public shift charts are recorded in whole seconds, causing occasional minor shift overlaps or misalignment with play-by-play events.
-- **On-Ice Reconstruction:** On-ice player presence at any given second is reconstructed from shift start and end times, assuming no delays in official records.
-- **Prototype xG Coefficients:** The coefficients for xG calculations are hand-selected based on domain expertise, rather than statistically fitted to historical shot outcomes.
-- **Single-Season Validation:** Validated primarily on the 2023-2024 regular season. Performance on historical data or changes in NHL API formats may vary.
-- **Development Deployment:** Running on a local SQLite database and Flask built-in development server; not yet configured for production scaling or cloud environments.
+- **Public API timing precision:** NHL shift charts use whole-second timing, which can produce occasional minor alignment ambiguity at shift boundaries.
+- **On-ice reconstruction:** Player presence is reconstructed from recorded shift start/end times and therefore inherits any source-data timing errors.
+- **Prototype xG:** Current coefficients are hand-selected rather than fitted to historical goal outcomes.
+- **Historical coverage:** The project has been validated primarily against recent NHL data and may require adaptation if historical API formats differ.
+- **Local deployment:** The current application uses SQLite and the Flask development workflow rather than production cloud infrastructure.
+- **Forecasting:** The platform currently analyzes observed games; next-game prediction models are planned future work.
 
 ---
 
 ## Roadmap
 
-- **v1.0 Release Candidate:** Correct analytical logic, standardize shift change boundaries, modularize service layer, and introduce database diagnostics.
-- **v1.x (Scaling Phase):** Build schedulers for full-season ingestion, run ingestion runtime profiling, and perform database indexing/performance tuning.
-- **v2.0 (ML Integration):** Gather full-season shot outcome datasets, train a logistic regression or XGBoost expected goals (xG) model, evaluate metrics (ROC-AUC, log loss, calibration curves), and introduce advanced on-ice analytics (e.g. teammate/opponent adjustments).
+### v1.0 — Game & Player Analytics Foundation
+
+- reproducible NHL ingestion pipeline
+- relational game/player/shift data model
+- historical roster attribution
+- game summary dashboard
+- interactive shot map
+- player game analysis
+- true 5v5 Corsi/Fenwick
+- 5v5 forward combinations
+- defensive pairings
+- shift visualization
+- prototype xG
+- automated regression testing
+- full-team-season ingestion
+
+### v1.1 — Exploration & Usability
+
+Potential next steps include:
+
+- event overlays on the shift visualizer
+- improved line-combination drill-down
+- richer metric explanations/tooltips
+- accessibility and responsive UI refinement
+- clearer presentation for different hockey-analytics experience levels
+
+### Future Modelling
+
+Planned research directions include:
+
+- statistically trained xG
+- season-level analytics
+- next-game team and player forecasting
+- comparison of statistical, gradient-boosting, and neural-network models
+- transparent model cards, equations, model versioning, and historical prediction evaluation
+
+---
+
+## Release Checklist
+
+The repository includes `release_checklist.md`, which documents the final verification steps required before tagging `v1.0.0`.
+
+The final release should only be tagged after:
+
+1. the full local test suite passes,
+2. the exact final commit passes GitHub Actions,
+3. README screenshots and documentation are committed,
+4. repository hygiene checks are complete, and
+5. the main UI has received a final manual smoke test.
+
+---
+
+## Project Status
+
+`v1.0.0` is the first public release target for the project.
+
+The emphasis of v1.0 is **analytical correctness, reproducibility, transparent methodology, and a strong single-game/player analytics foundation** rather than production-scale deployment or predictive modelling.
