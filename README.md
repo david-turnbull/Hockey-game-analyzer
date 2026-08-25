@@ -1,4 +1,4 @@
-# NHL Hockey Analytics Platform (Hockey-Ops)
+# NHL Hockey Analytics Platform
 
 [![Run Automated Tests](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml)
 
@@ -329,6 +329,14 @@ pip install -r requirements.txt
 
 ```powershell
 python scripts/initialise_database.py
+```
+
+By default, the application uses a local SQLite database.
+
+A different database URL can be supplied through:
+
+```env
+DATABASE_URL=...
 ```
 
 ---
