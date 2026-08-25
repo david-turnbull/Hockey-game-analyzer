@@ -2,7 +2,7 @@
 
 [![Run Automated Tests](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml)
 
-**Release target:** `v1.0.0`
+**Current Release:** `v1.0.0`
 
 Hockey Game Analyzer is an independent hockey-operations analytics platform that transforms raw NHL play-by-play and shift data into reproducible game, player, lineup, possession, and spatial analysis.
 
@@ -232,7 +232,8 @@ The current xG implementation is a **transparent heuristic prototype**, not a st
 
 It uses a logistic-style probability function:
 
-\[
+
+$$
 \text{log-odds}
 =
 \beta_0
@@ -244,11 +245,11 @@ It uses a logistic-style probability function:
 \text{shot-type adjustment}
 +
 \text{strength adjustment}
-\]
+$$
 
-\[
+$$
 xG = \frac{1}{1 + e^{-\text{log-odds}}}
-\]
+$$
 
 Current hand-selected coefficients include:
 
@@ -485,6 +486,6 @@ Planned research directions include:
 
 ## Project Status
 
-`v1.0.0` is the first public release target for the project.
+`v1.0.0`
 
 The emphasis of v1.0 is **analytical correctness, reproducibility, transparent methodology, and a strong single-game/player analytics foundation** rather than production-scale deployment or predictive modelling.
