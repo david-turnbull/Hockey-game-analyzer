@@ -483,20 +483,6 @@ Planned research directions include:
 
 ---
 
-## Release Checklist
-
-The repository includes `release_checklist.md`, which documents the final verification steps required before tagging `v1.0.0`.
-
-The final release should only be tagged after:
-
-1. the full local test suite passes,
-2. the exact final commit passes GitHub Actions,
-3. README screenshots and documentation are committed,
-4. repository hygiene checks are complete, and
-5. the main UI has received a final manual smoke test.
-
----
-
 ## Project Status
 
 `v1.0.0` is the first public release target for the project.
