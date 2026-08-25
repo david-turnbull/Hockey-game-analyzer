@@ -18,10 +18,13 @@
         <span class="score-number">{{ stats.away_score }}</span>
     </div>
     
-    <div style="text-align: center;">
-        <div class="status-indicator status-connected" style="font-size: 0.8rem; padding: 0.25rem 0.75rem;">
-            {{ stats.game_status }}
-        </div>
+    <div
+        id="game-status"
+        class="status-indicator {{ stats.game_status_class }}"
+        style="font-size: 0.8rem; padding: 0.25rem 0.75rem;"
+    >
+        {{ stats.game_status_display }}
+    </div>
         <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;" class="font-mono">
             {{ stats.game_date.strftime("%B %d, %Y") }}
         </div>

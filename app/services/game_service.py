@@ -1,8 +1,10 @@
 from app.models import db, Game, Team
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
-from app.utils.game_status import get_game_status_label
-
+from app.utils.game_status import (
+    get_game_status_label,
+    get_game_status_class,
+)
 class GameService:
     """Service class encapsulating queries for games, teams, schedules, and boxscore aggregations."""
 
@@ -48,7 +50,8 @@ class GameService:
                 "opponent_name": opponent.name,
                 "is_home": is_home,
                 "game_status": g.game_status,
-                "game_status_display": get_game_status_label(g.game_status)
+                "game_status_display": get_game_status_label(g.game_status),
+                "game_status_class": get_game_status_class(g.game_status),
             })
             
         return formatted_games
@@ -358,6 +361,7 @@ class GameService:
             "game_type": game.game_type,
             "game_status": game.game_status,
             "game_status_display": get_game_status_label(game.game_status),
+            "game_status_class": get_game_status_class(game.game_status),
             "home_team_id": game.home_team_id,
             "home_team_name": home_team.name,
             "home_team_abbrev": home_team.abbreviation,

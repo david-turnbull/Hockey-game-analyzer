@@ -155,7 +155,37 @@ main {
     background-color: rgba(239, 68, 68, 0.1);
     color: var(--danger);
 }
+/* Hockey game status styles */
 
+.status-final {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.status-live {
+    background-color: rgba(56, 189, 248, 0.12);
+    color: var(--accent-color);
+}
+
+.status-upcoming {
+    background-color: rgba(148, 163, 184, 0.12);
+    color: var(--text-secondary);
+}
+
+.status-postponed {
+    background-color: rgba(245, 158, 11, 0.12);
+    color: var(--warning);
+}
+
+.status-suspended {
+    background-color: rgba(239, 68, 68, 0.12);
+    color: var(--danger);
+}
+
+.status-unknown {
+    background-color: rgba(100, 116, 139, 0.12);
+    color: var(--text-muted);
+}
 /* Data Tables */
 .table-container {
     overflow-x: auto;
