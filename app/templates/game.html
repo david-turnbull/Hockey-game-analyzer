@@ -3,11 +3,29 @@
 {% block title %}{{ stats.away_team_abbrev }} @ {{ stats.home_team_abbrev }} - NHL Hockey Analytics Platform{% endblock %}
 
 {% block content %}
-<!-- Back link & Page header -->
-<div style="margin-bottom: 1.5rem;">
+<!-- Back link & Navigation row -->
+<div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
     <a href="/" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-hover)'" onmouseout="this.style.color='var(--accent-color)'">
         &larr; Back to Game Selector
     </a>
+    
+    <div style="display: flex; gap: 1rem; align-items: center;">
+        {% if prev_game %}
+        <a href="/game/{{ prev_game.game_id }}?team_id={{ context_team_id }}" style="display: flex; flex-direction: column; align-items: flex-start; text-decoration: none; padding: 0.4rem 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.75rem; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-color)'" onmouseout="this.style.borderColor='var(--border-color)'">
+            <span style="color: var(--accent-color); font-weight: 600;">&larr; Previous Game</span>
+            <span style="color: var(--text-primary); margin-top: 0.1rem;">{{ prev_game.away_team.abbreviation }} {{ prev_game.away_score }} @ {{ prev_game.home_team.abbreviation }} {{ prev_game.home_score }}</span>
+            <span style="color: var(--text-muted); font-size: 0.65rem; margin-top: 0.1rem;" class="font-mono">{{ prev_game.game_date.strftime("%b %d, %Y") }}</span>
+        </a>
+        {% endif %}
+        
+        {% if next_game %}
+        <a href="/game/{{ next_game.game_id }}?team_id={{ context_team_id }}" style="display: flex; flex-direction: column; align-items: flex-end; text-decoration: none; padding: 0.4rem 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.75rem; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-color)'" onmouseout="this.style.borderColor='var(--border-color)'">
+            <span style="color: var(--accent-color); font-weight: 600;">Next Game &rarr;</span>
+            <span style="color: var(--text-primary); margin-top: 0.1rem;">{{ next_game.away_team.abbreviation }} {{ next_game.away_score }} @ {{ next_game.home_team.abbreviation }} {{ next_game.home_score }}</span>
+            <span style="color: var(--text-muted); font-size: 0.65rem; margin-top: 0.1rem;" class="font-mono">{{ next_game.game_date.strftime("%b %d, %Y") }}</span>
+        </a>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Scoreboard Header -->
@@ -62,6 +80,7 @@
     <button class="tab-button active" onclick="switchTab(event, 'tab-overview')" style="background: none; border: none; color: var(--text-primary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Game Summary</button>
     <button class="tab-button" onclick="switchTab(event, 'tab-shotmap')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Interactive Shot Map</button>
     <button class="tab-button" onclick="switchTab(event, 'tab-lines')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Line Combinations</button>
+    <button class="tab-button" onclick="switchTab(event, 'tab-onice-explorer')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">On-Ice Explorer</button>
 </div>
 
 <!-- Tab 1: Game Summary -->
@@ -198,8 +217,24 @@
         </div>
 
         <!-- Column 2: Game Chronological Timeline Card -->
+        <style>
+            .badge-hit { background-color: rgba(147, 51, 234, 0.1); color: #a855f7; }
+            .badge-faceoff { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+            .badge-block { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
+            .badge-miss { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        </style>
         <div class="card">
             <h2 class="card-title">Scoring & Penalties Timeline</h2>
+            
+            <!-- Timeline Category Filters -->
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.5rem; padding: 0.5rem; background: rgba(255, 255, 255, 0.02); border-radius: 4px; font-size: 0.8rem; border: 1px solid var(--border-color);">
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-goal" checked onchange="filterTimeline()"> Goals</label>
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-penalty" checked onchange="filterTimeline()"> Penalties</label>
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-hit" onchange="filterTimeline()"> Hits</label>
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-faceoff" onchange="filterTimeline()"> Faceoffs</label>
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-blocked-shot" onchange="filterTimeline()"> Blocks</label>
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-missed-shot" onchange="filterTimeline()"> Misses</label>
+            </div>
             
             {% if not stats.timeline %}
             <p style="color: var(--text-muted); text-align: center; padding: 2rem;">No timeline events recorded for this game.</p>
@@ -210,7 +245,7 @@
                 <h3 class="timeline-period-title">{{ period_label }}</h3>
                 
                 {% for event in events %}
-                <div class="timeline-item">
+                <div class="timeline-item" data-event-type="{{ event.event_type }}" style="display: {% if event.event_type in ['goal', 'penalty'] %}flex{% else %}none{% endif %};">
                     <div class="timeline-time">{{ event.period_time }}</div>
                     
                     {% if event.event_type == 'goal' %}
@@ -224,7 +259,8 @@
                         <div class="timeline-assists">{{ event.assists }}</div>
                     </div>
                     <div class="timeline-score-tracker">{{ event.running_score }}</div>
-                    {% else %}
+                    
+                    {% elif event.event_type == 'penalty' %}
                     <div class="timeline-badge badge-penalty">Penalty</div>
                     <div class="timeline-content">
                         <span class="timeline-scorer">{{ event.player }}</span>
@@ -234,6 +270,49 @@
                             {% if event.drawn_by %}
                             <span style="color: var(--text-muted);"> (Drawn by: {{ event.drawn_by }})</span>
                             {% endif %}
+                            {% if event.served_by %}
+                            <span style="color: var(--text-muted);"> (Served by: {{ event.served_by }})</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% elif event.event_type == 'hit' %}
+                    <div class="timeline-badge badge-hit">Hit</div>
+                    <div class="timeline-content">
+                        <span class="timeline-scorer">{{ event.hitter }}</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">({{ event.team_abbrev }})</span>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            Hit: {{ event.hittee }}
+                        </div>
+                    </div>
+                    
+                    {% elif event.event_type == 'faceoff' %}
+                    <div class="timeline-badge badge-faceoff">Faceoff</div>
+                    <div class="timeline-content">
+                        <span class="timeline-scorer">{{ event.winner }}</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">({{ event.team_abbrev }})</span>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            Won vs {{ event.loser }} {% if event.zone %}(Zone: {{ event.zone }}){% endif %}
+                        </div>
+                    </div>
+                    
+                    {% elif event.event_type == 'blocked-shot' %}
+                    <div class="timeline-badge badge-block">Block</div>
+                    <div class="timeline-content">
+                        <span class="timeline-scorer">{{ event.blocker }}</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">({{ event.team_abbrev }})</span>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            Blocked shot by {{ event.shooter }}
+                        </div>
+                    </div>
+                    
+                    {% elif event.event_type == 'missed-shot' %}
+                    <div class="timeline-badge badge-miss">Miss</div>
+                    <div class="timeline-content">
+                        <span class="timeline-scorer">{{ event.shooter }}</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">({{ event.team_abbrev }})</span>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            Shot missed net
                         </div>
                     </div>
                     {% endif %}
@@ -244,6 +323,38 @@
             
             {% endif %}
         </div>
+        
+        <script>
+            function filterTimeline() {
+                const showGoal = document.getElementById('tl-show-goal').checked;
+                const showPenalty = document.getElementById('tl-show-penalty').checked;
+                const showHit = document.getElementById('tl-show-hit').checked;
+                const showFaceoff = document.getElementById('tl-show-faceoff').checked;
+                const showBlock = document.getElementById('tl-show-blocked-shot').checked;
+                const showMiss = document.getElementById('tl-show-missed-shot').checked;
+                
+                const items = document.querySelectorAll('.timeline-item');
+                items.forEach(item => {
+                    const type = item.getAttribute('data-event-type');
+                    let visible = false;
+                    if (type === 'goal') visible = showGoal;
+                    else if (type === 'penalty') visible = showPenalty;
+                    else if (type === 'hit') visible = showHit;
+                    else if (type === 'faceoff') visible = showFaceoff;
+                    else if (type === 'blocked-shot') visible = showBlock;
+                    else if (type === 'missed-shot') visible = showMiss;
+                    
+                    item.style.display = visible ? 'flex' : 'none';
+                });
+                
+                // Hide period group header if it contains no visible items
+                const groups = document.querySelectorAll('.timeline-period-group');
+                groups.forEach(group => {
+                    const visibleItems = Array.from(group.querySelectorAll('.timeline-item')).filter(i => i.style.display !== 'none');
+                    group.style.display = visibleItems.length > 0 ? 'block' : 'none';
+                });
+            }
+        </script>
     </div>
 
     <!-- Rosters Section -->
@@ -634,10 +745,204 @@
     </div>
 </div>
 
+<!-- Tab 4: On-Ice Player & Event Explorer -->
+<div id="tab-onice-explorer" class="tab-content" style="display: none;">
+    <style>
+        .explorer-event-item:hover {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border-color: var(--accent-hover) !important;
+        }
+        .explorer-event-item.active {
+            background: rgba(56, 189, 248, 0.08) !important;
+            border-color: var(--accent-color) !important;
+        }
+    </style>
+    <div class="grid-2" style="align-items: start;">
+        <!-- Column 1: Chronological Event Explorer Timeline -->
+        <div class="card" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+            <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Click Event to Inspect On-Ice Lineup</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Select any key event below to reconstruct exactly who was on the ice at that moment.</p>
+            
+            <div style="max-height: 500px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.75rem;" id="explorer-events-list">
+                <!-- Group events by period -->
+                {% for period_label, events in stats.timeline.items() %}
+                <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent-color); margin-top: 0.5rem; border-left: 2px solid var(--accent-color); padding-left: 0.5rem;">
+                    {{ period_label }}
+                </div>
+                {% for event in events %}
+                <div class="explorer-event-item" 
+                     data-period="{{ event.period }}" 
+                     data-time="{{ event.period_time }}" 
+                     onclick="selectExplorerEvent(this)"
+                     style="display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0.75rem; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; transition: all 0.2s;">
+                    
+                    <div style="font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono); width: 50px;">{{ event.period_time }}</div>
+                    
+                    <div style="flex-grow: 1; font-size: 0.85rem;">
+                        {% if event.event_type == 'goal' %}
+                        <span style="color: #10b981; font-weight: 600;">Goal:</span> {{ event.scorer }} ({{ event.team_abbrev }})
+                        {% elif event.event_type == 'penalty' %}
+                        <span style="color: #ef4444; font-weight: 600;">Penalty:</span> {{ event.player }} ({{ event.team_abbrev }}) - {{ event.infraction }}
+                        {% elif event.event_type == 'hit' %}
+                        <span style="color: #f59e0b; font-weight: 600;">Hit:</span> {{ event.description }}
+                        {% elif event.event_type == 'faceoff' %}
+                        <span style="color: #3b82f6; font-weight: 600;">Faceoff:</span> {{ event.description }}
+                        {% elif event.event_type == 'blocked-shot' %}
+                        <span style="color: var(--text-secondary); font-weight: 600;">Block:</span> {{ event.description }}
+                        {% elif event.event_type == 'missed-shot' %}
+                        <span style="color: var(--text-muted); font-weight: 600;">Miss:</span> {{ event.description }}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Column 2: On-Ice Players List & Custom Time Selector -->
+        <div class="card" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+            <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0;">On-Ice Player Reconstruct</h3>
+                
+                <!-- Manual time selection form -->
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <select id="explorer-period" style="padding: 0.25rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; font-size: 0.8rem; cursor: pointer;">
+                        <option value="1">Period 1</option>
+                        <option value="2">Period 2</option>
+                        <option value="3">Period 3</option>
+                        <option value="4">Overtime</option>
+                    </select>
+                    <input type="text" id="explorer-time" value="00:00" placeholder="MM:SS" style="width: 60px; padding: 0.25rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; font-family: var(--font-mono); font-size: 0.8rem; text-align: center;">
+                    <button class="btn-analyze" onclick="fetchOnIcePlayers()" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">Query</button>
+                </div>
+            </div>
+
+            <!-- Active time display banner -->
+            <div id="explorer-active-time-banner" style="padding: 0.75rem 1rem; background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.15); border-radius: 4px; font-size: 0.85rem; color: var(--accent-color); font-weight: 600; text-align: center;">
+                Select an event or query a custom time to load active lineups
+            </div>
+
+            <!-- Side-by-side lineups -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;" id="explorer-lineups-container">
+                <!-- Home Team Lineup -->
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.25rem;" id="explorer-home-title">{{ stats.home_team_abbrev }}</h4>
+                    <div id="explorer-home-players" style="display: flex; flex-direction: column; gap: 0.5rem; min-height: 200px; color: var(--text-muted); font-size: 0.85rem; justify-content: center; align-items: center; border: 1px dashed var(--border-color); border-radius: 4px;">
+                        No lineup loaded
+                    </div>
+                </div>
+
+                <!-- Away Team Lineup -->
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.25rem;" id="explorer-away-title">{{ stats.away_team_abbrev }}</h4>
+                    <div id="explorer-away-players" style="display: flex; flex-direction: column; gap: 0.5rem; min-height: 200px; color: var(--text-muted); font-size: 0.85rem; justify-content: center; align-items: center; border: 1px dashed var(--border-color); border-radius: 4px;">
+                        No lineup loaded
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Scripts -->
 <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
 <script>
     const GAME_ID = {{ stats.game_id }};
+    
+    function selectExplorerEvent(element) {
+        // Highlight active event item
+        document.querySelectorAll('.explorer-event-item').forEach(el => {
+            el.classList.remove('active');
+        });
+        element.classList.add('active');
+        
+        // Sync time selectors
+        const period = element.getAttribute('data-period');
+        const time = element.getAttribute('data-time');
+        
+        document.getElementById('explorer-period').value = period;
+        document.getElementById('explorer-time').value = time;
+        
+        const typeSpan = element.querySelector('span');
+        const typeText = typeSpan ? typeSpan.innerText : "Event";
+        const contentText = element.innerText.replace(time, '').trim();
+        
+        fetchOnIcePlayers(contentText);
+    }
+
+    async function fetchOnIcePlayers(contextLabel = "") {
+        const period = document.getElementById('explorer-period').value;
+        const time = document.getElementById('explorer-time').value;
+        
+        const banner = document.getElementById('explorer-active-time-banner');
+        const homeList = document.getElementById('explorer-home-players');
+        const awayList = document.getElementById('explorer-away-players');
+        
+        // Validate MM:SS format
+        if (!/^\d{1,2}:\d{2}$/.test(time)) {
+            banner.textContent = "Error: Invalid time format (use MM:SS)";
+            banner.style.color = "var(--danger)";
+            return;
+        }
+        
+        banner.style.color = "var(--accent-color)";
+        banner.textContent = `Loading lineups for P${period} @ ${time}...`;
+        
+        try {
+            const res = await fetch(`/api/game/${GAME_ID}/on-ice?period=${period}&time=${time}`);
+            if (!res.ok) throw new Error("Failed to fetch on-ice players");
+            const data = await res.json();
+            
+            // Update banner text
+            banner.innerHTML = contextLabel 
+                ? `Active Lineup at <strong>P${period} ${time}</strong> (${contextLabel})`
+                : `Active Lineup at <strong>P${period} ${time}</strong>`;
+                
+            // Render players helper
+            const renderList = (players, container) => {
+                container.innerHTML = "";
+                container.style.justifyContent = "flex-start";
+                container.style.borderStyle = "solid";
+                container.style.padding = "0.5rem";
+                container.style.width = "auto";
+                
+                if (players.length === 0) {
+                    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 2rem; font-size: 0.85rem; width: 100%;">No players reconstructed on ice</div>`;
+                    return;
+                }
+                
+                players.forEach(p => {
+                    const row = document.createElement('div');
+                    row.style.display = "flex";
+                    row.style.justifyContent = "space-between";
+                    row.style.alignItems = "center";
+                    row.style.padding = "0.4rem 0.6rem";
+                    row.style.background = "rgba(255, 255, 255, 0.01)";
+                    row.style.border = "1px solid var(--border-color)";
+                    row.style.borderRadius = "4px";
+                    row.style.fontSize = "0.85rem";
+                    row.style.marginBottom = "0.25rem";
+                    
+                    row.innerHTML = `
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <span style="font-weight: 700; color: var(--accent-color); font-family: var(--font-mono); width: 25px;">#${p.number !== null ? p.number : ''}</span>
+                            <span style="color: var(--text-primary); font-weight: 500;">${p.name}</span>
+                        </div>
+                        <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); background: var(--bg-secondary); padding: 0.1rem 0.3rem; border-radius: 3px;">${p.position}</span>
+                    `;
+                    container.appendChild(row);
+                });
+            };
+            
+            renderList(data.home, homeList);
+            renderList(data.away, awayList);
+            
+        } catch (err) {
+            console.error(err);
+            banner.textContent = "Error loading players: " + err.message;
+            banner.style.color = "var(--danger)";
+        }
+    }
 </script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}

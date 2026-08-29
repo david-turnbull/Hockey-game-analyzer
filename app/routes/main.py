@@ -41,6 +41,9 @@ def diagnostics():
             if not row[0].startswith('sqlite_')
         ]
         db_status = "Connected"
+        
+        from app.services.validation_service import ValidationService
+        checks = ValidationService.run_platform_diagnostics()
 
     except Exception as e:
         db_status = "Failed"
@@ -51,5 +54,6 @@ def diagnostics():
         'diagnostics.html',
         db_status=db_status,
         db_error=db_error,
-        tables=tables
+        tables=tables,
+        checks=checks
     )

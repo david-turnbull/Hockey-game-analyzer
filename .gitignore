@@ -163,7 +163,6 @@ Thumbs.db
 *.db
 *.db-journal
 
-# Milestone and Analysis documents
-NHL Analytics Milestone 5.5.pdf
-walkthrough*.md
-/walkthrough*.md
+*.pdf 
+
+scripts/

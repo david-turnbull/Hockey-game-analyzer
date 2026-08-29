@@ -98,7 +98,7 @@ def test_game_overview_calculations(app, db):
     assert "2nd Period" in timeline
     assert "3rd Period" in timeline
     
-    p1_events = timeline["1st Period"]
+    p1_events = [e for e in timeline["1st Period"] if e["event_type"] in ["goal", "penalty"]]
     assert len(p1_events) == 2  # Calgary Goal 1, Calgary Penalty 1
     
     # Goal 1 checks

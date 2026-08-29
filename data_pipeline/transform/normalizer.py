@@ -198,16 +198,53 @@ class DataNormalizer:
             team_name = self.team_names_fallback.get(team_abbrev, f"{team_abbrev} Team")
         return Team(team_id=team_id, abbreviation=team_abbrev, name=team_name)
 
-    def transform_player(self, spot: dict) -> Player:
-        """Constructs a Player model instance from a roster spot record."""
+    def transform_player(self, player_data: dict) -> Player:
+        """Constructs a Player model instance from a normalized player dictionary."""
+        # Support both the new schema dictionary and raw spot mapping
+        pid = player_data.get("player_id") or player_data.get("playerId")
+        
+        # Determine first and last name
+        first_name = player_data.get("first_name")
+        if first_name is None:
+            raw_first = player_data.get("firstName")
+            if isinstance(raw_first, dict):
+                first_name = raw_first.get("default", "")
+            else:
+                first_name = raw_first or ""
+                
+        last_name = player_data.get("last_name")
+        if last_name is None:
+            raw_last = player_data.get("lastName")
+            if isinstance(raw_last, dict):
+                last_name = raw_last.get("default", "")
+            else:
+                last_name = raw_last or ""
+                
+        # Retain original NHL position code L, C, R, D, G
+        position = player_data.get("position_code") or player_data.get("positionCode") or player_data.get("position")
+        
+        shoots_catches = player_data.get("shoots_catches") or player_data.get("shootsCatches")
+        sweater_number = player_data.get("sweater_number") or player_data.get("sweaterNumber")
+        current_team_id = player_data.get("team_id") or player_data.get("teamId") or player_data.get("current_team_id")
+        
         return Player(
-            player_id=spot["playerId"],
-            first_name=spot.get("firstName", {}).get("default", ""),
-            last_name=spot.get("lastName", {}).get("default", ""),
-            position=spot.get("positionCode"),
-            shoots_catches=spot.get("shootsCatches"),
-            current_team_id=spot.get("teamId")
+            player_id=pid,
+            first_name=first_name,
+            last_name=last_name,
+            position=position,
+            shoots_catches=shoots_catches,
+            current_team_id=current_team_id,
+            headshot_url=player_data.get("headshot_url") or player_data.get("headshot"),
+            sweater_number=sweater_number,
+            height_in_inches=player_data.get("height_in_inches") or player_data.get("heightInInches"),
+            height_in_centimeters=player_data.get("height_in_centimeters") or player_data.get("heightInCentimeters"),
+            weight_in_pounds=player_data.get("weight_in_pounds") or player_data.get("weightInPounds"),
+            weight_in_kilograms=player_data.get("weight_in_kilograms") or player_data.get("weightInKilograms"),
+            birth_date=player_data.get("birth_date") or player_data.get("birthDate"),
+            birth_city=player_data.get("birth_city") or (player_data.get("birthCity", {}).get("default", "") if isinstance(player_data.get("birthCity"), dict) else player_data.get("birthCity")),
+            birth_country=player_data.get("birth_country") or player_data.get("birthCountry")
         )
+
 
     def transform_game(self, pbp_raw: dict) -> Game:
         """Constructs a Game model instance."""
@@ -273,10 +310,16 @@ class DataNormalizer:
         secondary_player_id = None
         assist1_player_id = None
         assist2_player_id = None
+        served_by_player_id = None
         penalty_duration = None
         penalty_description = None
+        penalty_type_code = None
+        zone_code = details.get("zoneCode")
         
-        if event_type in ['shot-on-goal', 'missed-shot', 'blocked-shot']:
+        if event_type == 'blocked-shot':
+            primary_player_id = details.get("shootingPlayerId")
+            secondary_player_id = details.get("blockingPlayerId")
+        elif event_type in ['shot-on-goal', 'missed-shot']:
             primary_player_id = details.get("shootingPlayerId")
             secondary_player_id = details.get("goalieInNetId")
         elif event_type == 'goal':
@@ -290,7 +333,9 @@ class DataNormalizer:
         elif event_type == 'penalty':
             primary_player_id = details.get("committedByPlayerId")
             secondary_player_id = details.get("drawnByPlayerId")
+            served_by_player_id = details.get("servedByPlayerId")
             penalty_duration = details.get("duration")
+            penalty_type_code = details.get("typeCode")
             
             raw_desc = details.get("descKey", "")
             if raw_desc:
@@ -330,10 +375,15 @@ class DataNormalizer:
             secondary_player_id=secondary_player_id,
             assist1_player_id=assist1_player_id,
             assist2_player_id=assist2_player_id,
+            served_by_player_id=served_by_player_id,
             penalty_duration=penalty_duration,
             penalty_description=penalty_description,
+            penalty_type_code=penalty_type_code,
+            zone_code=zone_code,
             x_coordinate=raw_x,
             y_coordinate=raw_y,
+            x_coordinate_normalized=norm_x,
+            y_coordinate_normalized=norm_y,
             strength_state=strength_state,
             period_type=period_type,
             raw_situation_code=situation_code,
@@ -432,11 +482,12 @@ class DataNormalizer:
             team_id=team_id
         )
 
-    def transform_game_player(self, game_id: int, player_id: int, team_id: int, position: str = None) -> GamePlayer:
+    def transform_game_player(self, game_id: int, player_id: int, team_id: int, position: str = None, sweater_number: int = None) -> GamePlayer:
         """Constructs a GamePlayer model instance representing a player's roster assignment for a game."""
         return GamePlayer(
             game_id=game_id,
             player_id=player_id,
             team_id=team_id,
-            position=position
+            position=position,
+            sweater_number=sweater_number
         )

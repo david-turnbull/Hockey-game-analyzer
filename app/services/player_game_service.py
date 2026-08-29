@@ -164,11 +164,22 @@ class PlayerGameService:
             timeline.append(event_data)
             
         # Skater vs. Goalie metrics
+        # Height and weight string helpers
+        height_str = f"{player.height_in_inches // 12}'{player.height_in_inches % 12}\"" if player.height_in_inches else None
+        weight_str = f"{player.weight_in_pounds} lb" if player.weight_in_pounds else None
+        
         stats = {
             "player_id": player.player_id,
             "name": player.full_name,
             "position": position,
             "shoots_catches": player.shoots_catches,
+            "headshot_url": player.headshot_url,
+            "sweater_number": gp.sweater_number if (gp and gp.sweater_number) else player.sweater_number,
+            "height_str": height_str,
+            "weight_str": weight_str,
+            "birth_date": player.birth_date,
+            "birth_city": player.birth_city,
+            "birth_country": player.birth_country,
             "team_name": player_team.name if player_team else "Unknown",
             "team_abbrev": player_team.abbreviation if player_team else "UNK",
             "team_id": player_team.team_id if player_team else None,
@@ -219,11 +230,59 @@ class PlayerGameService:
             saves = shots_faced - goals_against
             save_pct = round((saves / shots_faced * 100), 1) if shots_faced > 0 else 0.0
             
+            # Goalie 5v5 stats
+            shots_faced_5v5 = db.session.query(Shot).join(Event).filter(
+                Event.game_id == game_id,
+                Shot.goalie_id == player_id,
+                Shot.outcome.in_(['Goal', 'Saved']),
+                Event.team_strength_state == '5v5',
+                or_(Event.period_type != 'SO', Event.period_type.is_(None))
+            ).count()
+            
+            goals_against_5v5 = db.session.query(Shot).join(Event).filter(
+                Event.game_id == game_id,
+                Shot.goalie_id == player_id,
+                Shot.goal == True,
+                Event.team_strength_state == '5v5',
+                or_(Event.period_type != 'SO', Event.period_type.is_(None))
+            ).count()
+            
+            saves_5v5 = shots_faced_5v5 - goals_against_5v5
+            save_pct_5v5 = round((saves_5v5 / shots_faced_5v5 * 100), 1) if shots_faced_5v5 > 0 else 0.0
+            
+            # Power play shots faced
+            shots_faced_pp = db.session.query(Shot).join(Event).filter(
+                Event.game_id == game_id,
+                Shot.goalie_id == player_id,
+                Shot.outcome.in_(['Goal', 'Saved']),
+                Event.manpower_state == 'PP',
+                or_(Event.period_type != 'SO', Event.period_type.is_(None))
+            ).count()
+            
+            # Goals against by strength
+            goals_by_strength = {
+                "EV": db.session.query(Shot).join(Event).filter(
+                    Event.game_id == game_id, Shot.goalie_id == player_id, Shot.goal == True, Event.manpower_state == 'EV', or_(Event.period_type != 'SO', Event.period_type.is_(None))
+                ).count(),
+                "PP": db.session.query(Shot).join(Event).filter(
+                    Event.game_id == game_id, Shot.goalie_id == player_id, Shot.goal == True, Event.manpower_state == 'PP', or_(Event.period_type != 'SO', Event.period_type.is_(None))
+                ).count(),
+                "PK": db.session.query(Shot).join(Event).filter(
+                    Event.game_id == game_id, Shot.goalie_id == player_id, Shot.goal == True, Event.manpower_state == 'PK', or_(Event.period_type != 'SO', Event.period_type.is_(None))
+                ).count()
+            }
+            
             stats.update({
                 "shots_faced": shots_faced,
                 "goals_against": goals_against,
                 "saves": saves,
-                "save_pct": save_pct
+                "save_pct": save_pct,
+                "shots_faced_5v5": shots_faced_5v5,
+                "goals_against_5v5": goals_against_5v5,
+                "saves_5v5": saves_5v5,
+                "save_pct_5v5": save_pct_5v5,
+                "shots_faced_pp": shots_faced_pp,
+                "goals_by_strength": goals_by_strength
             })
         else:
             # Skater stats

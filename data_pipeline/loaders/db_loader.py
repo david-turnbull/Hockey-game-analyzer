@@ -41,6 +41,13 @@ class DatabaseLoader:
                     existing_player.position = player.position
                     existing_player.shoots_catches = player.shoots_catches
                     existing_player.current_team_id = player.current_team_id
+                    existing_player.headshot_url = player.headshot_url
+                    existing_player.sweater_number = player.sweater_number
+                    existing_player.height_in_inches = player.height_in_inches
+                    existing_player.weight_in_pounds = player.weight_in_pounds
+                    existing_player.birth_date = player.birth_date
+                    existing_player.birth_city = player.birth_city
+                    existing_player.birth_country = player.birth_country
                 else:
                     self.session.add(player)
             

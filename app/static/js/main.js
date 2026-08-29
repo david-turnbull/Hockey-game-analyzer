@@ -8,6 +8,40 @@ document.addEventListener("DOMContentLoaded", () => {
         return; // Diagnostics page or empty DB view
     }
 
+    window.importGame = async function(gameId, btn) {
+        btn.disabled = true;
+        btn.textContent = "Importing...";
+        
+        const tr = btn.closest('tr');
+        const statusSpan = tr.querySelector('.status-indicator');
+        if (statusSpan) {
+            statusSpan.style.background = "rgba(56, 189, 248, 0.1)";
+            statusSpan.style.color = "var(--accent-color)";
+            statusSpan.textContent = "Importing...";
+        }
+        
+        try {
+            const res = await fetch(`/api/game/${gameId}/ingest`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                // Successfully ingested! Reload the table
+                await loadGames();
+            } else {
+                throw new Error(data.error || "Unknown error occurred during ingestion");
+            }
+        } catch (error) {
+            console.error("Failed to import game:", error);
+            alert("Failed to import game: " + error.message);
+            if (statusSpan) {
+                statusSpan.style.background = "rgba(239, 68, 68, 0.1)";
+                statusSpan.style.color = "#ef4444";
+                statusSpan.textContent = "Failed";
+            }
+            btn.disabled = false;
+            btn.textContent = "Import";
+        }
+    };
+
     async function loadGames() {
         const season = seasonSelect.value;
         const teamId = teamSelect.value;
@@ -27,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
         gamesCount.textContent = "Loading...";
 
         try {
-            const response = await fetch(`/api/games?team_id=${teamId}&season=${season}`);
+            const response = await fetch(`/api/schedule?team_id=${teamId}&season=${season}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -41,7 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 gamesTableBody.innerHTML = `
                     <tr>
                         <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                            No games ingested in the database for this team/season.
+                            No games found in schedule for this team/season.
                         </td>
                     </tr>
                 `;
@@ -60,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 // Type
                 const tdType = document.createElement("td");
-                tdType.textContent = game.game_type === 'R' ? 'Regular' : (game.game_type === 'P' ? 'Playoffs' : game.game_type);
+                tdType.textContent = game.game_type;
                 tr.appendChild(tdType);
 
                 // Matchup
@@ -91,27 +125,35 @@ document.addEventListener("DOMContentLoaded", () => {
                 tdResult.innerHTML = `<div style="display: flex; align-items: center; gap: 0.5rem;">${outcomeBadge} ${scoreDisplay}</div>`;
                 tr.appendChild(tdResult);
 
-                // Status
+                // Status & Action
                 const tdStatus = document.createElement("td");
-
-                const statusClass =
-                    game.game_status_class || "status-unknown";
-
-                const statusLabel =
-                    game.game_status_display || "Unknown";
-
-                tdStatus.innerHTML =
-                    `<span class="status-indicator ${statusClass}">${statusLabel}</span>`;
-                tr.appendChild(tdStatus);
-
-                // Action
                 const tdAction = document.createElement("td");
                 tdAction.style.textAlign = "right";
-                tdAction.innerHTML = `
-                    <a href="/game/${game.game_id}" class="btn-analyze">
-                        Analyze
-                    </a>
-                `;
+
+                if (game.is_ingested) {
+                    tdStatus.innerHTML = `<span class="status-indicator status-connected">Ingested</span>`;
+                    tdAction.innerHTML = `
+                        <a href="/game/${game.game_id}?team_id=${teamId}" class="btn-analyze">
+                            Analyze
+                        </a>
+                    `;
+                } else if (game.game_status === 'FINAL' || game.game_status === 'OFF') {
+                    tdStatus.innerHTML = `<span class="status-indicator" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 0.15rem 0.35rem; font-size: 0.75rem; border-radius: 3px;">Ready to Import</span>`;
+                    tdAction.innerHTML = `
+                        <button class="btn-analyze" style="background: var(--accent-color); border: none; cursor: pointer;" onclick="importGame(${game.game_id}, this)">
+                            Import
+                        </button>
+                    `;
+                } else {
+                    tdStatus.innerHTML = `<span class="status-indicator" style="background: rgba(148, 163, 184, 0.1); color: var(--text-secondary); padding: 0.15rem 0.35rem; font-size: 0.75rem; border-radius: 3px;">Scheduled</span>`;
+                    tdAction.innerHTML = `
+                        <button class="btn-analyze" style="opacity: 0.4; cursor: not-allowed;" disabled>
+                            Future
+                        </button>
+                    `;
+                }
+                
+                tr.appendChild(tdStatus);
                 tr.appendChild(tdAction);
 
                 gamesTableBody.appendChild(tr);
@@ -121,7 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
             gamesTableBody.innerHTML = `
                 <tr>
                     <td colspan="6" style="text-align: center; color: var(--danger); padding: 2rem;">
-                        Failed to load games. Check server logs.
+                        Failed to load schedule. Check server logs.
                     </td>
                 </tr>
             `;

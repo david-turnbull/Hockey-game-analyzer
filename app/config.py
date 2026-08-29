@@ -22,6 +22,7 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
+    ENABLE_DIAGNOSTICS = True
 
 
 class TestingConfig(Config):

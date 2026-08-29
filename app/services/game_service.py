@@ -161,10 +161,10 @@ class GameService:
                 except ValueError:
                     pass
                     
-        # 6. Fetch Scoring and Penalty Events chronologically
+        # 6. Fetch Scoring, Penalty, Hit, Faceoff, and Blocked Shot Events chronologically
         timeline_events = Event.query.filter(
             Event.game_id == game_id,
-            Event.event_type.in_(['goal', 'penalty'])
+            Event.event_type.in_(['goal', 'penalty', 'hit', 'faceoff', 'blocked-shot', 'missed-shot'])
         ).order_by(Event.period.asc(), Event.elapsed_game_seconds.asc()).all()
         
         # Build chronological timeline
@@ -215,12 +215,46 @@ class GameService:
             elif event.event_type == 'penalty':
                 player = event.primary_player.full_name if event.primary_player else "Unknown"
                 drawn_by = event.secondary_player.full_name if event.secondary_player else None
+                served_by = event.served_by_player.full_name if event.served_by_player else None
                 
                 event_data.update({
                     "player": player,
                     "infraction": event.penalty_description or "Unknown infraction",
                     "duration": event.penalty_duration or 2,
-                    "drawn_by": drawn_by
+                    "drawn_by": drawn_by,
+                    "served_by": served_by,
+                    "penalty_type": event.penalty_type_code
+                })
+            elif event.event_type == 'hit':
+                hitter = event.primary_player.full_name if event.primary_player else "Unknown"
+                hittee = event.secondary_player.full_name if event.secondary_player else "Unknown"
+                event_data.update({
+                    "hitter": hitter,
+                    "hittee": hittee,
+                    "description": f"{hitter} hit {hittee}"
+                })
+            elif event.event_type == 'faceoff':
+                winner = event.primary_player.full_name if event.primary_player else "Unknown"
+                loser = event.secondary_player.full_name if event.secondary_player else "Unknown"
+                event_data.update({
+                    "winner": winner,
+                    "loser": loser,
+                    "zone": event.zone_code,
+                    "description": f"{winner} won faceoff vs {loser}"
+                })
+            elif event.event_type == 'blocked-shot':
+                shooter = event.primary_player.full_name if event.primary_player else "Unknown"
+                blocker = event.secondary_player.full_name if event.secondary_player else "Unknown"
+                event_data.update({
+                    "shooter": shooter,
+                    "blocker": blocker,
+                    "description": f"{shooter}'s shot blocked by {blocker}"
+                })
+            elif event.event_type == 'missed-shot':
+                shooter = event.primary_player.full_name if event.primary_player else "Unknown"
+                event_data.update({
+                    "shooter": shooter,
+                    "description": f"{shooter}'s shot missed net"
                 })
                 
             timeline.append(event_data)

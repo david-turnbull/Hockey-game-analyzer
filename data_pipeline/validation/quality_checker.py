@@ -94,6 +94,8 @@ class DataQualityChecker:
             self.add_warning("EVENT_INTEGRITY", f"Primary player {event.primary_player_id} not in roster", event.event_id)
         if event.secondary_player_id and event.secondary_player_id not in known_player_ids:
             self.add_warning("EVENT_INTEGRITY", f"Secondary player {event.secondary_player_id} not in roster", event.event_id)
+        if event.served_by_player_id and event.served_by_player_id not in known_player_ids:
+            self.add_warning("EVENT_INTEGRITY", f"Serving player {event.served_by_player_id} not in roster", event.event_id)
             
         # Shot event shooter validation (fatal error)
         if event.event_type in ['shot-on-goal', 'goal', 'missed-shot', 'blocked-shot']:

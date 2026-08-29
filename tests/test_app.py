@@ -38,17 +38,17 @@ def test_database_models_and_relationships(app, db):
     
     # 2. Create a Player and link to Team
     player = Player(
-        player_id=8476458,
+        player_id=8476456,
         first_name='Jonathan',
         last_name='Huberdeau',
-        position='LW',
+        position='L',
         shoots_catches='L',
         current_team=cgy
     )
     db.session.add(player)
     db.session.commit()
     
-    retrieved_player = db.session.get(Player, 8476458)
+    retrieved_player = db.session.get(Player, 8476456)
     assert retrieved_player is not None
     assert retrieved_player.current_team.abbreviation == 'CGY'
     assert retrieved_player.full_name == 'Jonathan Huberdeau'

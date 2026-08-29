@@ -88,3 +88,40 @@ class NHLApiClient:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             logger.info(f"Cached shifts to {filepath}")
         return data
+
+    def get_season_roster(self, team_abbr: str, season: str, force_refresh: bool = False) -> dict:
+        """Fetches and caches the roster of a team for a season."""
+        filename = f"roster_{team_abbr}_{season}.json"
+        filepath = os.path.join(self.raw_data_dir, filename)
+        
+        if not force_refresh and os.path.exists(filepath):
+            logger.debug(f"Loading cached roster from {filepath}")
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+                
+        url = f"https://api-web.nhle.com/v1/roster/{team_abbr}/{season}"
+        data = self._fetch_url(url)
+        if data:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            logger.info(f"Cached roster to {filepath}")
+        return data
+
+    def get_boxscore(self, game_id: int, force_refresh: bool = False) -> dict:
+        """Fetches and caches the boxscore for a game."""
+        filename = f"boxscore_{game_id}.json"
+        filepath = os.path.join(self.raw_data_dir, filename)
+        
+        if not force_refresh and os.path.exists(filepath):
+            logger.debug(f"Loading cached boxscore from {filepath}")
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+                
+        url = f"https://api-web.nhle.com/v1/gamecenter/{game_id}/boxscore"
+        data = self._fetch_url(url)
+        if data:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            logger.info(f"Cached boxscore to {filepath}")
+        return data
+

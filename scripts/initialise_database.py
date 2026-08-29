@@ -30,10 +30,10 @@ def initialise():
             # Seed a couple of notable Flames players
             players = [
                 Player(
-                    player_id=8476458, 
+                    player_id=8476456, 
                     first_name='Jonathan', 
                     last_name='Huberdeau', 
-                    position='LW', 
+                    position='L', 
                     shoots_catches='L', 
                     current_team=cgy
                 ),

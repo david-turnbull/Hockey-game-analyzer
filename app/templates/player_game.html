@@ -13,14 +13,29 @@
 <!-- Player Header -->
 <div class="scoreboard" style="padding: 1.5rem 2rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <div style="display: flex; align-items: center; gap: 1.5rem;">
-        <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--bg-secondary); border: 2px solid var(--accent-color); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; color: var(--accent-color);">
+        {% if stats.headshot_url %}
+        <img src="{{ stats.headshot_url }}" alt="{{ stats.name }}" style="width: 75px; height: 75px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-color); background: var(--bg-secondary);">
+        {% else %}
+        <div style="width: 75px; height: 75px; border-radius: 50%; background: var(--bg-secondary); border: 2px solid var(--accent-color); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; color: var(--accent-color);">
             {{ stats.position }}
         </div>
+        {% endif %}
         <div>
             <h1 style="font-size: 1.75rem; font-weight: 800; margin: 0; color: var(--text-primary);">{{ stats.name }}</h1>
-            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                {{ stats.team_name }} ({{ stats.team_abbrev }}) &bull; Shoots/Catches: {{ stats.shoots_catches or 'N/A' }}
+            <div style="font-size: 0.95rem; color: var(--text-secondary); margin-top: 0.25rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                {% if stats.sweater_number is not none %}#{{ stats.sweater_number }} &bull;{% endif %}
+                <strong>{{ stats.position }}</strong> &bull;
+                Shoots/Catches: {{ stats.shoots_catches or 'N/A' }}
+                {% if stats.height_str or stats.weight_str %}
+                &bull; {{ stats.height_str or '' }}{% if stats.height_str and stats.weight_str %} · {% endif %}{{ stats.weight_str or '' }}
+                {% endif %}
             </div>
+            {% if stats.birth_city or stats.birth_country %}
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Born: {{ stats.birth_city }}{% if stats.birth_city and stats.birth_country %}, {% endif %}{{ stats.birth_country }}
+                {% if stats.birth_date %} ({{ stats.birth_date }}){% endif %}
+            </div>
+            {% endif %}
         </div>
     </div>
     
@@ -61,6 +76,28 @@
         <div class="card" style="text-align: center; padding: 1.5rem;">
             <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Save Percentage</div>
             <div style="font-size: 2rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">{{ stats.save_pct }}%</div>
+        </div>
+    </div>
+    
+    <!-- Goalie Special Situations & Strength Splits -->
+    <div style="margin-top: 2rem;">
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem;">Goalie Special Situations & Strength Splits</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem;">
+            <div class="card" style="padding: 1.5rem;">
+                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 0 0 1rem 0;">5v5 Even Strength</h4>
+                <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;" class="font-mono">{{ stats.saves_5v5 }} / {{ stats.shots_faced_5v5 }}</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary);">Save Percentage: <strong>{{ stats.save_pct_5v5 }}%</strong></div>
+            </div>
+            <div class="card" style="padding: 1.5rem;">
+                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-color); margin: 0 0 1rem 0;">Power Play / Penalty Kill</h4>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">PP Shots Faced: <strong>{{ stats.shots_faced_pp }}</strong></div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary);">Goals Allowed by Strength:</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem; padding-left: 0.5rem; border-left: 2px solid var(--accent-color);">
+                    Even Strength (EV): <strong>{{ stats.goals_by_strength.EV }}</strong><br>
+                    Power Play (PP): <strong>{{ stats.goals_by_strength.PP }}</strong><br>
+                    Penalty Kill (PK): <strong>{{ stats.goals_by_strength.PK }}</strong>
+                </div>
+            </div>
         </div>
     </div>
     {% else %}
@@ -189,7 +226,17 @@
             <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0; color: var(--text-primary);">
                 {% if stats.position == 'G' %}Shots Faced Map{% else %}Individual Shot Attempts{% endif %}
             </h3>
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <div style="display: flex; align-items: center; gap: 0.8rem;">
+                {% if stats.position == 'G' %}
+                <div style="display: flex; align-items: center; gap: 0.3rem;">
+                    <label for="filter-goalie-situation" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">Situation:</label>
+                    <select id="filter-goalie-situation" style="padding: 0.15rem 0.3rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; font-size: 0.75rem; outline: none; cursor: pointer;">
+                        <option value="all">All</option>
+                        <option value="5v5">5v5</option>
+                        <option value="special">PP/PK</option>
+                    </select>
+                </div>
+                {% endif %}
                 <input type="checkbox" id="normalize-shots" checked style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--accent-color);">
                 <label for="normalize-shots" style="font-size: 0.75rem; cursor: pointer; color: var(--text-secondary); font-weight: 600;">Normalize Right</label>
             </div>
@@ -280,11 +327,28 @@
             const normalize = normalizeToggle.checked;
             const plotContainer = document.getElementById("player-shot-map-plot");
 
+            // Goalie-specific filtering
+            let filteredShots = playerShots;
+            if (IS_GOALIE) {
+                // Keep only Saves and Goals (exclude Missed and Blocked shots from goalie shot map)
+                filteredShots = playerShots.filter(s => s.outcome === "Goal" || s.outcome === "Saved");
+                
+                const goalieSitSelect = document.getElementById("filter-goalie-situation");
+                if (goalieSitSelect) {
+                    const situation = goalieSitSelect.value;
+                    if (situation === "5v5") {
+                        filteredShots = filteredShots.filter(s => s.strength_state === "5v5");
+                    } else if (situation === "special") {
+                        filteredShots = filteredShots.filter(s => s.manpower_state === "PP" || s.manpower_state === "PK");
+                    }
+                }
+            }
+
             // Split into categories
-            const goals = playerShots.filter(s => s.outcome === "Goal");
-            const saves = playerShots.filter(s => s.outcome === "Saved");
-            const misses = playerShots.filter(s => s.outcome === "Missed");
-            const blocks = playerShots.filter(s => s.outcome === "Blocked");
+            const goals = filteredShots.filter(s => s.outcome === "Goal");
+            const saves = filteredShots.filter(s => s.outcome === "Saved");
+            const misses = filteredShots.filter(s => s.outcome === "Missed");
+            const blocks = filteredShots.filter(s => s.outcome === "Blocked");
 
             const getCoords = (list) => {
                 return {
@@ -310,25 +374,28 @@
             const traces = [
                 {
                     x: gCoords.x, y: gCoords.y, text: gCoords.text,
-                    mode: 'markers', name: 'Goal', hoverinfo: 'text',
+                    mode: 'markers', name: IS_GOALIE ? 'Goal Allowed' : 'Goal', hoverinfo: 'text',
                     marker: { symbol: 'star', size: 12, color: '#10b981', line: { width: 1, color: '#ffffff' } }
                 },
                 {
                     x: sCoords.x, y: sCoords.y, text: sCoords.text,
                     mode: 'markers', name: 'Save', hoverinfo: 'text',
                     marker: { symbol: 'circle', size: 8, color: '#38bdf8' }
-                },
-                {
+                }
+            ];
+
+            if (!IS_GOALIE) {
+                traces.push({
                     x: mCoords.x, y: mCoords.y, text: mCoords.text,
                     mode: 'markers', name: 'Miss', hoverinfo: 'text',
                     marker: { symbol: 'diamond', size: 8, color: '#f59e0b' }
-                },
-                {
+                });
+                traces.push({
                     x: bCoords.x, y: bCoords.y, text: bCoords.text,
                     mode: 'markers', name: 'Blocked', hoverinfo: 'text',
                     marker: { symbol: 'x', size: 8, color: '#ef4444' }
-                }
-            ];
+                });
+            }
 
             const shapes = [];
             // Outer rink boundary
@@ -455,6 +522,10 @@
 
         // Init
         normalizeToggle.addEventListener("change", renderShotMap);
+        const goalieSitSelect = document.getElementById("filter-goalie-situation");
+        if (goalieSitSelect) {
+            goalieSitSelect.addEventListener("change", renderShotMap);
+        }
         loadShots();
         renderShifts();
     });
