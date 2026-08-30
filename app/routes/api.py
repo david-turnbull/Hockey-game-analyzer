@@ -23,17 +23,18 @@ def get_games():
     games = GameService.get_games_list(team_id, season)
     return jsonify(games)
 
+@api_bp.route('/game/<int:game_id>/shots')
 @api_bp.route('/shots')
-def get_shots():
+def get_shots(game_id=None):
     """Returns a list of shot attempts for a given game_id as JSON."""
-    game_id_raw = request.args.get('game_id')
-    if not game_id_raw:
-        return jsonify({"error": "Missing game_id parameter"}), 400
-        
-    try:
-        game_id = int(game_id_raw)
-    except ValueError:
-        return jsonify({"error": "Invalid game_id format"}), 400
+    if game_id is None:
+        game_id_raw = request.args.get('game_id')
+        if not game_id_raw:
+            return jsonify({"error": "Missing game_id parameter"}), 400
+        try:
+            game_id = int(game_id_raw)
+        except ValueError:
+            return jsonify({"error": "Invalid game_id format"}), 400
         
     current_app.logger.info(f"API query for shots of game_id={game_id}")
     
@@ -50,8 +51,8 @@ def get_shots():
             "shot_id": s.shot_id,
             "raw_x": s.event.x_coordinate,
             "raw_y": s.event.y_coordinate,
-            "norm_x": s.x_coordinate,
-            "norm_y": s.y_coordinate,
+            "norm_x": s.x_coordinate_normalized,
+            "norm_y": s.y_coordinate_normalized,
             "distance": s.distance,
             "angle": s.angle,
             "outcome": s.outcome,
@@ -274,8 +275,8 @@ def get_player_shots(game_id, player_id):
             "shot_id": s.shot_id,
             "raw_x": s.event.x_coordinate,
             "raw_y": s.event.y_coordinate,
-            "norm_x": s.x_coordinate,
-            "norm_y": s.y_coordinate,
+            "norm_x": s.x_coordinate_normalized,
+            "norm_y": s.y_coordinate_normalized,
             "distance": s.distance,
             "angle": s.angle,
             "outcome": s.outcome,

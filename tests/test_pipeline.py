@@ -6,7 +6,7 @@ from data_pipeline.transform.normalizer import (
     parse_situation_code,
     DataNormalizer
 )
-from data_pipeline.validation.quality_checker import DataQualityChecker
+from data_pipeline.validation.ingestion_validator import IngestionValidator
 from data_pipeline.loaders.db_loader import DatabaseLoader
 from app.models import Team, Player, Game, Event, Shot, Shift
 
@@ -84,7 +84,7 @@ def test_situation_code_parsing():
     assert not empty
 
 def test_data_quality_checker():
-    checker = DataQualityChecker()
+    checker = IngestionValidator()
     
     # Check invalid coordinates warning
     invalid_event = Event(
@@ -105,7 +105,7 @@ def test_data_quality_checker():
     assert any("X Coordinate out of bounds" in w["message"] for w in summary["warnings"])
     
     # Check shift durations and overlaps
-    checker_shift = DataQualityChecker()
+    checker_shift = IngestionValidator()
     shift1 = Shift(
         shift_id="shift_1",
         game_id=1,

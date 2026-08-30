@@ -71,6 +71,31 @@ def run_migrations(db):
                 if col_name not in existing_event_cols:
                     logger.info(f"Migrating: Adding column '{col_name}' to 'event' table")
                     connection.execute(text(f"ALTER TABLE event ADD COLUMN {col_name} {col_type}"))
+
+        # 4. Check game table status column rename
+        game_exists = connection.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='game'"
+        )).first()
+        if game_exists:
+            result = connection.execute(text("PRAGMA table_info(game)")).fetchall()
+            existing_game_cols = {row[1] for row in result}
+            if "game_status" in existing_game_cols and "nhl_game_state" not in existing_game_cols:
+                logger.info("Migrating: Renaming column 'game_status' to 'nhl_game_state' in 'game' table")
+                connection.execute(text("ALTER TABLE game RENAME COLUMN game_status TO nhl_game_state"))
+
+        # 5. Check shot table coordinate column rename
+        shot_exists = connection.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='shot'"
+        )).first()
+        if shot_exists:
+            result = connection.execute(text("PRAGMA table_info(shot)")).fetchall()
+            existing_shot_cols = {row[1] for row in result}
+            if "x_coordinate" in existing_shot_cols and "x_coordinate_normalized" not in existing_shot_cols:
+                logger.info("Migrating: Renaming column 'x_coordinate' to 'x_coordinate_normalized' in 'shot' table")
+                connection.execute(text("ALTER TABLE shot RENAME COLUMN x_coordinate TO x_coordinate_normalized"))
+            if "y_coordinate" in existing_shot_cols and "y_coordinate_normalized" not in existing_shot_cols:
+                logger.info("Migrating: Renaming column 'y_coordinate' to 'y_coordinate_normalized' in 'shot' table")
+                connection.execute(text("ALTER TABLE shot RENAME COLUMN y_coordinate TO y_coordinate_normalized"))
             
         db.session.commit()
         logger.info("Database migration check completed successfully.")

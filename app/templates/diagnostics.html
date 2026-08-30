@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Diagnostics - NHL Hockey Analytics Platform{% endblock %}
+{% block title %}Diagnostics - PuckLens{% endblock %}
 
 {% block content %}
 <h1 class="page-title">Platform Diagnostics</h1>
@@ -100,7 +100,7 @@
         {% if tables|length == 0 %}
         <div class="alert-box alert-info" style="margin-top: 1rem;">
             No tables initialized yet. Please run the database initialization script:
-            <code class="font-mono" style="display: block; margin-top: 0.5rem; background: rgba(0,0,0,0.2); padding: 0.25rem 0.5rem; border-radius: 4px;">python scripts/initialise_database.py</code>
+            <code class="font-mono" style="display: block; margin-top: 0.5rem; background: rgba(0,0,0,0.2); padding: 0.25rem 0.5rem; border-radius: 4px;">python scripts/initialize_database.py</code>
         </div>
         {% endif %}
         {% endif %}

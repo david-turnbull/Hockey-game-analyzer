@@ -10,8 +10,24 @@ class Shot(db.Model):
     shot_type = db.Column(db.String(50))  # e.g., Slap, Wrist, Snap, Backhand, Tip-In
     
     # Coordinates (already normalized to positive/negative values or standardized direction)
-    x_coordinate = db.Column(db.Float, nullable=False)
-    y_coordinate = db.Column(db.Float, nullable=False)
+    x_coordinate_normalized = db.Column(db.Float, nullable=False)
+    y_coordinate_normalized = db.Column(db.Float, nullable=False)
+
+    @property
+    def x_coordinate(self):
+        return self.x_coordinate_normalized
+
+    @x_coordinate.setter
+    def x_coordinate(self, value):
+        self.x_coordinate_normalized = value
+
+    @property
+    def y_coordinate(self):
+        return self.y_coordinate_normalized
+
+    @y_coordinate.setter
+    def y_coordinate(self, value):
+        self.y_coordinate_normalized = value
     
     distance = db.Column(db.Float)  # Distance in feet to the center of net
     angle = db.Column(db.Float)     # Angle in degrees relative to the center of net
@@ -21,7 +37,6 @@ class Shot(db.Model):
     empty_net = db.Column(db.Boolean, default=False)
     xg = db.Column(db.Float, nullable=True)  # Expected goals prediction (when model is built)
     
-    # Milestone 5.5: Data Correctness & Hardening fields
     game_id = db.Column(db.Integer, db.ForeignKey('game.game_id'), nullable=True, index=True)
     team_id = db.Column(db.Integer, db.ForeignKey('team.team_id'), nullable=True, index=True)
 

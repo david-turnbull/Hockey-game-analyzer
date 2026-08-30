@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from app import create_app
 from app.models import Game, Team, Player, Event, Shot, Shift
 from data_pipeline.transform.normalizer import parse_time_to_seconds, parse_situation_code_raw, derive_event_manpower
-from data_pipeline.validation.quality_checker import DataQualityChecker
+from data_pipeline.validation.ingestion_validator import IngestionValidator
 
 def test_sqlite_foreign_key_enforcement(app, db):
     """Verifies that inserting a record with a non-existent foreign key fails."""
@@ -40,7 +40,7 @@ def test_duplicate_logging_handlers(app):
 
 def test_position_aware_shift_validation():
     """Verifies that goalie shifts are validated using separate thresholds from skater shifts."""
-    checker = DataQualityChecker()
+    checker = IngestionValidator()
     
     # Skater shift > 300s (excessive)
     skater_shift = Shift(
@@ -90,19 +90,19 @@ def test_position_aware_shift_validation():
     assert any("Excessive shift duration: 360s" in w["message"] for w in warnings)
     
     # Reset checker and validate goalie shift (should NOT warn)
-    checker2 = DataQualityChecker()
+    checker2 = IngestionValidator()
     checker2.validate_shifts([goalie_shift], player_positions)
     assert len(checker2.get_summary()["warnings"]) == 0
     
     # Validate excessive goalie shift (should warn)
-    checker3 = DataQualityChecker()
+    checker3 = IngestionValidator()
     checker3.validate_shifts([excessive_goalie_shift], player_positions)
     warnings3 = checker3.get_summary()["warnings"]
     assert any("Excessive goalie shift duration: 5100s" in w["message"] for w in warnings3)
 
 def test_zero_duration_shift_anomaly():
     """Verifies that zero-duration shifts are preserved but flagged as anomalies."""
-    checker = DataQualityChecker()
+    checker = IngestionValidator()
     zero_shift = Shift(
         shift_id="zero_shift",
         game_id=1,
@@ -133,7 +133,7 @@ def test_invalid_clock_handling():
     assert parse_time_to_seconds("05") is None
     
     # Test validation warning
-    checker = DataQualityChecker()
+    checker = IngestionValidator()
     invalid_event = Event(
         event_id="invalid_clock_event",
         game_id=1,
@@ -150,7 +150,7 @@ def test_invalid_clock_handling():
 
 def test_strengthened_shot_validation():
     """Verifies that missing shot shooters cause fatal validation rejection."""
-    checker = DataQualityChecker()
+    checker = IngestionValidator()
     
     # 1. Shot with shooter not in roster
     shot_no_roster = Shot(

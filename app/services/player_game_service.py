@@ -76,7 +76,7 @@ class PlayerGameService:
             "is_home": profile["is_home"],
             "game_id": game.game_id,
             "game_date": game.game_date,
-            "game_status": game.game_status,
+            "game_status": game.nhl_game_state,
             "home_score": game.home_score,
             "away_score": game.away_score,
             "home_team_abbrev": home_team.abbreviation,

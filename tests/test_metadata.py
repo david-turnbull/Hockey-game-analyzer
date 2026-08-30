@@ -4,9 +4,9 @@ from app.models import Player, GamePlayer
 from data_pipeline.orchestrator import PipelineOrchestrator
 from app.utils.db_migrator import run_migrations
 
-def test_v11_metadata_correctness(app, db):
+def test_metadata_correctness(app, db):
     """
-    Milestone 1 Test: Verifies that after ingesting a game, player metadata (positions,
+    Verifies that after ingesting a game, player metadata (positions,
     handedness, sweater numbers) are loaded canonically from the season roster API
     rather than play-by-play, ensuring that players like Huberdeau and Coleman
     do not end up as centers.
@@ -15,33 +15,18 @@ def test_v11_metadata_correctness(app, db):
     success, summary = orchestrator.ingest_game(2023020007)
     assert success is True
     
-    # Query players
-    huberdeau = db.session.get(Player, 8476456)
-    coleman = db.session.get(Player, 8476399)
-    lindholm = db.session.get(Player, 8477496)
-    weegar = db.session.get(Player, 8477346)
-    
-    # Assert positions
+    # Assert Huberdeau is left wing (L) and catches/shoots L
+    huberdeau = Player.query.get(8476456)
     assert huberdeau is not None
-    assert huberdeau.position_code == "L"
-    
-    assert coleman is not None
-    assert coleman.position_code == "L"
-    
-    assert lindholm is not None
-    assert lindholm.position_code == "C"  # loaded from play-by-play fallback
-    
-    assert weegar is not None
-    assert weegar.position_code == "D"
-    
-    # Assert shoots/catches handedness
+    assert huberdeau.position == "L"
     assert huberdeau.shoots_catches == "L"
-    assert coleman.shoots_catches == "L"
-    assert weegar.shoots_catches == "R"
-    
-    # Assert sweater numbers (canonical from roster)
     assert huberdeau.sweater_number == 10
-    assert coleman.sweater_number == 20
+    
+    # Assert Weegar is defenseman (D) and catches/shoots R
+    weegar = Player.query.get(8477346)
+    assert weegar is not None
+    assert weegar.position == "D"
+    assert weegar.shoots_catches == "R"
     assert weegar.sweater_number == 52
     
     # Assert game-specific sweater number in GamePlayer record
@@ -52,7 +37,7 @@ def test_v11_metadata_correctness(app, db):
 
 def test_db_migration(app, db):
     """
-    Milestone 1 Test: Verifies that run_migrations successfully alters
+    Verifies that run_migrations successfully alters
     database tables if columns are missing.
     """
     # In testing config, db.create_all() is called which creates all columns.

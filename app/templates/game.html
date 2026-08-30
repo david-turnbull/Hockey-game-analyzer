@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ stats.away_team_abbrev }} @ {{ stats.home_team_abbrev }} - NHL Hockey Analytics Platform{% endblock %}
+{% block title %}{{ stats.away_team_abbrev }} @ {{ stats.home_team_abbrev }} - PuckLens{% endblock %}
 
 {% block content %}
 <!-- Back link & Navigation row -->
@@ -324,38 +324,6 @@
             
             {% endif %}
         </div>
-        
-        <script>
-            function filterTimeline() {
-                const showGoal = document.getElementById('tl-show-goal').checked;
-                const showPenalty = document.getElementById('tl-show-penalty').checked;
-                const showHit = document.getElementById('tl-show-hit').checked;
-                const showFaceoff = document.getElementById('tl-show-faceoff').checked;
-                const showBlock = document.getElementById('tl-show-blocked-shot').checked;
-                const showMiss = document.getElementById('tl-show-missed-shot').checked;
-                
-                const items = document.querySelectorAll('.timeline-item');
-                items.forEach(item => {
-                    const type = item.getAttribute('data-event-type');
-                    let visible = false;
-                    if (type === 'goal') visible = showGoal;
-                    else if (type === 'penalty') visible = showPenalty;
-                    else if (type === 'hit') visible = showHit;
-                    else if (type === 'faceoff') visible = showFaceoff;
-                    else if (type === 'blocked-shot') visible = showBlock;
-                    else if (type === 'missed-shot') visible = showMiss;
-                    
-                    item.style.display = visible ? 'flex' : 'none';
-                });
-                
-                // Hide period group header if it contains no visible items
-                const groups = document.querySelectorAll('.timeline-period-group');
-                groups.forEach(group => {
-                    const visibleItems = Array.from(group.querySelectorAll('.timeline-item')).filter(i => i.style.display !== 'none');
-                    group.style.display = visibleItems.length > 0 ? 'block' : 'none';
-                });
-            }
-        </script>
     </div>
 
     <!-- Rosters Section -->
@@ -865,101 +833,6 @@
 <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
 <script>
     const GAME_ID = {{ stats.game_id }};
-    
-    function selectExplorerEvent(element) {
-        // Highlight active event item
-        document.querySelectorAll('.explorer-event-item').forEach(el => {
-            el.classList.remove('active');
-        });
-        element.classList.add('active');
-        
-        // Sync time selectors
-        const period = element.getAttribute('data-period');
-        const time = element.getAttribute('data-time');
-        
-        document.getElementById('explorer-period').value = period;
-        document.getElementById('explorer-time').value = time;
-        
-        const typeSpan = element.querySelector('span');
-        const typeText = typeSpan ? typeSpan.innerText : "Event";
-        const contentText = element.innerText.replace(time, '').trim();
-        
-        fetchOnIcePlayers(contentText);
-    }
-
-    async function fetchOnIcePlayers(contextLabel = "") {
-        const period = document.getElementById('explorer-period').value;
-        const time = document.getElementById('explorer-time').value;
-        
-        const banner = document.getElementById('explorer-active-time-banner');
-        const homeList = document.getElementById('explorer-home-players');
-        const awayList = document.getElementById('explorer-away-players');
-        
-        // Validate MM:SS format
-        if (!/^\d{1,2}:\d{2}$/.test(time)) {
-            banner.textContent = "Error: Invalid time format (use MM:SS)";
-            banner.style.color = "var(--danger)";
-            return;
-        }
-        
-        banner.style.color = "var(--accent-color)";
-        banner.textContent = `Loading lineups for P${period} @ ${time}...`;
-        
-        try {
-            const res = await fetch(`/api/game/${GAME_ID}/on-ice?period=${period}&time=${time}`);
-            if (!res.ok) throw new Error("Failed to fetch on-ice players");
-            const data = await res.json();
-            
-            // Update banner text
-            banner.innerHTML = contextLabel 
-                ? `Active Lineup at <strong>P${period} ${time}</strong> (${contextLabel})`
-                : `Active Lineup at <strong>P${period} ${time}</strong>`;
-                
-            // Render players helper
-            const renderList = (players, container) => {
-                container.innerHTML = "";
-                container.style.justifyContent = "flex-start";
-                container.style.borderStyle = "solid";
-                container.style.padding = "0.5rem";
-                container.style.width = "auto";
-                
-                if (players.length === 0) {
-                    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 2rem; font-size: 0.85rem; width: 100%;">No players reconstructed on ice</div>`;
-                    return;
-                }
-                
-                players.forEach(p => {
-                    const row = document.createElement('div');
-                    row.style.display = "flex";
-                    row.style.justifyContent = "space-between";
-                    row.style.alignItems = "center";
-                    row.style.padding = "0.4rem 0.6rem";
-                    row.style.background = "rgba(255, 255, 255, 0.01)";
-                    row.style.border = "1px solid var(--border-color)";
-                    row.style.borderRadius = "4px";
-                    row.style.fontSize = "0.85rem";
-                    row.style.marginBottom = "0.25rem";
-                    
-                    row.innerHTML = `
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <span style="font-weight: 700; color: var(--accent-color); font-family: var(--font-mono); width: 25px;">#${p.number !== null ? p.number : ''}</span>
-                            <span style="color: var(--text-primary); font-weight: 500;">${p.name}</span>
-                        </div>
-                        <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); background: var(--bg-secondary); padding: 0.1rem 0.3rem; border-radius: 3px;">${p.position}</span>
-                    `;
-                    container.appendChild(row);
-                });
-            };
-            
-            renderList(data.home, homeList);
-            renderList(data.away, awayList);
-            
-        } catch (err) {
-            console.error(err);
-            banner.textContent = "Error loading players: " + err.message;
-            banner.style.color = "var(--danger)";
-        }
-    }
 </script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/game_dashboard.js') }}"></script>
 {% endblock %}

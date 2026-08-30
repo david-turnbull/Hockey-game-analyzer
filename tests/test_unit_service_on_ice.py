@@ -1,12 +1,12 @@
 import pytest
 from datetime import date
 from app.models import Game, Team, Player, Shift, GamePlayer, Event, Shot
-from app.services.line_service import LineService
+from app.services.unit_service import UnitService
 from app.services.on_ice_service import OnIceService
 
 def test_line_reconstruction_shift_boundaries(app, db):
     """
-    Verifies that LineService uses the same active-player logic as OnIceService at boundaries.
+    Verifies that UnitService uses the same active-player logic as OnIceService at boundaries.
     Test:
       Player A shift: [600, 640)
       Player B shift: [640, 680)
@@ -117,7 +117,7 @@ def test_line_reconstruction_shift_boundaries(app, db):
     db.session.commit()
 
     # 8. Run combinations calculation
-    combos = LineService.get_line_combinations(850)
+    combos = UnitService.get_unit_combinations(850)
     home_lines = combos["home"]["lines"]
 
     # Player 103 is active on [600, 660); Player 107 is active on [660, 720).

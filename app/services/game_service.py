@@ -49,9 +49,9 @@ class GameService:
                 "opponent_abbrev": opponent.abbreviation,
                 "opponent_name": opponent.name,
                 "is_home": is_home,
-                "game_status": g.game_status,
-                "game_status_display": get_game_status_label(g.game_status),
-                "game_status_class": get_game_status_class(g.game_status),
+                "game_status": g.nhl_game_state,
+                "game_status_display": get_game_status_label(g.nhl_game_state),
+                "game_status_class": get_game_status_class(g.nhl_game_state),
             })
             
         return formatted_games
@@ -64,7 +64,7 @@ class GameService:
         """
         from app.models import Event, Shot, Player, GamePlayer, Shift
         from app.services.possession_service import PossessionService
-        from app.services.line_service import LineService
+        from app.services.unit_service import UnitService
         
         game = db.session.get(Game, game_id)
         if not game:
@@ -393,9 +393,9 @@ class GameService:
             "season": game.season,
             "game_date": game.game_date,
             "game_type": game.game_type,
-            "game_status": game.game_status,
-            "game_status_display": get_game_status_label(game.game_status),
-            "game_status_class": get_game_status_class(game.game_status),
+            "game_status": game.nhl_game_state,
+            "game_status_display": get_game_status_label(game.nhl_game_state),
+            "game_status_class": get_game_status_class(game.nhl_game_state),
             "home_team_id": game.home_team_id,
             "home_team_name": home_team.name,
             "home_team_abbrev": home_team.abbreviation,
@@ -432,5 +432,5 @@ class GameService:
                 "away_goalies": away_goalies_list
             },
             # Line Combinations
-            "line_combinations": LineService.get_line_combinations(game_id)
+            "line_combinations": UnitService.get_unit_combinations(game_id)
         }

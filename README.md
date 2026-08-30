@@ -1,10 +1,10 @@
-# NHL Hockey Analytics Platform
+# PuckLens - NHL Hockey Analytics Platform
 
 [![Run Automated Tests](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml)
 
 **Current Release:** `v1.1.0`
 
-Hockey Game Analyzer is an independent hockey-operations analytics platform that transforms raw NHL play-by-play and shift data into reproducible game, player, lineup, possession, and spatial analysis.
+PuckLens is an independent hockey-operations analytics platform that transforms raw NHL play-by-play and shift data into reproducible game, player, lineup, possession, and spatial analysis.
 
 The project is designed as both a hockey analytics tool and a portfolio demonstration of data ingestion, relational modelling, analytical service design, testing, visualization, and reproducible sports analysis.
 
@@ -331,7 +331,7 @@ pip install -r requirements.txt
 ### 4. Initialize the database
 
 ```powershell
-python scripts/initialise_database.py
+python scripts/initialize_database.py
 ```
 
 By default, the application uses a local SQLite database.

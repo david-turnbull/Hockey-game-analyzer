@@ -1,11 +1,11 @@
 import pytest
 from data_pipeline.orchestrator import PipelineOrchestrator
-from app.services.line_service import LineService
+from app.services.unit_service import UnitService
 from app.services.player_game_service import PlayerGameService
 
 def test_line_service_unit_detail(app, db):
     """
-    Verifies that LineService.get_unit_detail retrieves correct 5v5 metrics,
+    Verifies that UnitService.get_unit_detail retrieves correct 5v5 metrics,
     intervals, shot map coordinates, and timeline events for a forward line.
     """
     orchestrator = PipelineOrchestrator(session=db.session)
@@ -13,7 +13,7 @@ def test_line_service_unit_detail(app, db):
     assert success is True
 
     # 1. Fetch line combinations first
-    combos = LineService.get_line_combinations(2023020007)
+    combos = UnitService.get_unit_combinations(2023020007)
     assert combos is not None
     assert "home" in combos
     assert "away" in combos
@@ -26,7 +26,7 @@ def test_line_service_unit_detail(app, db):
     player_ids = first_line["player_ids"]
     assert len(player_ids) == 3
 
-    detail = LineService.get_unit_detail(2023020007, player_ids)
+    detail = UnitService.get_unit_detail(2023020007, player_ids)
     assert detail is not None
     assert detail["game_id"] == 2023020007
     assert detail["toi"] is not None

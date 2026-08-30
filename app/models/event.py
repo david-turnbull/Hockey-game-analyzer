@@ -30,7 +30,6 @@ class Event(db.Model):
     y_coordinate_normalized = db.Column(db.Float, nullable=True)
     strength_state = db.Column(db.String(20), nullable=True)  # e.g., '5v5', '5v4', 'PP', 'SH'
     
-    # Milestone 5.5: Data Correctness & Hardening fields
     period_type = db.Column(db.String(10), nullable=True)
     raw_situation_code = db.Column(db.String(4), nullable=True)
     home_skaters = db.Column(db.Integer, nullable=True)

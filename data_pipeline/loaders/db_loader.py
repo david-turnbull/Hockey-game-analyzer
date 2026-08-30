@@ -84,7 +84,7 @@ class DatabaseLoader:
                 existing_game.away_team_id = game.away_team_id
                 existing_game.home_score = game.home_score
                 existing_game.away_score = game.away_score
-                existing_game.game_status = game.game_status
+                existing_game.nhl_game_state = game.nhl_game_state
             else:
                 self.session.add(game)
                 

@@ -1,3 +1,3 @@
-from data_pipeline.validation.quality_checker import DataQualityChecker
+from data_pipeline.validation.ingestion_validator import IngestionValidator
 
-__all__ = ['DataQualityChecker']
+__all__ = ['IngestionValidator']

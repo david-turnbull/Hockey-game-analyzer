@@ -2,13 +2,13 @@ from sqlalchemy import or_
 from app.models import db, Game, Shift, Event, GamePlayer
 from app.services.on_ice_service import OnIceService
 
-class LineService:
-    """Service for computing forward line combinations and defensive pairings, including TOI and on-ice stats."""
+class UnitService:
+    """Service for computing forward lines and defensive pairings as unified skater units, including TOI and on-ice stats."""
 
     @staticmethod
-    def get_line_combinations(game_id: int) -> dict:
+    def get_unit_combinations(game_id: int) -> dict:
         """
-        Groups skaters into forward lines (trios) and defensive pairings (duos),
+        Groups skaters into forward lines (trios) and defensive pairings (duos) as skater units,
         calculating TOI and on-ice statistics (Goals For/Against, SOG For/Against)
         for each combination.
         """
@@ -416,7 +416,7 @@ class LineService:
                 "duration_str": f"{duration // 60}:{duration % 60:02d}"
             })
 
-        # Fetch Shots during unit's together time
+        # Fetch Shots during unit's together time (with standardized column names)
         shots = Shot.query.join(Event).filter(
             Event.game_id == game_id,
             Event.elapsed_game_seconds.in_(together_seconds),
@@ -465,8 +465,8 @@ class LineService:
                 "shot_id": s.shot_id,
                 "raw_x": s.event.x_coordinate,
                 "raw_y": s.event.y_coordinate,
-                "norm_x": s.x_coordinate,
-                "norm_y": s.y_coordinate,
+                "norm_x": s.x_coordinate_normalized,
+                "norm_y": s.y_coordinate_normalized,
                 "distance": s.distance,
                 "angle": s.angle,
                 "outcome": s.outcome,

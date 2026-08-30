@@ -3,8 +3,8 @@ from app.models import Game, Team, Player, Event, Shot, Shift
 
 logger = logging.getLogger(__name__)
 
-class DataQualityChecker:
-    """Validates hockey game data records and outputs structured quality reports."""
+class IngestionValidator:
+    """Validates hockey game data records during ingestion and outputs structured quality reports."""
 
     def __init__(self):
         self.warnings = []

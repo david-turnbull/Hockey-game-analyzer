@@ -259,7 +259,7 @@ class DataNormalizer:
         away_team_id = pbp_raw["awayTeam"]["id"]
         home_score = pbp_raw["homeTeam"].get("score", 0)
         away_score = pbp_raw["awayTeam"].get("score", 0)
-        game_status = pbp_raw.get("gameState")
+        nhl_game_state = pbp_raw.get("gameState")
         
         return Game(
             game_id=game_id,
@@ -270,7 +270,7 @@ class DataNormalizer:
             away_team_id=away_team_id,
             home_score=home_score,
             away_score=away_score,
-            game_status=game_status
+            nhl_game_state=nhl_game_state
         )
 
     def transform_event(self, play: dict, game_id: int, home_team_id: int) -> tuple:
@@ -425,8 +425,8 @@ class DataNormalizer:
                 shooter_id=primary_player_id,
                 goalie_id=secondary_player_id if event_type in ['shot-on-goal', 'goal', 'missed-shot'] else None,
                 shot_type=details.get("shotType"),
-                x_coordinate=norm_x,
-                y_coordinate=norm_y,
+                x_coordinate_normalized=norm_x,
+                y_coordinate_normalized=norm_y,
                 distance=metrics["distance"],
                 angle=metrics["angle"],
                 outcome=outcome,

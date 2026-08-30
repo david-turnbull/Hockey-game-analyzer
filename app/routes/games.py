@@ -80,8 +80,8 @@ def line_detail(game_id):
     except ValueError:
         abort(400)
         
-    from app.services.line_service import LineService
-    unit_stats = LineService.get_unit_detail(game_id, player_ids)
+    from app.services.unit_service import UnitService
+    unit_stats = UnitService.get_unit_detail(game_id, player_ids)
     if not unit_stats:
         abort(404)
         

@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Game Selector - NHL Hockey Analytics Platform{% endblock %}
+{% block title %}Game Selector - PuckLens{% endblock %}
 
 {% block content %}
 <h1 class="page-title">Game Selection Dashboard</h1>
@@ -14,7 +14,7 @@
     <p>Please initialize the database and ingest games using the CLI tools:</p>
     <pre class="font-mono" style="background: rgba(0, 0, 0, 0.2); padding: 1rem; border-radius: 4px; margin-top: 1rem;">
 # 1. Initialize DB tables
-python scripts/initialise_database.py
+python scripts/initialize_database.py
 
 # 2. Ingest some games (first 10 games of Calgary Flames 2023-2024)
 python scripts/ingest_season.py CGY 20232024 --limit 10

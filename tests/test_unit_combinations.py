@@ -1,11 +1,11 @@
 import pytest
 from datetime import date
 from app.models import Game, Team, Player, Shift, Event, Shot, GamePlayer
-from app.services.line_service import LineService
+from app.services.unit_service import UnitService
 
 def test_line_combinations_logic(app, db):
     """
-    Verify that get_line_combinations correctly identifies 3-forward lines 
+    Verify that get_unit_combinations correctly identifies 3-forward lines 
     and 2-defenseman pairings, computes their TOI, and maps events to them.
     """
     # 1. Seed Teams
@@ -135,8 +135,8 @@ def test_line_combinations_logic(app, db):
     db.session.add(shot1)
     db.session.commit()
     
-    # 6. Run line combinations engine
-    combos = LineService.get_line_combinations(800)
+    # 6. Run unit combinations engine
+    combos = UnitService.get_unit_combinations(800)
     
     assert combos is not None
     assert "home" in combos
@@ -263,7 +263,7 @@ def test_forward_line_minimum_toi_boundary_59_excluded_60_included(app, db):
     db.session.add_all(shifts)
     db.session.commit()
 
-    combos = LineService.get_line_combinations(801)
+    combos = UnitService.get_unit_combinations(801)
     home_lines = combos["home"]["lines"]
 
     excluded_59 = next((line for line in home_lines if 303 in line["player_ids"]), None)

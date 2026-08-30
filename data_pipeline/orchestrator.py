@@ -3,7 +3,7 @@ from app import create_app
 from app.models.base import db
 from data_pipeline.ingest.nhl_api import NHLApiClient
 from data_pipeline.transform.normalizer import DataNormalizer
-from data_pipeline.validation.quality_checker import DataQualityChecker
+from data_pipeline.validation.ingestion_validator import IngestionValidator
 from data_pipeline.loaders.db_loader import DatabaseLoader
 
 logger = logging.getLogger(__name__)
@@ -209,7 +209,7 @@ class PipelineOrchestrator:
             return False, {"error": f"Transformation failure: {str(e)}"}
             
         # 3. Validation Phase
-        checker = DataQualityChecker()
+        checker = IngestionValidator()
         
         # Validate game & teams & players
         checker.validate_game(game_model)
