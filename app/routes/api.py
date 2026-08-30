@@ -143,6 +143,9 @@ def get_schedule():
 @api_bp.route('/game/<int:game_id>/ingest', methods=['POST'])
 def ingest_single_game(game_id):
     """Ingests a single game on demand."""
+    if not current_app.config.get('ALLOW_PUBLIC_INGESTION', True):
+        return jsonify({"success": False, "error": "Public ingestion is disabled. Administration credentials required."}), 403
+
     from data_pipeline.orchestrator import PipelineOrchestrator
     try:
         current_app.logger.info(f"On-demand ingestion triggered for game_id={game_id}")
@@ -163,6 +166,7 @@ def ingest_single_game(game_id):
 def get_on_ice_players(game_id):
     """Returns the players on the ice for both teams at a specific period and game-clock time."""
     from app.models import Shift
+    from app.services.on_ice_service import OnIceService
     period_raw = request.args.get('period')
     time_str = request.args.get('time')
     
@@ -174,13 +178,12 @@ def get_on_ice_players(game_id):
     except ValueError:
         return jsonify({"error": "Invalid period format"}), 400
         
-    # Parse time_str (MM:SS) to seconds
+    # Parse time_str (MM:SS) to game-elapsed seconds (accounting for period offsets)
     if not time_str or ':' not in time_str:
         return jsonify({"error": "Invalid time format (must be MM:SS)"}), 400
         
     try:
-        minutes, seconds = map(int, time_str.split(':'))
-        elapsed_seconds = minutes * 60 + seconds
+        elapsed_seconds = OnIceService.period_time_to_game_elapsed(period, time_str)
     except ValueError:
         return jsonify({"error": "Invalid time format (must be MM:SS)"}), 400
         

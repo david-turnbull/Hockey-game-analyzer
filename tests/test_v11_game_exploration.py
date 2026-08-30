@@ -190,3 +190,76 @@ def test_on_demand_ingestion_api_endpoint(client, db):
         assert data["success"] is True
         assert data["summary"]["game_id"] == 2023020025
         mock_ingest.assert_called_once_with(2023020025)
+
+
+def test_on_ice_players_period_2_lookup(client, db):
+    """
+    Verifies that Period 2 / Period 3 on-ice lookups correctly calculate
+    multi-period game-elapsed offsets using OnIceService.period_time_to_game_elapsed.
+    """
+    cgy = Team(team_id=20, abbreviation='CGY', name='Calgary Flames')
+    wpg = Team(team_id=21, abbreviation='WPG', name='Winnipeg Jets')
+    db.session.add_all([cgy, wpg])
+    db.session.flush()
+
+    p1 = Player(player_id=1, first_name='Mikael', last_name='Backlund', position='C', sweater_number=11, current_team=cgy)
+    p3 = Player(player_id=3, first_name='Mark', last_name='Scheifele', position='C', sweater_number=55, current_team=wpg)
+    db.session.add_all([p1, p3])
+    db.session.flush()
+
+    game = Game(
+        game_id=2023020007,
+        season='20232024',
+        game_date=date(2023, 10, 11),
+        game_type='R',
+        home_team_id=20,
+        away_team_id=21,
+        home_score=5,
+        away_score=3,
+        game_status='Final'
+    )
+    db.session.add(game)
+    db.session.flush()
+
+    # Shift for Backlund: Period 2, 00:00 to 01:00 (which is 1200s to 1260s)
+    s1 = Shift(
+        shift_id="2023020007_1_2_1200",
+        game_id=2023020007,
+        player_id=1,
+        team_id=20,
+        period=2,
+        start_time="00:00",
+        end_time="01:00",
+        start_elapsed_seconds=1200,
+        end_elapsed_seconds=1260,
+        duration=60,
+        is_anomaly=False
+    )
+    # Shift for Scheifele: Period 2, 01:00 to 02:00 (which is 1260s to 1320s)
+    s2 = Shift(
+        shift_id="2023020007_3_2_1260",
+        game_id=2023020007,
+        player_id=3,
+        team_id=21,
+        period=2,
+        start_time="01:00",
+        end_time="02:00",
+        start_elapsed_seconds=1260,
+        end_elapsed_seconds=1320,
+        duration=60,
+        is_anomaly=False
+    )
+    db.session.add_all([s1, s2])
+    db.session.commit()
+
+    # Query Period 2 exactly at "01:00" -> this translates to 1260 game elapsed seconds
+    # Mikael Backlund: ends at 1260s -> EXCLUDED
+    # Mark Scheifele: starts at 1260s -> INCLUDED
+    res = client.get('/api/game/2023020007/on-ice?period=2&time=01:00')
+    assert res.status_code == 200
+    data = res.get_json()
+
+    assert len(data["home"]) == 0  # Calgary (Backlund) is excluded
+    assert len(data["away"]) == 1  # Winnipeg (Scheifele) is included
+    assert data["away"][0]["player_id"] == 3
+

@@ -81,6 +81,7 @@
     <button class="tab-button" onclick="switchTab(event, 'tab-shotmap')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Interactive Shot Map</button>
     <button class="tab-button" onclick="switchTab(event, 'tab-lines')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Line Combinations</button>
     <button class="tab-button" onclick="switchTab(event, 'tab-onice-explorer')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">On-Ice Explorer</button>
+    <a href="/game/{{ stats.game_id }}/compare?team_id={{ context_team_id }}" class="tab-button" style="text-decoration: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; padding: 0.5rem 1rem;">Player Comparison &rarr;</a>
 </div>
 
 <!-- Tab 1: Game Summary -->
@@ -622,7 +623,11 @@
                         {% else %}
                         {% for line in stats.line_combinations.away.lines %}
                         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
-                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ line.players }}</td>
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">
+                                <a href="/game/{{ stats.game_id }}/line?players={{ line.player_ids | join(',') }}&team_id={{ context_team_id }}" style="color: var(--accent-color); text-decoration: none;">
+                                    {{ line.players }}
+                                </a>
+                            </td>
                             <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ line.toi }}</td>
                             <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ line.goals_for }}</td>
                             <td style="padding: 0.5rem; text-align: center;">{{ line.goals_against }}</td>
@@ -656,7 +661,11 @@
                         {% else %}
                         {% for pair in stats.line_combinations.away.pairings %}
                         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
-                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ pair.players }}</td>
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">
+                                <a href="/game/{{ stats.game_id }}/line?players={{ pair.player_ids | join(',') }}&team_id={{ context_team_id }}" style="color: var(--accent-color); text-decoration: none;">
+                                    {{ pair.players }}
+                                </a>
+                            </td>
                             <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ pair.toi }}</td>
                             <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ pair.goals_for }}</td>
                             <td style="padding: 0.5rem; text-align: center;">{{ pair.goals_against }}</td>
@@ -695,7 +704,11 @@
                         {% else %}
                         {% for line in stats.line_combinations.home.lines %}
                         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
-                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ line.players }}</td>
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">
+                                <a href="/game/{{ stats.game_id }}/line?players={{ line.player_ids | join(',') }}&team_id={{ context_team_id }}" style="color: var(--accent-color); text-decoration: none;">
+                                    {{ line.players }}
+                                </a>
+                            </td>
                             <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ line.toi }}</td>
                             <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ line.goals_for }}</td>
                             <td style="padding: 0.5rem; text-align: center;">{{ line.goals_against }}</td>
@@ -729,7 +742,11 @@
                         {% else %}
                         {% for pair in stats.line_combinations.home.pairings %}
                         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
-                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ pair.players }}</td>
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">
+                                <a href="/game/{{ stats.game_id }}/line?players={{ pair.player_ids | join(',') }}&team_id={{ context_team_id }}" style="color: var(--accent-color); text-decoration: none;">
+                                    {{ pair.players }}
+                                </a>
+                            </td>
                             <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ pair.toi }}</td>
                             <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ pair.goals_for }}</td>
                             <td style="padding: 0.5rem; text-align: center;">{{ pair.goals_against }}</td>

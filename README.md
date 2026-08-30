@@ -2,7 +2,7 @@
 
 [![Run Automated Tests](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml)
 
-**Current Release:** `v1.0.0`
+**Current Release:** `v1.1.0`
 
 Hockey Game Analyzer is an independent hockey-operations analytics platform that transforms raw NHL play-by-play and shift data into reproducible game, player, lineup, possession, and spatial analysis.
 
@@ -20,8 +20,11 @@ The project is designed as both a hockey analytics tool and a portfolio demonstr
 - **5v5 forward combinations** — observed forward trios with shared TOI and on-ice GF/GA/SF/SA.
 - **Defensive pairings** — defenseman duos with shared TOI and on-ice GF/GA/SF/SA.
 - **Prototype expected goals (xG)** — transparent heuristic shot-quality estimates using distance, angle, shot type, and manpower context.
-- **Full-season ingestion** — ingest a team's regular-season schedule using the same validated game pipeline.
-- **Automated regression testing and CI** — analytical edge cases and historical attribution are covered by `pytest` and GitHub Actions.
+- **Shared 5v5 combination drill-down** — Clickable forward lines and defensive pairings details dashboard showing shared shifts, on-ice events, Corsi/Fenwick statistics, and Plotly shot maps.
+- **Side-by-side player comparisons** — Side-by-side single-game performance comparison dashboard with situation filters and dual Plotly maps.
+- **Standardized metric explanations** — Help tooltip hovers explaining advanced stats (Corsi, Fenwick, xG) across the platform.
+- **Full-season ingestion** — Ingest a team's regular-season schedule using the same validated game pipeline.
+- **Automated regression testing and CI** — Analytical edge cases and historical attribution are covered by `pytest` and GitHub Actions.
 
 ---
 
@@ -302,7 +305,7 @@ The application preserves source values where practical. For example, the NHL ga
 ```powershell
 git clone https://github.com/david-turnbull/Hockey-game-analyzer.git
 cd Hockey-game-analyzer
-git checkout v1.0
+git checkout v1.1
 ```
 
 ### 2. Create a virtual environment
@@ -470,15 +473,15 @@ Diagnostics are intended for development and verification and are hidden from th
 - automated regression testing
 - full-team-season ingestion
 
-### v1.1 — Exploration & Usability
+### v1.1 — Exploration & Usability (Completed)
 
-Potential next steps include:
+Version 1.1 delivers a robust set of exploration capabilities:
 
-- event overlays on the shift visualizer
-- improved line-combination drill-down
-- richer metric explanations/tooltips
-- accessibility and responsive UI refinement
-- clearer presentation for different hockey-analytics experience levels
+- event overlays on the timeline
+- interactive shared forward line & defensive pairing detail views
+- side-by-side player comparison dashboard
+- standardized metric explanations and hover tooltips
+- UI responsive and accessibility refinements
 
 ### Future Modelling
 
@@ -494,6 +497,6 @@ Planned research directions include:
 
 ## Project Status
 
-`v1.0.0`
+`v1.1.0`
 
-The emphasis of v1.0 is **analytical correctness, reproducibility, transparent methodology, and a strong single-game/player analytics foundation** rather than production-scale deployment or predictive modelling.
+The emphasis of v1.1 is **bringing reliable game-exploration, visual analytics, and modular sports services** to the analytics foundation built in v1.0.

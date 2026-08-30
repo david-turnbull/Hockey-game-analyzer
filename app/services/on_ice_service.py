@@ -106,3 +106,21 @@ class OnIceService:
         """Helper to retrieve active goalie(s) on the ice."""
         players = OnIceService.get_players_on_ice(game_id, elapsed_seconds, team_id)
         return [p for p in players if p["position"] == "G"]
+
+    @staticmethod
+    def period_time_to_game_elapsed(period: int, period_time_str: str) -> int:
+        """
+        Converts a period-specific time string (MM:SS) into game-elapsed seconds.
+        E.g. period 1, "01:00" -> 60
+             period 2, "01:00" -> 1260
+        """
+        if not period_time_str or ':' not in period_time_str:
+            return 0
+        try:
+            parts = period_time_str.split(':')
+            minutes = int(parts[0])
+            seconds = int(parts[1])
+            elapsed_seconds = (period - 1) * 1200 + minutes * 60 + seconds
+            return elapsed_seconds
+        except ValueError:
+            return 0

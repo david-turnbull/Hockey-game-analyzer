@@ -336,10 +336,10 @@ class GameService:
                 if s.outcome in ['Goal', 'Saved']:
                     if s.shooter_id in player_stats:
                         player_stats[s.shooter_id]["shots"] += 1
-                if s.goalie_id in player_stats:
-                    player_stats[s.goalie_id]["shots_faced"] += 1
-                    if s.goal:
-                        player_stats[s.goalie_id]["goals_against"] += 1
+                    if s.goalie_id in player_stats:
+                        player_stats[s.goalie_id]["shots_faced"] += 1
+                        if s.goal:
+                            player_stats[s.goalie_id]["goals_against"] += 1
                         
         # Get possession stats (Corsi / Fenwick) for skaters from PossessionService (mode="5v5")
         possession = PossessionService.calculate_possession_stats(game_id, mode="5v5")

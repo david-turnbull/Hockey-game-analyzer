@@ -262,3 +262,332 @@ class LineService:
                 "pairings": away_def_list[:5]
             }
         }
+
+    @classmethod
+    def get_unit_detail(cls, game_id: int, player_ids: list) -> dict:
+        """
+        Computes detailed on-ice statistics, shared shifts, timeline events,
+        and shot coordinates for a specific skater combination (trio or duo)
+        during complete 5v5 play.
+        """
+        from app.models import Player, GamePlayer, Shot, Event, Team
+        from app.services.on_ice_service import OnIceService
+        from sqlalchemy.orm import joinedload
+        
+        game = db.session.get(Game, game_id)
+        if not game:
+            return {}
+
+        home_team_id = game.home_team_id
+        away_team_id = game.away_team_id
+
+        # Fetch players metadata
+        players = Player.query.filter(Player.player_id.in_(player_ids)).all()
+        players_map = {p.player_id: p for p in players}
+
+        # Fetch roster GamePlayer mappings for jersey and position validation
+        roster = GamePlayer.query.filter(
+            GamePlayer.game_id == game_id,
+            GamePlayer.player_id.in_(player_ids)
+        ).all()
+        roster_map = {r.player_id: r for r in roster}
+
+        # Resolve unit team
+        unit_team_id = None
+        if roster:
+            unit_team_id = roster[0].team_id
+        else:
+            # fallback to player's current team
+            if players:
+                unit_team_id = players[0].current_team_id
+
+        is_home_unit = (unit_team_id == home_team_id)
+        unit_team = db.session.get(Team, unit_team_id) if unit_team_id else None
+        opponent_team = db.session.get(Team, away_team_id if is_home_unit else home_team_id)
+
+        # Get general game rosters
+        full_roster = GamePlayer.query.filter_by(game_id=game_id).all()
+        player_meta = {}
+        for rp in full_roster:
+            player_meta[rp.player_id] = {
+                "name": rp.player.full_name if rp.player else f"Player {rp.player_id}",
+                "position": rp.position or (rp.player.position if rp.player else "skater")
+            }
+
+        FORWARD_POSITIONS = {'C', 'L', 'R', 'LW', 'RW', 'F'}
+        DEFENSE_POSITIONS = {'D', 'LD', 'RD'}
+
+        def is_forward(p_id):
+            pos = player_meta.get(p_id, {}).get("position")
+            return pos in FORWARD_POSITIONS
+
+        def is_defenseman(p_id):
+            pos = player_meta.get(p_id, {}).get("position")
+            return pos in DEFENSE_POSITIONS
+
+        # Fetch shifts
+        shifts = Shift.query.filter(Shift.game_id == game_id).all()
+        max_time = 3600
+        for s in shifts:
+            if s.end_elapsed_seconds is not None and s.end_elapsed_seconds > max_time:
+                max_time = s.end_elapsed_seconds
+
+        home_players_timeline, away_players_timeline = OnIceService.build_active_players_timeline(
+            shifts, max_time, home_team_id
+        )
+
+        def get_true_5v5_combinations(t):
+            if t < 0 or t >= max_time:
+                return None
+            h_players = home_players_timeline[t]
+            a_players = away_players_timeline[t]
+
+            h_skaters = {p for p in h_players if player_meta.get(p, {}).get("position") != "G"}
+            a_skaters = {p for p in a_players if player_meta.get(p, {}).get("position") != "G"}
+            h_goalies = [p for p in h_players if player_meta.get(p, {}).get("position") == "G"]
+            a_goalies = [p for p in a_players if player_meta.get(p, {}).get("position") == "G"]
+
+            h_fwds = tuple(sorted(p for p in h_skaters if is_forward(p)))
+            h_def = tuple(sorted(p for p in h_skaters if is_defenseman(p)))
+            a_fwds = tuple(sorted(p for p in a_skaters if is_forward(p)))
+            a_def = tuple(sorted(p for p in a_skaters if is_defenseman(p)))
+
+            valid_5v5 = (
+                len(h_skaters) == 5
+                and len(a_skaters) == 5
+                and len(h_fwds) == 3
+                and len(h_def) == 2
+                and len(a_fwds) == 3
+                and len(a_def) == 2
+                and len(h_goalies) == 1
+                and len(a_goalies) == 1
+            )
+            if not valid_5v5:
+                return None
+            return h_fwds, h_def, a_fwds, a_def
+
+        # Compute seconds on ice together
+        together_seconds = []
+        unit_set = set(player_ids)
+        for t in range(max_time):
+            combos = get_true_5v5_combinations(t)
+            if combos is None:
+                continue
+            h_fwds, h_def, a_fwds, a_def = combos
+            if len(player_ids) == 3:
+                if unit_set.issubset(h_fwds) or unit_set.issubset(a_fwds):
+                    together_seconds.append(t)
+            elif len(player_ids) == 2:
+                if unit_set.issubset(h_def) or unit_set.issubset(a_def):
+                    together_seconds.append(t)
+
+        together_set = set(together_seconds)
+        toi_seconds = len(together_seconds)
+
+        # Formulate shared shift intervals
+        intervals = []
+        if together_seconds:
+            start_sec = together_seconds[0]
+            prev_sec = together_seconds[0]
+            for sec in together_seconds[1:]:
+                if sec == prev_sec + 1:
+                    prev_sec = sec
+                else:
+                    intervals.append((start_sec, prev_sec))
+                    start_sec = sec
+                    prev_sec = sec
+            intervals.append((start_sec, prev_sec))
+
+        formatted_intervals = []
+        for start, end in intervals:
+            period = start // 1200 + 1
+            start_in_period = start % 1200
+            end_in_period = (end + 1) % 1200
+            if end_in_period == 0 and end > 0:
+                end_in_period = 1200
+            duration = end + 1 - start
+            start_str = f"{start_in_period // 60:02d}:{start_in_period % 60:02d}"
+            end_str = f"{end_in_period // 60:02d}:{end_in_period % 60:02d}"
+            formatted_intervals.append({
+                "period": period,
+                "start": start_str,
+                "end": end_str,
+                "duration": duration,
+                "duration_str": f"{duration // 60}:{duration % 60:02d}"
+            })
+
+        # Fetch Shots during unit's together time
+        shots = Shot.query.join(Event).filter(
+            Event.game_id == game_id,
+            Event.elapsed_game_seconds.in_(together_seconds),
+            or_(Event.period_type != 'SO', Event.period_type.is_(None))
+        ).options(
+            joinedload(Shot.event).joinedload(Event.team),
+            joinedload(Shot.shooter),
+            joinedload(Shot.goalie)
+        ).all()
+
+        cf = ca = ff = fa = sf = sa = gf = ga = 0
+        formatted_shots = []
+
+        for s in shots:
+            is_for = (s.team_id == unit_team_id)
+            
+            # Corsi
+            if is_for:
+                cf += 1
+            else:
+                ca += 1
+
+            # Fenwick (unblocked)
+            if s.outcome != 'Blocked':
+                if is_for:
+                    ff += 1
+                else:
+                    fa += 1
+
+            # Shots on goal
+            if s.outcome in ['Goal', 'Saved']:
+                if is_for:
+                    sf += 1
+                else:
+                    sa += 1
+
+            # Goals
+            if s.goal:
+                if is_for:
+                    gf += 1
+                else:
+                    ga += 1
+
+            # Format for client-side Plotly map reuse
+            formatted_shots.append({
+                "shot_id": s.shot_id,
+                "raw_x": s.event.x_coordinate,
+                "raw_y": s.event.y_coordinate,
+                "norm_x": s.x_coordinate,
+                "norm_y": s.y_coordinate,
+                "distance": s.distance,
+                "angle": s.angle,
+                "outcome": s.outcome,
+                "shot_type": s.shot_type,
+                "team_abbrev": s.event.team.abbreviation if s.event.team else "UNK",
+                "team_id": s.event.team_id,
+                "shooter_name": s.shooter.full_name if s.shooter else "Unknown",
+                "shooter_id": s.shooter_id,
+                "goalie_name": s.goalie.full_name if s.goalie else "None",
+                "period": s.event.period,
+                "period_time": s.event.period_time,
+                "strength_state": s.strength_state,
+                "manpower_state": s.event.manpower_state,
+                "empty_net": s.empty_net,
+                "xg": round(s.xg, 4) if s.xg is not None else 0.0
+            })
+
+        cf_pct = round((cf / (cf + ca) * 100), 1) if (cf + ca) > 0 else 50.0
+        ff_pct = round((ff / (ff + fa) * 100), 1) if (ff + fa) > 0 else 50.0
+
+        # Fetch play-by-play events during together time
+        events = Event.query.filter(
+            Event.game_id == game_id,
+            Event.elapsed_game_seconds.in_(together_seconds)
+        ).order_by(Event.period.asc(), Event.elapsed_game_seconds.asc()).all()
+
+        timeline = []
+        home_team_abbr = game.home_team.abbreviation
+        away_team_abbr = game.away_team.abbreviation
+        
+        for event in events:
+            is_home_event = (event.team_id == home_team_id)
+            event_team_abbr = home_team_abbr if is_home_event else away_team_abbr
+            
+            event_data = {
+                "event_id": event.event_id,
+                "event_type": event.event_type,
+                "period": event.period,
+                "period_time": event.period_time,
+                "elapsed_game_seconds": event.elapsed_game_seconds,
+                "team_abbrev": event_team_abbr,
+                "strength_state": event.strength_state,
+                "period_type": event.period_type
+            }
+            
+            desc = ""
+            if event.event_type == 'goal':
+                scorer = event.primary_player.full_name if event.primary_player else "Unknown"
+                desc = f"Goal scored by {scorer} ({event.strength_state})"
+            elif event.event_type == 'shot-on-goal':
+                shooter = event.primary_player.full_name if event.primary_player else "Unknown"
+                desc = f"Shot on goal by {shooter} (saved)"
+            elif event.event_type == 'missed-shot':
+                shooter = event.primary_player.full_name if event.primary_player else "Unknown"
+                desc = f"Shot by {shooter} missed net"
+            elif event.event_type == 'blocked-shot':
+                shooter = event.primary_player.full_name if event.primary_player else "Unknown"
+                blocker = event.secondary_player.full_name if event.secondary_player else "Unknown"
+                desc = f"Shot by {shooter} blocked by {blocker}"
+            elif event.event_type == 'hit':
+                hitter = event.primary_player.full_name if event.primary_player else "Unknown"
+                hittee = event.secondary_player.full_name if event.secondary_player else "Unknown"
+                desc = f"Hit delivered by {hitter} on {hittee}"
+            elif event.event_type == 'penalty':
+                infraction = event.penalty_description or "Unknown infraction"
+                dur = event.penalty_duration or 2
+                committer = event.primary_player.full_name if event.primary_player else "Unknown"
+                desc = f"Penalty to {committer} ({dur} min for {infraction})"
+            elif event.event_type == 'faceoff':
+                winner = event.primary_player.full_name if event.primary_player else "Unknown"
+                loser = event.secondary_player.full_name if event.secondary_player else "Unknown"
+                desc = f"Faceoff won by {winner} against {loser}"
+                
+            event_data["description"] = desc
+            timeline.append(event_data)
+
+        # Build players list details
+        player_details = []
+        for p_id in player_ids:
+            p = players_map.get(p_id)
+            r = roster_map.get(p_id)
+            player_details.append({
+                "player_id": p_id,
+                "name": p.full_name if p else f"Player {p_id}",
+                "number": r.sweater_number if r else (p.sweater_number if p else None),
+                "position": r.position if r else (p.position if p else "skater"),
+                "shoots_catches": p.shoots_catches if p else None,
+                "headshot_url": p.headshot_url if p else None
+            })
+
+        mins = toi_seconds // 60
+        secs = toi_seconds % 60
+        toi_str = f"{mins:02d}:{secs:02d}"
+
+        return {
+            "game_id": game_id,
+            "toi_seconds": toi_seconds,
+            "toi": toi_str,
+            "team": {
+                "id": unit_team_id,
+                "name": unit_team.name if unit_team else "Unknown Team",
+                "abbrev": unit_team.abbreviation if unit_team else "UNK"
+            },
+            "opponent": {
+                "name": opponent_team.name if opponent_team else "Unknown Opponent",
+                "abbrev": opponent_team.abbreviation if opponent_team else "UNK"
+            },
+            "players": player_details,
+            "intervals": formatted_intervals,
+            "stats": {
+                "gf": gf,
+                "ga": ga,
+                "sf": sf,
+                "sa": sa,
+                "cf": cf,
+                "ca": ca,
+                "cf_pct": cf_pct,
+                "ff": ff,
+                "fa": fa,
+                "ff_pct": ff_pct
+            },
+            "shots": formatted_shots,
+            "timeline": timeline
+        }
