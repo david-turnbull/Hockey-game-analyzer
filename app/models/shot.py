@@ -35,7 +35,8 @@ class Shot(db.Model):
     goal = db.Column(db.Boolean, default=False, nullable=False)
     strength_state = db.Column(db.String(20))
     empty_net = db.Column(db.Boolean, default=False)
-    xg = db.Column(db.Float, nullable=True)  # Expected goals prediction (when model is built)
+    xg = db.Column(db.Float, nullable=True)  # Expected goals prediction
+    model_version = db.Column(db.String(50), nullable=True)  # Name/version of generating model
     
     game_id = db.Column(db.Integer, db.ForeignKey('game.game_id'), nullable=True, index=True)
     team_id = db.Column(db.Integer, db.ForeignKey('team.team_id'), nullable=True, index=True)

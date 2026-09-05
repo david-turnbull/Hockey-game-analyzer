@@ -16,9 +16,14 @@ window.switchTab = function(event, tabId) {
     // Add active class to clicked button
     event.currentTarget.classList.add('active');
     
-    // If we switched to shotmap tab, resize Plotly plot to fit container correctly
+    // If we switched to shotmap or timeline tab, resize Plotly plot to fit container correctly
     if (tabId === 'tab-shotmap') {
         const plotEl = document.getElementById('shot-map-plot');
+        if (plotEl && window.Plotly) {
+            window.Plotly.Plots.resize(plotEl);
+        }
+    } else if (tabId === 'tab-timeline') {
+        const plotEl = document.getElementById('xg-timeline-plot');
         if (plotEl && window.Plotly) {
             window.Plotly.Plots.resize(plotEl);
         }
@@ -144,10 +149,11 @@ window.fetchOnIcePlayers = async function(contextLabel = "") {
     }
 };
 
-// Interactive Shot Map Logic
+// Interactive Shot Map & Expected Goals Timeline Logic
 document.addEventListener("DOMContentLoaded", () => {
     if (typeof GAME_ID !== 'undefined') {
         initShotMap();
+        initXGTimeline();
     }
 });
 
@@ -218,15 +224,21 @@ async function initShotMap() {
             return {
                 x: list.map(s => normalize ? s.norm_x : s.raw_x),
                 y: list.map(s => normalize ? s.norm_y : s.raw_y),
+                size: list.map(s => {
+                    const prob = (s.xg !== undefined && s.xg !== null) ? Number(s.xg) : 0.05;
+                    return Math.max(7, Math.min(26, Math.round(7 + prob * 28)));
+                }),
                 text: list.map(s => {
-                    const goalDetail = s.outcome === "Goal" ? `<b>GOAL!</b><br>` : "";
-                    const goalieText = s.goalie_name !== "None" ? `<br>Goalie: ${s.goalie_name}` : "";
-                    const xgText = s.xg !== undefined && s.xg !== null ? `<br>xG: ${s.xg.toFixed(4)}` : "";
-                    return `${goalDetail}Shooter: ${s.shooter_name} (${s.team_abbrev})` +
-                           `${goalieText}<br>Shot: ${s.shot_type}` +
-                           `<br>Dist: ${Math.round(s.distance)} ft &nbsp; Angle: ${Math.round(s.angle)}°` +
-                           `<br>P${s.period} - ${s.period_time} &nbsp; Strength: ${s.strength_state}` +
-                           `${xgText}`;
+                    const xgFormatted = (s.xg !== undefined && s.xg !== null) ? Number(s.xg).toFixed(3) : "N/A";
+                    const distText = (s.distance !== undefined && s.distance !== null) ? `${Math.round(s.distance)} ft` : "N/A";
+                    const angleText = (s.angle !== undefined && s.angle !== null) ? `${Math.round(s.angle)}°` : "N/A";
+                    const shotType = s.shot_type ? s.shot_type : "Shot";
+                    return `<b>${s.shooter_name}</b><br>` +
+                           `${shotType} Shot<br>` +
+                           `<b>xG:</b> ${xgFormatted}<br>` +
+                           `<b>Distance:</b> ${distText}<br>` +
+                           `<b>Angle:</b> ${angleText}<br>` +
+                           `<b>Result:</b> ${s.outcome}`;
                 })
             };
         };
@@ -246,9 +258,9 @@ async function initShotMap() {
                 hoverinfo: 'text',
                 marker: {
                     symbol: 'star',
-                    size: 13,
+                    size: gCoords.size,
                     color: '#10b981',
-                    line: { width: 1, color: '#ffffff' }
+                    line: { width: 1.5, color: '#ffffff' }
                 }
             },
             {
@@ -260,8 +272,9 @@ async function initShotMap() {
                 hoverinfo: 'text',
                 marker: {
                     symbol: 'circle',
-                    size: 8,
-                    color: '#38bdf8'
+                    size: sCoords.size,
+                    color: '#38bdf8',
+                    opacity: 0.85
                 }
             },
             {
@@ -273,8 +286,9 @@ async function initShotMap() {
                 hoverinfo: 'text',
                 marker: {
                     symbol: 'diamond',
-                    size: 8,
-                    color: '#f59e0b'
+                    size: mCoords.size,
+                    color: '#f59e0b',
+                    opacity: 0.85
                 }
             },
             {
@@ -286,8 +300,9 @@ async function initShotMap() {
                 hoverinfo: 'text',
                 marker: {
                     symbol: 'x',
-                    size: 8,
-                    color: '#ef4444'
+                    size: bCoords.size,
+                    color: '#ef4444',
+                    opacity: 0.85
                 }
             }
         ];
@@ -432,4 +447,135 @@ async function initShotMap() {
     normalizeToggle.addEventListener("change", renderPlot);
 
     renderPlot();
+}
+
+// ==========================================
+// Milestone 11: Expected Goals Timeline
+// ==========================================
+async function initXGTimeline() {
+    const plotContainer = document.getElementById("xg-timeline-plot");
+    if (!plotContainer) return;
+
+    let currentSituation = 'all';
+
+    async function loadAndRender(situation) {
+        try {
+            const res = await fetch(`/api/games/${GAME_ID}/xg_timeline?situation=${situation}`);
+            if (!res.ok) throw new Error("Failed to fetch timeline data");
+            const data = await res.json();
+
+            renderTimelinePlot(data);
+        } catch (err) {
+            console.error("xG Timeline Error:", err);
+            plotContainer.innerHTML = `<p style="color: var(--danger); text-align: center; padding: 2rem;">Failed to load xG timeline: ${err.message}</p>`;
+        }
+    }
+
+    function renderTimelinePlot(data) {
+        const homeAbbrev = data.home_team.abbrev;
+        const awayAbbrev = data.away_team.abbrev;
+        const homeTotal = data.home_team.total_xg;
+        const awayTotal = data.away_team.total_xg;
+
+        // Group timeline points
+        const times = data.timeline.map(t => (t.seconds / 60.0).toFixed(2));
+        const homeXG = data.timeline.map(t => t.home_xg);
+        const awayXG = data.timeline.map(t => t.away_xg);
+        const hoverTextsHome = data.timeline.map(t => `<b>${homeAbbrev}</b><br>Time: P${t.period} ${t.period_time}<br>Cumulative xG: ${t.home_xg}`);
+        const hoverTextsAway = data.timeline.map(t => `<b>${awayAbbrev}</b><br>Time: P${t.period} ${t.period_time}<br>Cumulative xG: ${t.away_xg}`);
+
+        const traces = [
+            {
+                x: times,
+                y: homeXG,
+                text: hoverTextsHome,
+                hoverinfo: 'text',
+                mode: 'lines',
+                name: `${homeAbbrev} (Home: ${homeTotal} xG)`,
+                line: { shape: 'hv', color: '#38bdf8', width: 3 }
+            },
+            {
+                x: times,
+                y: awayXG,
+                text: hoverTextsAway,
+                hoverinfo: 'text',
+                mode: 'lines',
+                name: `${awayAbbrev} (Away: ${awayTotal} xG)`,
+                line: { shape: 'hv', color: '#f97316', width: 3 }
+            }
+        ];
+
+        // Add goal markers
+        if (data.goals && data.goals.length > 0) {
+            const goalTimes = data.goals.map(g => (g.seconds / 60.0).toFixed(2));
+            const goalY = data.goals.map(g => g.is_home ? g.home_xg : g.away_xg);
+            const goalTexts = data.goals.map(g => `<b>GOAL!</b> ${g.scorer} (${g.team_abbrev})<br>P${g.period} ${g.period_time}`);
+            const goalColors = data.goals.map(g => g.is_home ? '#38bdf8' : '#f97316');
+
+            traces.push({
+                x: goalTimes,
+                y: goalY,
+                text: goalTexts,
+                hoverinfo: 'text',
+                mode: 'markers',
+                name: 'Actual Goal',
+                marker: {
+                    symbol: 'star',
+                    size: 14,
+                    color: goalColors,
+                    line: { width: 2, color: '#ffffff' }
+                }
+            });
+        }
+
+        // Period break markers at 20, 40, 60 minutes
+        const maxMinute = Math.max(60, Math.ceil((times[times.length - 1] || 60) / 5) * 5);
+        const shapes = [
+            { type: 'line', x0: 20, x1: 20, y0: 0, y1: 1, yref: 'paper', line: { color: 'rgba(255,255,255,0.2)', dash: 'dash', width: 1 } },
+            { type: 'line', x0: 40, x1: 40, y0: 0, y1: 1, yref: 'paper', line: { color: 'rgba(255,255,255,0.2)', dash: 'dash', width: 1 } },
+            { type: 'line', x0: 60, x1: 60, y0: 0, y1: 1, yref: 'paper', line: { color: 'rgba(255,255,255,0.2)', dash: 'dash', width: 1 } }
+        ];
+
+        const layout = {
+            plot_bgcolor: '#0f172a',
+            paper_bgcolor: '#0b0f19',
+            shapes: shapes,
+            xaxis: {
+                title: { text: 'Game Time (Minutes)', font: { color: '#94a3b8', size: 12 } },
+                range: [0, maxMinute],
+                tickvals: [0, 20, 40, 60],
+                ticktext: ['Start', 'End P1', 'End P2', 'End P3'],
+                gridcolor: 'rgba(255,255,255,0.05)',
+                tickfont: { color: '#cbd5e1' }
+            },
+            yaxis: {
+                title: { text: 'Cumulative Expected Goals (xG)', font: { color: '#94a3b8', size: 12 } },
+                gridcolor: 'rgba(255,255,255,0.05)',
+                tickfont: { color: '#cbd5e1' }
+            },
+            margin: { l: 50, r: 20, t: 30, b: 50 },
+            legend: {
+                font: { color: '#cbd5e1' },
+                orientation: 'h',
+                x: 0.5,
+                xanchor: 'center',
+                y: -0.2
+            }
+        };
+
+        Plotly.newPlot(plotContainer, traces, layout, { responsive: true, displayModeBar: false });
+    }
+
+    // Attach situation filter listeners
+    const buttons = document.querySelectorAll('[data-xg-situation]');
+    buttons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            buttons.forEach(b => b.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            currentSituation = e.currentTarget.getAttribute('data-xg-situation');
+            loadAndRender(currentSituation);
+        });
+    });
+
+    loadAndRender(currentSituation);
 }

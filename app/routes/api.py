@@ -67,10 +67,22 @@ def get_shots(game_id=None):
             "strength_state": s.strength_state,
             "manpower_state": s.event.manpower_state,
             "empty_net": s.empty_net,
-            "xg": round(s.xg, 4) if s.xg is not None else 0.0
+            "xg": round(s.xg, 4) if s.xg is not None else 0.0,
+            "model_version": s.model_version
         })
         
     return jsonify(formatted_shots)
+
+
+@api_bp.route('/games/<int:game_id>/xg_timeline')
+@api_bp.route('/game/<int:game_id>/xg_timeline')
+def get_xg_timeline(game_id: int):
+    """Returns the cumulative expected goals timeline for a game."""
+    situation = request.args.get('situation', 'all').lower()
+    timeline_data = GameService.get_game_xg_timeline(game_id, situation=situation)
+    if not timeline_data:
+        return jsonify({"error": f"Game {game_id} not found"}), 404
+    return jsonify(timeline_data)
 
 
 @api_bp.route('/schedule')

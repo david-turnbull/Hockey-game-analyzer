@@ -96,6 +96,9 @@ def run_migrations(db):
             if "y_coordinate" in existing_shot_cols and "y_coordinate_normalized" not in existing_shot_cols:
                 logger.info("Migrating: Renaming column 'y_coordinate' to 'y_coordinate_normalized' in 'shot' table")
                 connection.execute(text("ALTER TABLE shot RENAME COLUMN y_coordinate TO y_coordinate_normalized"))
+            if "model_version" not in existing_shot_cols:
+                logger.info("Migrating: Adding column 'model_version' to 'shot' table")
+                connection.execute(text("ALTER TABLE shot ADD COLUMN model_version VARCHAR(50)"))
             
         db.session.commit()
         logger.info("Database migration check completed successfully.")

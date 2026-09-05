@@ -1,4 +1,4 @@
-from app.models import db, Game, Team
+from app.models import db, Game, Team, Event, Shot
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from app.utils.game_status import (
@@ -120,6 +120,53 @@ class GameService:
         
         home_xg = round(home_xg_val, 2) if home_xg_val is not None else 0.0
         away_xg = round(away_xg_val, 2) if away_xg_val is not None else 0.0
+
+        # Calculate 5v5 Expected Goals
+        home_5v5_xg_val = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
+            Event.game_id == game_id,
+            Event.team_id == game.home_team_id,
+            Event.team_strength_state == '5v5',
+            or_(Event.period_type != 'SO', Event.period_type.is_(None))
+        ).scalar()
+        away_5v5_xg_val = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
+            Event.game_id == game_id,
+            Event.team_id == game.away_team_id,
+            Event.team_strength_state == '5v5',
+            or_(Event.period_type != 'SO', Event.period_type.is_(None))
+        ).scalar()
+        home_5v5_xg = round(home_5v5_xg_val, 2) if home_5v5_xg_val is not None else 0.0
+        away_5v5_xg = round(away_5v5_xg_val, 2) if away_5v5_xg_val is not None else 0.0
+
+        # xG% = xGF / (xGF + xGA)
+        tot_xg = home_xg + away_xg
+        home_xg_pct = round((home_xg / tot_xg * 100), 1) if tot_xg > 0 else 50.0
+        away_xg_pct = round((away_xg / tot_xg * 100), 1) if tot_xg > 0 else 50.0
+
+        # Period-by-period xG breakdown
+        periods = [r[0] for r in db.session.query(Event.period).filter(
+            Event.game_id == game_id,
+            or_(Event.period_type != 'SO', Event.period_type.is_(None))
+        ).distinct().order_by(Event.period.asc()).all()]
+        
+        xg_by_period = {}
+        for p in periods:
+            h_p_xg = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
+                Event.game_id == game_id,
+                Event.team_id == game.home_team_id,
+                Event.period == p,
+                or_(Event.period_type != 'SO', Event.period_type.is_(None))
+            ).scalar() or 0.0
+            a_p_xg = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
+                Event.game_id == game_id,
+                Event.team_id == game.away_team_id,
+                Event.period == p,
+                or_(Event.period_type != 'SO', Event.period_type.is_(None))
+            ).scalar() or 0.0
+            label = f"P{p}" if p <= 3 else "OT"
+            xg_by_period[label] = {
+                "home": round(h_p_xg, 2),
+                "away": round(a_p_xg, 2)
+            }
         
         # 3. Calculate Shooting percentages
         home_shooting_pct = round((game.home_score / home_sog * 100), 1) if home_sog > 0 else 0.0
@@ -418,7 +465,12 @@ class GameService:
                 "home_ppg": home_ppg,
                 "away_ppg": away_ppg,
                 "home_xg": home_xg,
-                "away_xg": away_xg
+                "away_xg": away_xg,
+                "home_5v5_xg": home_5v5_xg,
+                "away_5v5_xg": away_5v5_xg,
+                "home_xg_pct": home_xg_pct,
+                "away_xg_pct": away_xg_pct,
+                "xg_by_period": xg_by_period
             },
             
             # Timeline grouped by period
@@ -433,4 +485,100 @@ class GameService:
             },
             # Line Combinations
             "line_combinations": UnitService.get_unit_combinations(game_id)
+        }
+
+    @classmethod
+    def get_game_xg_timeline(cls, game_id: int, situation: str = 'all') -> dict:
+        """
+        Calculates cumulative expected goals timeline series for home and away teams.
+        Supports filtering by situation: 'all', '5v5', 'pp'.
+        """
+        game = db.session.get(Game, game_id)
+        if not game:
+            return {}
+
+        home_team_id = game.home_team_id
+        away_team_id = game.away_team_id
+
+        query = Shot.query.join(Event).filter(
+            Event.game_id == game_id,
+            or_(Event.period_type != 'SO', Event.period_type.is_(None)),
+            Event.elapsed_game_seconds.isnot(None)
+        )
+
+        if situation == '5v5':
+            query = query.filter(Event.team_strength_state == '5v5')
+        elif situation == 'pp':
+            query = query.filter(Event.strength_state == 'PP')
+
+        shots = query.order_by(Event.period.asc(), Event.elapsed_game_seconds.asc()).all()
+
+        timeline = []
+        home_cum_xg = 0.0
+        away_cum_xg = 0.0
+
+        # Initial point at clock 0
+        timeline.append({
+            "seconds": 0,
+            "period": 1,
+            "period_time": "00:00",
+            "home_xg": 0.0,
+            "away_xg": 0.0
+        })
+
+        goals = []
+
+        for shot in shots:
+            evt = shot.event
+            s_val = round(float(shot.xg), 4) if shot.xg is not None else 0.0
+            is_home = (evt.team_id == home_team_id)
+
+            if is_home:
+                home_cum_xg += s_val
+            else:
+                away_cum_xg += s_val
+
+            timeline.append({
+                "seconds": evt.elapsed_game_seconds,
+                "period": evt.period,
+                "period_time": evt.period_time,
+                "home_xg": round(home_cum_xg, 2),
+                "away_xg": round(away_cum_xg, 2),
+                "event_type": evt.event_type,
+                "shooter_id": shot.shooter_id,
+                "shooter_name": shot.shooter.full_name if shot.shooter else "Unknown",
+                "team_id": evt.team_id,
+                "is_home": is_home,
+                "shot_xg": s_val
+            })
+
+            if shot.goal:
+                goals.append({
+                    "seconds": evt.elapsed_game_seconds,
+                    "period": evt.period,
+                    "period_time": evt.period_time,
+                    "is_home": is_home,
+                    "team_abbrev": game.home_team.abbreviation if is_home else game.away_team.abbreviation,
+                    "scorer": shot.shooter.full_name if shot.shooter else "Unknown",
+                    "home_xg": round(home_cum_xg, 2),
+                    "away_xg": round(away_cum_xg, 2)
+                })
+
+        return {
+            "game_id": game_id,
+            "situation": situation,
+            "home_team": {
+                "id": home_team_id,
+                "abbrev": game.home_team.abbreviation,
+                "name": game.home_team.name,
+                "total_xg": round(home_cum_xg, 2)
+            },
+            "away_team": {
+                "id": away_team_id,
+                "abbrev": game.away_team.abbreviation,
+                "name": game.away_team.name,
+                "total_xg": round(away_cum_xg, 2)
+            },
+            "timeline": timeline,
+            "goals": goals
         }

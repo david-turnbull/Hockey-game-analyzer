@@ -1,0 +1,38 @@
+{
+  "name": "pucklens-xg-logistic",
+  "version": "1.0.0",
+  "training_date": "2026-09-05T17:16:54.413651",
+  "features": [
+    "distance",
+    "angle",
+    "period",
+    "period_seconds",
+    "score_differential",
+    "is_home",
+    "empty_net",
+    "time_since_prev_event",
+    "distance_from_prev_event",
+    "angle_change",
+    "is_rebound",
+    "is_rush",
+    "is_turnover",
+    "is_after_faceoff",
+    "is_lateral_movement",
+    "is_power_play",
+    "is_shorthanded",
+    "shot_type",
+    "strength_state",
+    "prev_event_type"
+  ],
+  "metrics": {
+    "log_loss": 0.213,
+    "brier_score": 0.0564,
+    "roc_auc": 0.7498,
+    "actual_goals": 147,
+    "total_shots": 2226,
+    "expected_goals": 148.74,
+    "actual_goal_pct": 6.6,
+    "expected_goal_pct": 6.68
+  },
+  "model_type": "LogisticRegressionXGModel"
+}

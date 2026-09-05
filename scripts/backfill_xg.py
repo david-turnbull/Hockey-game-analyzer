@@ -29,6 +29,7 @@ def main():
                 empty_net=shot.empty_net
             )
             shot.xg = xg_val
+            shot.model_version = XGService.get_active_model_version()
             updated_count += 1
             
             if (i + 1) % 500 == 0:

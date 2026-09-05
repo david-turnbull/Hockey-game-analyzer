@@ -79,6 +79,7 @@
 <div class="tabs-container" style="margin-bottom: 2rem; display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
     <button class="tab-button active" onclick="switchTab(event, 'tab-overview')" style="background: none; border: none; color: var(--text-primary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Game Summary</button>
     <button class="tab-button" onclick="switchTab(event, 'tab-shotmap')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Interactive Shot Map</button>
+    <button class="tab-button" onclick="switchTab(event, 'tab-timeline')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">xG Timeline</button>
     <button class="tab-button" onclick="switchTab(event, 'tab-lines')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Line Combinations</button>
     <button class="tab-button" onclick="switchTab(event, 'tab-onice-explorer')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">On-Ice Explorer</button>
     <a href="/game/{{ stats.game_id }}/compare?team_id={{ context_team_id }}" class="tab-button" style="text-decoration: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; padding: 0.5rem 1rem;">Player Comparison &rarr;</a>
@@ -134,7 +135,7 @@
             <!-- Expected Goals (xG) Stat -->
             <div class="stat-label-row">
                 <span class="stat-value font-mono">{{ stats.stats.away_xg }}</span>
-                <span style="color: var(--text-secondary);" title="Prototype Expected Goals (excluding shootouts)">Prototype Expected Goals (xG)</span>
+                <span style="color: var(--text-secondary);" title="All-Situations Expected Goals">Expected Goals (xG)</span>
                 <span class="stat-value font-mono">{{ stats.stats.home_xg }}</span>
             </div>
             <div class="stat-bar-container">
@@ -147,6 +148,53 @@
                 <div class="stat-bar-home" style="width: 50%"></div>
                 {% endif %}
             </div>
+
+            <!-- 5v5 Expected Goals Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value font-mono">{{ stats.stats.away_5v5_xg }}</span>
+                <span style="color: var(--text-secondary);" title="5v5 Strength State Expected Goals">5v5 Expected Goals</span>
+                <span class="stat-value font-mono">{{ stats.stats.home_5v5_xg }}</span>
+            </div>
+            <div class="stat-bar-container">
+                {% set total_5v5 = stats.stats.away_5v5_xg + stats.stats.home_5v5_xg %}
+                {% if total_5v5 > 0 %}
+                <div class="stat-bar-away" style="width: {{ (stats.stats.away_5v5_xg / total_5v5) * 100 }}%"></div>
+                <div class="stat-bar-home" style="width: {{ (stats.stats.home_5v5_xg / total_5v5) * 100 }}%"></div>
+                {% else %}
+                <div class="stat-bar-away" style="width: 50%"></div>
+                <div class="stat-bar-home" style="width: 50%"></div>
+                {% endif %}
+            </div>
+
+            <!-- Expected Goals Share (xG%) Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value font-mono">{{ stats.stats.away_xg_pct }}%</span>
+                <span style="color: var(--text-secondary);" title="Expected Goals Share: xGF / (xGF + xGA)">xG Share (xG%)</span>
+                <span class="stat-value font-mono">{{ stats.stats.home_xg_pct }}%</span>
+            </div>
+            <div class="stat-bar-container">
+                <div class="stat-bar-away" style="width: {{ stats.stats.away_xg_pct }}%"></div>
+                <div class="stat-bar-home" style="width: {{ stats.stats.home_xg_pct }}%"></div>
+            </div>
+
+            <!-- Period by Period xG Breakdown -->
+            {% if stats.stats.xg_by_period %}
+            <div style="margin: 1.5rem 0 1rem 0; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.75rem;">Expected Goals by Period</div>
+                <div style="display: grid; grid-template-columns: repeat({{ stats.stats.xg_by_period|length }}, 1fr); gap: 0.5rem; text-align: center;">
+                    {% for p_label, p_data in stats.stats.xg_by_period.items() %}
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.4rem 0.2rem;">
+                        <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">{{ p_label }}</div>
+                        <div style="font-size: 0.8rem; font-family: monospace; margin-top: 0.2rem;">
+                            <span style="color: #f97316;">{{ p_data.away }}</span>
+                            <span style="color: var(--text-muted); font-size: 0.65rem;">&ndash;</span>
+                            <span style="color: #38bdf8;">{{ p_data.home }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
             <!-- PPG Stat -->
             <div class="stat-label-row">
@@ -825,6 +873,33 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab 5: Expected Goals Timeline -->
+<div id="tab-timeline" class="tab-content" style="display: none;">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h2 class="card-title" style="margin-bottom: 0.25rem;">Expected Goals (xG) Timeline</h2>
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">
+                    Cumulative shot quality progression over game time with actual goal events.
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;" id="timeline-situation-filters">
+                <button class="tab-button active" data-xg-situation="all" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid var(--border-color);">All Situations</button>
+                <button class="tab-button" data-xg-situation="5v5" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid var(--border-color);">5v5 Only</button>
+                <button class="tab-button" data-xg-situation="pp" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid var(--border-color);">Power Play</button>
+            </div>
+        </div>
+        
+        <div id="xg-timeline-plot" style="width: 100%; height: 480px;"></div>
+        
+        <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 1.5rem; justify-content: flex-end;">
+            <span><span style="color: #38bdf8; font-weight: bold;">&#9644;&#9644;</span> {{ stats.home_team_abbrev }} Cumulative</span>
+            <span><span style="color: #f97316; font-weight: bold;">&#9644;&#9644;</span> {{ stats.away_team_abbrev }} Cumulative</span>
+            <span><span style="color: #ffffff;">&#9733;</span> Actual Goal</span>
         </div>
     </div>
 </div>

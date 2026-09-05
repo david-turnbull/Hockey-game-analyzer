@@ -135,6 +135,21 @@
                         {% endif %}
                     </td>
                 </tr>
+                {% if check.summary %}
+                <tr>
+                    <td colspan="2" style="background: rgba(255, 255, 255, 0.015); padding: 0.75rem 1rem;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Summary Statistics</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                            {% for s_key, s_val in check.summary.items() %}
+                            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem 0.75rem;">
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ s_key.replace('_', ' ').title() }}</div>
+                                <div style="font-size: 1.1rem; font-weight: 700; font-family: monospace; color: var(--text-primary); margin-top: 0.25rem;">{{ s_val }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
                 {% if check.details %}
                 <tr>
                     <td colspan="2" style="background: rgba(255, 255, 255, 0.02); padding: 0.75rem 1rem;">

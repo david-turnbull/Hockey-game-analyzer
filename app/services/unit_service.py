@@ -140,7 +140,11 @@ class UnitService:
         ).all()
 
         def init_stats():
-            return {"goals_for": 0, "goals_against": 0, "sog_for": 0, "sog_against": 0}
+            return {
+                "goals_for": 0, "goals_against": 0,
+                "sog_for": 0, "sog_against": 0,
+                "xg_for": 0.0, "xg_against": 0.0
+            }
 
         home_line_stats = {}
         home_pair_stats = {}
@@ -155,6 +159,7 @@ class UnitService:
             shot_team_id = event.team_id
             is_goal = (event.event_type == 'goal')
             is_sog = event.event_type in ['shot-on-goal', 'goal']
+            shot_xg = float(event.shot.xg) if (event.shot and event.shot.xg is not None) else 0.0
 
             # Active combinations on ice at second t
             combinations = get_true_5v5_combinations(t)
@@ -174,11 +179,13 @@ class UnitService:
                         stats_dict[key]["goals_for"] += 1
                     if is_sog:
                         stats_dict[key]["sog_for"] += 1
+                    stats_dict[key]["xg_for"] += shot_xg
                 else:
                     if is_goal:
                         stats_dict[key]["goals_against"] += 1
                     if is_sog:
                         stats_dict[key]["sog_against"] += 1
+                    stats_dict[key]["xg_against"] += shot_xg
 
             is_home_shot = (shot_team_id == home_team_id)
             add_event_stats(home_line_stats, h_fwds, is_home_shot)
@@ -209,6 +216,13 @@ class UnitService:
 
                 s = stats_dict.get(players_tup, init_stats())
 
+                xg_for = round(s["xg_for"], 2)
+                xg_against = round(s["xg_against"], 2)
+                total_xg = xg_for + xg_against
+                xg_pct = round((xg_for / total_xg * 100), 1) if total_xg > 0 else 50.0
+                xg_for_per_60 = round(xg_for / (seconds / 3600.0), 2) if seconds > 0 else 0.0
+                xg_against_per_60 = round(xg_against / (seconds / 3600.0), 2) if seconds > 0 else 0.0
+
                 list_out.append({
                     "player_ids": list(players_tup),
                     "players": ", ".join(names),
@@ -218,6 +232,11 @@ class UnitService:
                     "goals_against": s["goals_against"],
                     "sog_for": s["sog_for"],
                     "sog_against": s["sog_against"],
+                    "xg_for": xg_for,
+                    "xg_against": xg_against,
+                    "xg_pct": xg_pct,
+                    "xg_for_per_60": xg_for_per_60,
+                    "xg_against_per_60": xg_against_per_60
                 })
 
             list_out.sort(key=lambda x: -x["toi_seconds"])
@@ -428,16 +447,20 @@ class UnitService:
         ).all()
 
         cf = ca = ff = fa = sf = sa = gf = ga = 0
+        xgf = xga = 0.0
         formatted_shots = []
 
         for s in shots:
             is_for = (s.team_id == unit_team_id)
+            shot_xg = float(s.xg) if s.xg is not None else 0.0
             
             # Corsi
             if is_for:
                 cf += 1
+                xgf += shot_xg
             else:
                 ca += 1
+                xga += shot_xg
 
             # Fenwick (unblocked)
             if s.outcome != 'Blocked':
@@ -586,7 +609,12 @@ class UnitService:
                 "cf_pct": cf_pct,
                 "ff": ff,
                 "fa": fa,
-                "ff_pct": ff_pct
+                "ff_pct": ff_pct,
+                "xgf": round(xgf, 2),
+                "xga": round(xga, 2),
+                "xg_pct": round(xgf / (xgf + xga) * 100, 1) if (xgf + xga) > 0 else 50.0,
+                "xgf_per_60": round(xgf / (toi_seconds / 3600.0), 2) if toi_seconds > 0 else 0.0,
+                "xga_per_60": round(xga / (toi_seconds / 3600.0), 2) if toi_seconds > 0 else 0.0
             },
             "shots": formatted_shots,
             "timeline": timeline

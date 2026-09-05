@@ -2,29 +2,33 @@
 
 [![Run Automated Tests](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml)
 
-**Current Release:** `v1.1.0`
+**Current Release:** `v1.2.0` (Predictive Analytics Upgrade)
 
-PuckLens is an independent hockey-operations analytics platform that transforms raw NHL play-by-play and shift data into reproducible game, player, lineup, possession, and spatial analysis.
+PuckLens is an independent hockey-operations analytics platform that transforms raw NHL play-by-play and shift data into reproducible game, player, lineup, possession, spatial, and predictive analysis.
 
-The project is designed as both a hockey analytics tool and a portfolio demonstration of data ingestion, relational modelling, analytical service design, testing, visualization, and reproducible sports analysis.
+The project is designed as both a hockey analytics tool and a portfolio demonstration of data ingestion, relational modelling, machine learning pipelines, analytical service design, testing, visualization, and reproducible sports analysis.
 
 ---
 
 ## What the platform does
 
-- **Game analysis** — team boxscore comparisons, scoring/penalty timelines, and game-level dashboards.
-- **Interactive shot mapping** — spatial visualization of goals, saves, misses, and blocked attempts with game/player filters.
-- **Player game analysis** — player-specific boxscore statistics, possession metrics, shot maps, shift data, and prototype xG.
+- **Statistically trained Expected Goals (xG)** — machine-learning shot-quality pipeline with feature engineering, versioned model registry, and persistent database scoring.
+- **Interactive cumulative game xG timeline** — step-function cumulative xG progression chart with period markers and situation filtering (All, 5v5, Power Play).
+- **Probability-scaled shot mapping** — spatial rink visualization where shot markers dynamically scale in radius and color intensity by expected goal probability.
+- **Goaltender predictive analytics** — Expected Goals Against ($xGA$), Goals Saved Above Expected ($GSAx$), and rate stats ($GSAx/60$), strictly excluding empty nets.
+- **Skater finishing analytics** — Goals Above Expected ($G - xG$), Expected Goals per 60 ($xG/60$), and Expected Shooting Percentage ($xSh\%$).
+- **5v5 unit xG profiling** — Expected Goals For ($xGF$), Expected Goals Against ($xGA$), and Expected Goal Share ($xG\%$) for forward trios and defensive pairings.
+- **Game analysis** — team boxscore comparisons, scoring/penalty timelines, and game-level dashboards with period-by-period xG breakdowns.
 - **Shift reconstruction** — aligns NHL shift-chart data with play-by-play timing using consistent half-open interval semantics.
 - **True 5v5 possession** — Corsi and Fenwick calculations restricted to complete 5v5 play.
-- **5v5 forward combinations** — observed forward trios with shared TOI and on-ice GF/GA/SF/SA.
-- **Defensive pairings** — defenseman duos with shared TOI and on-ice GF/GA/SF/SA.
-- **Prototype expected goals (xG)** — transparent heuristic shot-quality estimates using distance, angle, shot type, and manpower context.
-- **Shared 5v5 combination drill-down** — Clickable forward lines and defensive pairings details dashboard showing shared shifts, on-ice events, Corsi/Fenwick statistics, and Plotly shot maps.
+- **5v5 forward combinations** — observed forward trios with shared TOI and on-ice GF/GA/SF/SA and xGF/xGA/xG%.
+- **Defensive pairings** — defenseman duos with shared TOI and on-ice GF/GA/SF/SA and xGF/xGA/xG%.
+- **Shared 5v5 combination drill-down** — Clickable forward lines and defensive pairings details dashboard showing shared shifts, on-ice events, Corsi/Fenwick/xG statistics, and Plotly shot maps.
 - **Side-by-side player comparisons** — Side-by-side single-game performance comparison dashboard with situation filters and dual Plotly maps.
-- **Standardized metric explanations** — Help tooltip hovers explaining advanced stats (Corsi, Fenwick, xG) across the platform.
+- **Model & data quality diagnostics** — Shot model data quality audits (coordinate geometry, goalie attribution, missing values) and relational integrity checks.
+- **Standardized metric explanations** — Help tooltip hovers explaining advanced stats (Corsi, Fenwick, xG, GSAx) across the platform.
 - **Full-season ingestion** — Ingest a team's regular-season schedule using the same validated game pipeline.
-- **Automated regression testing and CI** — Analytical edge cases and historical attribution are covered by `pytest` and GitHub Actions.
+- **Automated regression testing and CI** — Analytical edge cases, ML reproducibility, and historical attribution covered by 76 tests in `pytest` and GitHub Actions.
 
 ---
 
@@ -75,9 +79,11 @@ flowchart TD
     A[NHL API] --> B[Raw JSON Cache]
     B --> C[Transform & Validate]
     C --> D[SQLite / SQLAlchemy]
-    D --> E["Service Layer<br/>GameService<br/>PlayerGameService<br/>PossessionService<br/>OnIceService<br/>LineService<br/>XGService"]
-    E --> F[Flask Routes / JSON API]
-    F --> G[Analytics UI]
+    D --> E["Predictive Analytics Engine<br/>ShotFeatureExtractor<br/>ModelRegistry<br/>LogisticRegressionXGModel"]
+    E --> F[models/xg/ Serialization]
+    E --> G["Service Layer<br/>GameService<br/>PlayerGameService<br/>GoalieStatsService<br/>SkaterStatsService<br/>UnitService<br/>XGService"]
+    G --> H[Flask Routes / JSON API]
+    H --> I[Analytics UI & Plotly Dashboards]
 ```
 
 The application intentionally separates ingestion, persistence, analytics, and presentation. Raw NHL status values and source records are preserved internally, while user-friendly presentation logic is handled separately.
@@ -224,56 +230,83 @@ Shift matching uses half-open intervals:
 ```text
 [start, end)
 ```
-
 A player is active at the shift start second and inactive at the shift end second. This avoids double-counting players at exact shift-change boundaries.
 
 ---
 
-## Prototype Expected Goals (xG)
+## Expected Goals (xG) Predictive Analytics Engine
 
-The current xG implementation is a **transparent heuristic prototype**, not a statistically fitted or machine-learning model.
+PuckLens v1.2 transitions from a descriptive heuristic prototype to a fully trained, validated, and reproducible **machine learning Expected Goals (xG)** pipeline.
 
-It uses a logistic-style probability function:
+The model estimates the probability ($0.0 \le xG \le 1.0$) that an unblocked shot attempt (goal, save, or miss) results in a goal based on spatial geometry, shot release characteristics, manpower situation, and sequential play-by-play dynamics.
 
+> **Independent Attribution Notice:** PuckLens Expected Goals is an independently developed statistical model engineered for this platform. It is not affiliated with, sponsored by, or endorsed by the National Hockey League (NHL), NHL EDGE, Sportlogiq, or any commercial analytics vendor.
 
-$$
-\text{log-odds}
-=
-\beta_0
-+
-\beta_{dist}(\text{distance})
-+
-\beta_{angle}|\text{angle}|
-+
-\text{shot-type adjustment}
-+
-\text{strength adjustment}
-$$
+### 1. Model Architecture & Training Methodology
 
-$$
-xG = \frac{1}{1 + e^{-\text{log-odds}}}
-$$
+- **Population**: 14,262 unblocked regular-season NHL shot attempts extracted from 162 cached NHL regular season games (2023–2024 season). Shootout attempts are excluded.
+- **Chronological Split Strategy**: Games are split chronologically (70% train / 15% validation / 15% test) to prevent temporal data leakage:
+  - **Train**: 113 games (9,860 shots, 690 goals; 7.00% goal rate)
+  - **Validation**: 24 games (2,176 shots, 157 goals; 7.22% goal rate)
+  - **Held-Out Test**: 25 games (2,226 shots, 147 goals; 6.60% goal rate)
+- **Active Model (`pucklens-xg-v1`)**: Standardized Logistic Regression (`pucklens-xg-logistic`, version `1.0.0`) with one-hot categorical encoding and robust fallback handling.
 
-Current hand-selected coefficients include:
+### 2. Feature Engineering & Spatial Geometry
 
-- baseline constant: `-1.9`
-- distance coefficient: `-0.035` per foot
-- angle coefficient: `-0.015` per degree
+All coordinates are symmetrically mapped to the attacking net at $(89, 0)$ such that shot geometry is invariant to attack direction and period. Features are restricted strictly to information available prior to or at shot release (zero look-ahead bias):
 
-Shot-type adjustments:
+| Category | Features | Description |
+| :--- | :--- | :--- |
+| **Spatial Geometry** | `distance`, `angle` | Euclidean distance (ft) and absolute angle (deg) to net center $(89, 0)$. |
+| **Shot Context** | `shot_type`, `strength_state` | One-hot encoded shot release type and manpower state (`EV`, `PP`, `SH`). |
+| **Game Context** | `score_differential`, `period`, `period_seconds`, `is_home` | Score deficit/lead, period timing, and home ice advantage. |
+| **Sequential Dynamics** | `is_rebound`, `is_rush`, `is_turnover`, `is_after_faceoff`, `is_lateral_movement` | Temporal and spatial delta from preceding event (rebounds within $\le 3$s, rushes $\ge 40$ft in $\le 4$s, turnovers within $\le 4$s, faceoffs within $\le 4$s, lateral angle shifts $\ge 25^\circ$). |
+| **Net State** | `empty_net` | Binary indicator for pulled goaltender situations. |
 
-- Tip-In / Deflection: `+0.40`
-- Backhand: `+0.10`
-- Slap Shot: `-0.20`
+### 3. Held-Out Test Evaluation & Selection
 
-Strength adjustments:
+On the identical 2,226-shot held-out test set, Logistic Regression was selected over HistGradientBoosting for production deployment based on calibration accuracy and parsimony:
 
-- attacking power play: `+0.15`
-- attacking shorthanded: `-0.15`
+| Evaluation Metric | Logistic Regression (Selected) | Gradient Boosting | Target Direction |
+| :--- | :--- | :--- | :--- |
+| **Log Loss** | **0.2130** | 0.2162 | Lower is better |
+| **Brier Score** | **0.0564** | 0.0565 | Lower is better |
+| **ROC AUC** | **0.7498** | 0.7490 | Higher is better |
+| **Total Expected Goals** | **148.74** | 139.37 | Target: 147.0 Actual Goals |
+| **Calibration Delta** | **+1.1%** | -5.2% | Target: 0.0% |
 
-For empty-net attempts, the prototype uses a separate distance-based override.
+For comprehensive diagnostic breakdowns across distance brackets, calibration curves, and feature importances, see the [PuckLens xG Model Card](docs/models/xg_v1.md).
 
-The purpose of the current implementation is to provide an explainable shot-quality prototype while the project develops the historical dataset required for a properly trained and validated xG model.
+### 4. Application Integration & Downstream Metrics
+
+- **Goaltender Predictive Analytics**:
+  - **Expected Goals Against ($xGA$)**: Cumulative expected goal probability faced by the goalie.
+  - **Goals Saved Above Expected ($GSAx = xGA - GA$)**: Shot-quality adjusted goaltender performance.
+  - **$GSAx/60$**: Rate metric per 60 minutes of ice time.
+  - *Safety Rule*: Empty-net attempts (`empty_net == True`) and shootout attempts are strictly excluded from goalie $xGA$ to avoid penalizing goaltenders for empty-net goals against while pulled.
+- **Skater Finishing Analytics**:
+  - **Goals Above Expected ($G - xG$)**: Individual finishing impact relative to league-average shooter expectation.
+  - **$xG/60$**: Expected goals generation rate per 60 minutes of individual TOI.
+  - **Expected Shooting Percentage ($xSh\% = xG / Shots \times 100$)**.
+- **Line & Pairing Combinations**:
+  - True 5v5 forward trios and defensive pairings report $xGF$, $xGA$, $xG\%$, $xGF/60$, and $xGA/60$.
+- **Cumulative Game xG Timeline**:
+  - Interactive Plotly step chart plotting home and away cumulative expected goals over 60+ minutes with situation filtering (`All`, `5v5`, `Power Play`).
+- **Probability-Scaled Shot Maps**:
+  - Rink shot markers scale dynamically in radius and color intensity (ice blue for low danger up to intense scarlet for high danger) with hover tooltips displaying model version, xG probability, distance, and sequence flags.
+
+### 5. CLI Model Management & Persistence
+
+- **Model Training**:
+  ```powershell
+  python scripts/train_xg.py
+  ```
+  Runs chronological splits, trains and evaluates candidate models, evaluates calibration curves, and serializes the production model to `models/xg/xg_v1.pkl` and `models/xg/metadata.json`.
+- **Database Backfill**:
+  ```powershell
+  python scripts/backfill_xg.py
+  ```
+  Applies schema migrations (`Shot.model_version`) and updates stored model predictions across all existing shots.
 
 ---
 
@@ -416,7 +449,12 @@ The suite includes unit and regression coverage for areas such as:
 - 59-second exclusion / 60-second inclusion
 - game-status display mapping
 - average-shift calculations
-- prototype xG mathematics
+- predictive Expected Goals machine-learning mathematics and calibration
+- feature engineering spatial geometry and coordinate normalization
+- sequential context extraction (rebounds, rushes, turnovers, faceoffs)
+- goalie GSAx and skater G-xG calculations
+- model registry fallback and serialization
+- database schema persistence and integrity checks
 
 The repository also uses GitHub Actions to execute the test suite in a clean Python environment.
 
@@ -438,9 +476,10 @@ Diagnostics include checks for:
 - missing `GamePlayer` relationships
 - shift/team mismatches
 - timing anomalies
+- shot model data quality (coordinate anomalies, missing shooter/goalie attribution, coordinate normalization)
 - database integrity issues
 
-Diagnostics are intended for development and verification and are hidden from the normal public UI unless explicitly enabled.
+Diagnostics are intended for development, verification, and audit purposes, accessible via the CLI script or the web interface at `/diagnostics`.
 
 ---
 
@@ -448,16 +487,16 @@ Diagnostics are intended for development and verification and are hidden from th
 
 - **Public API timing precision:** NHL shift charts use whole-second timing, which can produce occasional minor alignment ambiguity at shift boundaries.
 - **On-ice reconstruction:** Player presence is reconstructed from recorded shift start/end times and therefore inherits any source-data timing errors.
-- **Prototype xG:** Current coefficients are hand-selected rather than fitted to historical goal outcomes.
+- **Play-by-play tracking resolution:** While the v1.2 xG model incorporates spatial geometry, shot type, strength, and sequence context, public NHL play-by-play feeds lack optical tracking data (exact skater speed, passing velocity, stick blade orientation, and screening defender proximity).
 - **Historical coverage:** The project has been validated primarily against recent NHL data and may require adaptation if historical API formats differ.
 - **Local deployment:** The current application uses SQLite and the Flask development workflow rather than production cloud infrastructure.
-- **Forecasting:** The platform currently analyzes observed games; next-game prediction models are planned future work.
+- **Forecasting:** The platform currently analyzes observed games and retrospective predictive shot quality; forward next-game win forecasting is planned future work.
 
 ---
 
 ## Roadmap
 
-### v1.0 — Game & Player Analytics Foundation
+### v1.0 — Game & Player Analytics Foundation (Completed)
 
 - reproducible NHL ingestion pipeline
 - relational game/player/shift data model
@@ -469,13 +508,10 @@ Diagnostics are intended for development and verification and are hidden from th
 - 5v5 forward combinations
 - defensive pairings
 - shift visualization
-- prototype xG
 - automated regression testing
 - full-team-season ingestion
 
 ### v1.1 — Exploration & Usability (Completed)
-
-Version 1.1 delivers a robust set of exploration capabilities:
 
 - event overlays on the timeline
 - interactive shared forward line & defensive pairing detail views
@@ -483,20 +519,32 @@ Version 1.1 delivers a robust set of exploration capabilities:
 - standardized metric explanations and hover tooltips
 - UI responsive and accessibility refinements
 
-### Future Modelling
+### v1.2 — Predictive Analytics Upgrade (Completed)
 
-Planned research directions include:
+- statistically trained and calibrated Expected Goals (xG) machine learning pipeline
+- chronological train/val/test split across 162 NHL games (14,262 unblocked shots)
+- versioned model registry and metadata serialization (`models/xg/`)
+- database schema persistence (`Shot.model_version`) with automated backfill
+- goaltender predictive metrics: $xGA$, $GSAx$, and $GSAx/60$ (excluding empty nets)
+- individual skater finishing metrics: $G - xG$, $xG/60$, and $xSh\%$
+- 5v5 forward trios and defensive pairings $xGF$, $xGA$, and $xG\%$
+- cumulative game xG timeline step chart with situation filters
+- probability-scaled rink shot maps with danger-level color gradients and rich tooltips
+- shot model data quality integrity checks in diagnostics suite
+- comprehensive model card documentation (`docs/models/xg_v1.md`)
+- 76 regression and predictive unit tests passing
 
-- statistically trained xG
-- season-level analytics
-- next-game team and player forecasting
-- comparison of statistical, gradient-boosting, and neural-network models
-- transparent model cards, equations, model versioning, and historical prediction evaluation
+### Future Modelling (v1.3+)
+
+- season-level multi-game rolling xG and GSAx trend analysis
+- Bayesian regression for individual finishing talent separation from variance
+- next-game win probability and score margin forecasting models
+- player impact regularization (e.g. RAPM / Ridge regression on shift data)
 
 ---
 
 ## Project Status
 
-`v1.1.0`
+`v1.2.0`
 
-The emphasis of v1.1 is **bringing reliable game-exploration, visual analytics, and modular sports services** to the analytics foundation built in v1.0.
+The emphasis of v1.2 is **delivering an end-to-end predictive analytics engine**, elevating PuckLens from descriptive boxscores to state-of-the-art expected goals, goaltender evaluation, and lineup shot-quality analysis.

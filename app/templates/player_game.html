@@ -111,6 +111,20 @@
             <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Save Percentage</div>
             <div style="font-size: 2rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">{{ stats.save_pct }}%</div>
         </div>
+        <div class="card" style="text-align: center; padding: 1.5rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;" title="Expected Goals Against on unblocked shots faced">xGA</div>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;" class="font-mono">{{ stats.xga }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.5rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;" title="Goals Saved Above Expected: xGA - GA (excluding empty net)">GSAx</div>
+            <div style="font-size: 2rem; font-weight: 800; color: {% if stats.gsax > 0 %}var(--success, #10b981){% elif stats.gsax < 0 %}var(--danger, #ef4444){% else %}var(--text-primary){% endif %}; margin-top: 0.5rem;" class="font-mono">
+                {% if stats.gsax > 0 %}+{% endif %}{{ stats.gsax }}
+            </div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.5rem;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;" title="Goals Saved Above Expected per 60 minutes">GSAx / 60</div>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">{{ stats.gsax_per_60 }}</div>
+        </div>
     </div>
     
     <!-- Goalie Special Situations & Strength Splits -->
@@ -189,9 +203,29 @@
         </div>
         <div class="card" style="text-align: center; padding: 1.25rem;">
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
-                <span class="metric-tooltip" data-tooltip="Expected Goals (xG): experimental/heuristic projection of shot quality. Note that PuckLens xG is an independent, non-NHL prototype.">Prototype Expected Goals (xG)</span>
+                <span class="metric-tooltip" data-tooltip="Expected Goals (xG): statistical model projection of shot probability.">Expected Goals (xG)</span>
             </div>
             <div style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">{{ stats.xg }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                <span class="metric-tooltip" data-tooltip="Goals Above Expected: Actual Goals - Expected Goals (G - xG).">G &minus; xG</span>
+            </div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: {% if stats.goals_above_expected > 0 %}var(--success, #10b981){% elif stats.goals_above_expected < 0 %}var(--danger, #ef4444){% else %}var(--text-primary){% endif %}; margin-top: 0.5rem;" class="font-mono">
+                {% if stats.goals_above_expected > 0 %}+{% endif %}{{ stats.goals_above_expected }}
+            </div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                <span class="metric-tooltip" data-tooltip="Expected Goals generated per 60 minutes of ice time.">xG / 60</span>
+            </div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">{{ stats.xg_per_60 }}</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                <span class="metric-tooltip" data-tooltip="Expected Shooting %: xG / Shots.">Exp. SH %</span>
+            </div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;" class="font-mono">{{ stats.expected_shooting_pct }}%</div>
         </div>
     </div>
     {% endif %}

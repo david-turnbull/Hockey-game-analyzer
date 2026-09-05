@@ -433,7 +433,8 @@ class DataNormalizer:
                 goal=is_goal,
                 strength_state=team_strength_state,
                 empty_net=empty_net,
-                xg=xg_val
+                xg=xg_val,
+                model_version=XGService.get_active_model_version()
             )
             
         return event, shot

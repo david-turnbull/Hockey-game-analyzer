@@ -207,5 +207,67 @@ class DataIntegrityService:
             )
             if diagnostics["five_v_five_reconstruction"]["status"] == "PASS":
                 diagnostics["five_v_five_reconstruction"]["status"] = "WARNING"
+
+        # 6. Shot Model Data Quality Checks (Milestone 15)
+        shots_analyzed = db.session.query(Shot).count()
+        missing_coords = db.session.query(Shot).filter(
+            (Shot.x_coordinate_normalized.is_(None)) | (Shot.y_coordinate_normalized.is_(None))
+        ).count()
+        impossible_coords = db.session.query(Shot).filter(
+            (Shot.x_coordinate_normalized.isnot(None)) & (
+                (Shot.x_coordinate_normalized < -100) | (Shot.x_coordinate_normalized > 100) |
+                (Shot.y_coordinate_normalized < -42.5) | (Shot.y_coordinate_normalized > 42.5)
+            )
+        ).count()
+        coord_norm_failures = db.session.query(Shot).filter(
+            (Shot.x_coordinate_normalized.isnot(None)) & (Shot.x_coordinate_normalized < 0)
+        ).count()
+        missing_shooters = db.session.query(Shot).filter(Shot.shooter_id.is_(None)).count()
+        missing_goalies = db.session.query(Shot).filter(
+            Shot.goalie_id.is_(None),
+            Shot.empty_net == False,
+            Shot.outcome.in_(['Goal', 'Saved'])
+        ).count()
+        unknown_shot_types = db.session.query(Shot).filter(
+            (Shot.shot_type.is_(None)) | (Shot.shot_type.in_(['Unknown', 'other', '']))
+        ).count()
+        missing_times = db.session.query(Shot).join(Event).filter(
+            Event.elapsed_game_seconds.is_(None)
+        ).count()
+
+        summary = {
+            "shots_analyzed": shots_analyzed,
+            "missing_coordinates": missing_coords,
+            "impossible_coordinates": impossible_coords,
+            "coordinate_normalization_failures": coord_norm_failures,
+            "missing_shooters": missing_shooters,
+            "missing_goalies": missing_goalies,
+            "unknown_shot_types": unknown_shot_types,
+            "missing_event_times": missing_times
+        }
+
+        diagnostics["shot_model_data_quality"] = {
+            "status": "PASS",
+            "details": [],
+            "summary": summary
+        }
+
+        if missing_coords > 0:
+            diagnostics["shot_model_data_quality"]["details"].append(f"{missing_coords} shot(s) missing coordinates.")
+        if impossible_coords > 0:
+            diagnostics["shot_model_data_quality"]["details"].append(f"{impossible_coords} shot(s) with coordinates out of rink bounds.")
+            diagnostics["shot_model_data_quality"]["status"] = "FAIL"
+        if missing_shooters > 0:
+            diagnostics["shot_model_data_quality"]["details"].append(f"{missing_shooters} shot(s) missing shooter IDs.")
+            diagnostics["shot_model_data_quality"]["status"] = "FAIL"
+        if missing_goalies > 0:
+            diagnostics["shot_model_data_quality"]["details"].append(f"{missing_goalies} shot(s) on goal missing goalie attribution.")
+            if diagnostics["shot_model_data_quality"]["status"] == "PASS":
+                diagnostics["shot_model_data_quality"]["status"] = "WARNING"
+        if unknown_shot_types > 0:
+            diagnostics["shot_model_data_quality"]["details"].append(f"{unknown_shot_types} shot(s) with unknown or unclassified shot type.")
+        if missing_times > 0:
+            diagnostics["shot_model_data_quality"]["details"].append(f"{missing_times} shot(s) with missing game clocks.")
+            diagnostics["shot_model_data_quality"]["status"] = "FAIL"
                 
         return diagnostics
