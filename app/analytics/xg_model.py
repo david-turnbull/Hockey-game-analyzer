@@ -23,10 +23,18 @@ class BaseXGModel(abc.ABC):
         self.name = name
         self.version = version
         self.pipeline: Optional[Pipeline] = None
-        self.features: List[str] = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+        self.features: List[str] = list(NUMERIC_FEATURES + CATEGORICAL_FEATURES)
         self.metrics: Dict[str, Any] = {}
         self.training_date: Optional[str] = None
         self.is_fitted = False
+        self._metadata: Dict[str, Any] = {
+            'name': self.name,
+            'version': self.version,
+            'model_type': self.__class__.__name__,
+            'training_date': self.training_date,
+            'features': list(self.features),
+            'metrics': self.metrics
+        }
 
     @abc.abstractmethod
     def fit(self, X: pd.DataFrame, y: np.ndarray) -> 'BaseXGModel':
@@ -59,7 +67,7 @@ class BaseXGModel(abc.ABC):
     def _ensure_dataframe(self, X: Union[pd.DataFrame, Dict[str, Any], List[Dict[str, Any]]]) -> pd.DataFrame:
         """Converts raw inputs to formatted DataFrame containing all required feature columns."""
         if isinstance(X, pd.DataFrame):
-            df = X
+            df = X.copy()
         elif isinstance(X, dict):
             standardized = ShotFeatureExtractor.extract_features_from_dict(X)
             df = pd.DataFrame([standardized])
@@ -69,24 +77,31 @@ class BaseXGModel(abc.ABC):
         else:
             raise TypeError(f"Unsupported feature input type: {type(X)}")
 
-        # Ensure all columns exist
+        # Ensure all columns exist with explicit neutral defaults
         for col in self.features:
             if col not in df.columns:
-                df[col] = 0 if col in NUMERIC_FEATURES else 'other'
+                df[col] = 0 if col in NUMERIC_FEATURES else 'UNKNOWN'
 
         return df[self.features]
 
     @property
     def metadata(self) -> Dict[str, Any]:
-        """Returns standard metadata for model registry and tracking."""
-        return {
-            'name': self.name,
-            'version': self.version,
-            'training_date': self.training_date,
-            'features': self.features,
-            'metrics': self.metrics,
-            'model_type': self.__class__.__name__
-        }
+        """Returns standard persistent metadata for model registry and tracking."""
+        if not hasattr(self, '_metadata') or self._metadata is None:
+            self._metadata = {}
+        self._metadata['name'] = self.name
+        self._metadata['version'] = self.version
+        self._metadata['model_type'] = self.__class__.__name__
+        self._metadata['training_date'] = self.training_date
+        self._metadata['features'] = list(self.features)
+        self._metadata['metrics'] = self.metrics
+        return self._metadata
+
+    def update_metadata(self, new_meta: Dict[str, Any]) -> None:
+        """Updates persistent metadata in place."""
+        if not hasattr(self, '_metadata') or self._metadata is None:
+            self._metadata = {}
+        self._metadata.update(new_meta)
 
 
 class LogisticRegressionXGModel(BaseXGModel):
@@ -117,6 +132,7 @@ class LogisticRegressionXGModel(BaseXGModel):
         self.pipeline.fit(df, y)
         self.is_fitted = True
         self.training_date = datetime.now(timezone.utc).isoformat()
+        self.metadata['training_date'] = self.training_date
         return self
 
 
@@ -157,4 +173,5 @@ class GradientBoostingXGModel(BaseXGModel):
         self.pipeline.fit(df, y)
         self.is_fitted = True
         self.training_date = datetime.now(timezone.utc).isoformat()
+        self.metadata['training_date'] = self.training_date
         return self

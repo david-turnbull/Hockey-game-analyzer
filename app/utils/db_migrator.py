@@ -99,6 +99,12 @@ def run_migrations(db):
             if "model_version" not in existing_shot_cols:
                 logger.info("Migrating: Adding column 'model_version' to 'shot' table")
                 connection.execute(text("ALTER TABLE shot ADD COLUMN model_version VARCHAR(50)"))
+            if "model_name" not in existing_shot_cols:
+                logger.info("Migrating: Adding column 'model_name' to 'shot' table")
+                connection.execute(text("ALTER TABLE shot ADD COLUMN model_name VARCHAR(64)"))
+            if "prediction_method" not in existing_shot_cols:
+                logger.info("Migrating: Adding column 'prediction_method' to 'shot' table")
+                connection.execute(text("ALTER TABLE shot ADD COLUMN prediction_method VARCHAR(20)"))
             
         db.session.commit()
         logger.info("Database migration check completed successfully.")

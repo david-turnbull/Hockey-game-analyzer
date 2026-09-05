@@ -21,15 +21,17 @@ def main():
         
         updated_count = 0
         for i, shot in enumerate(shots):
-            xg_val = XGService.calculate_shot_xg(
+            pred = XGService.predict_shot_xg(
                 distance=shot.distance,
                 angle=shot.angle,
                 shot_type=shot.shot_type,
                 strength_state=shot.strength_state,
                 empty_net=shot.empty_net
             )
-            shot.xg = xg_val
-            shot.model_version = XGService.get_active_model_version()
+            shot.xg = pred.xg
+            shot.model_name = pred.model_name
+            shot.model_version = pred.model_version
+            shot.prediction_method = pred.method
             updated_count += 1
             
             if (i + 1) % 500 == 0:

@@ -2,7 +2,7 @@
 
 [![Run Automated Tests](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml)
 
-**Current Release:** `v1.2.0` (Predictive Analytics Upgrade)
+**Current Release:** `v1.2.1` (Predictive Analytics Hardening)
 
 PuckLens is an independent hockey-operations analytics platform that transforms raw NHL play-by-play and shift data into reproducible game, player, lineup, possession, spatial, and predictive analysis.
 
@@ -16,7 +16,7 @@ The project is designed as both a hockey analytics tool and a portfolio demonstr
 - **Interactive cumulative game xG timeline** — step-function cumulative xG progression chart with period markers and situation filtering (All, 5v5, Power Play).
 - **Probability-scaled shot mapping** — spatial rink visualization where shot markers dynamically scale in radius and color intensity by expected goal probability.
 - **Goaltender predictive analytics** — Expected Goals Against ($xGA$), Goals Saved Above Expected ($GSAx$), and rate stats ($GSAx/60$), strictly excluding empty nets.
-- **Skater finishing analytics** — Goals Above Expected ($G - xG$), Expected Goals per 60 ($xG/60$), and Expected Shooting Percentage ($xSh\%$).
+- **Skater finishing analytics** — Goals Above Expected ($G - xG$), Expected Goals per 60 ($xG/60$), and Expected Conversion Rate / Shooting Percentage.
 - **5v5 unit xG profiling** — Expected Goals For ($xGF$), Expected Goals Against ($xGA$), and Expected Goal Share ($xG\%$) for forward trios and defensive pairings.
 - **Game analysis** — team boxscore comparisons, scoring/penalty timelines, and game-level dashboards with period-by-period xG breakdowns.
 - **Shift reconstruction** — aligns NHL shift-chart data with play-by-play timing using consistent half-open interval semantics.
@@ -28,7 +28,7 @@ The project is designed as both a hockey analytics tool and a portfolio demonstr
 - **Model & data quality diagnostics** — Shot model data quality audits (coordinate geometry, goalie attribution, missing values) and relational integrity checks.
 - **Standardized metric explanations** — Help tooltip hovers explaining advanced stats (Corsi, Fenwick, xG, GSAx) across the platform.
 - **Full-season ingestion** — Ingest a team's regular-season schedule using the same validated game pipeline.
-- **Automated regression testing and CI** — Analytical edge cases, ML reproducibility, and historical attribution covered by 76 tests in `pytest` and GitHub Actions.
+- **Automated regression testing and CI** — Analytical edge cases, ML reproducibility, and historical attribution covered by comprehensive tests in `pytest` and GitHub Actions.
 
 ---
 
@@ -60,7 +60,7 @@ Observed 5v5 forward trios are shown when they record at least 1:00 of shared tr
 
 ### Player Game Page
 
-Player-level game statistics, TOI, possession metrics, and prototype expected goals.
+Player-level game statistics, TOI, possession metrics, and calibrated expected goals.
 
 ![Player Game Page](docs/screenshots/05_player_game_page.png)
 
@@ -119,7 +119,7 @@ Each analyzed game includes:
 - faceoff percentage
 - penalty minutes
 - power-play goals
-- prototype xG
+- expected goals (xG)
 - chronological goals and penalties
 
 ### Interactive shot maps
@@ -181,7 +181,7 @@ Player pages include:
 - faceoff win percentage where applicable
 - valid shifts
 - TOI
-- prototype xG
+- expected goals (xG)
 - 5v5 Corsi/Fenwick
 - individual shot visualization
 - shift visualization
@@ -263,17 +263,21 @@ All coordinates are symmetrically mapped to the attacking net at $(89, 0)$ such 
 | **Sequential Dynamics** | `is_rebound`, `is_rush`, `is_turnover`, `is_after_faceoff`, `is_lateral_movement` | Temporal and spatial delta from preceding event (rebounds within $\le 3$s, rushes $\ge 40$ft in $\le 4$s, turnovers within $\le 4$s, faceoffs within $\le 4$s, lateral angle shifts $\ge 25^\circ$). |
 | **Net State** | `empty_net` | Binary indicator for pulled goaltender situations. |
 
-### 3. Held-Out Test Evaluation & Selection
+### 3. Candidate Selection & Held-Out Test Evaluation
 
-On the identical 2,226-shot held-out test set, Logistic Regression was selected over HistGradientBoosting for production deployment based on calibration accuracy and parsimony:
+Candidate models were evaluated and compared strictly on the chronological validation set (2,176 shots, 24 games) using Validation Log Loss as the primary decision metric, keeping the held-out test set completely untouched during selection:
 
-| Evaluation Metric | Logistic Regression (Selected) | Gradient Boosting | Target Direction |
-| :--- | :--- | :--- | :--- |
-| **Log Loss** | **0.2130** | 0.2162 | Lower is better |
-| **Brier Score** | **0.0564** | 0.0565 | Lower is better |
-| **ROC AUC** | **0.7498** | 0.7490 | Higher is better |
-| **Total Expected Goals** | **148.74** | 139.37 | Target: 147.0 Actual Goals |
-| **Calibration Delta** | **+1.1%** | -5.2% | Target: 0.0% |
+- **Validation Selection**: Logistic Regression achieved lower validation log loss (0.2325 vs 0.2328) and superior calibration compared to gradient boosting.
+- **Production Retraining (Option B)**: The selected Logistic Regression configuration was refitted on the combined training and validation set (12,036 shots across 137 games).
+- **Final Benchmark**: The retrained model was evaluated once on the untouched held-out test set (2,226 shots across 25 games):
+
+| Evaluation Metric | Production Model (`pucklens-xg-logistic` v1.0.0) | Target Direction |
+| :--- | :--- | :--- |
+| **Test Log Loss** | **0.2127** | Lower is better |
+| **Test Brier Score** | **0.0563** | Lower is better |
+| **Test ROC AUC** | **0.7493** | Higher is better |
+| **Total Expected Goals** | **150.44** | Target: 147.0 Actual Goals (+2.3% delta) |
+| **Expected Goal Rate** | **6.76%** | Target: 6.60% Actual |
 
 For comprehensive diagnostic breakdowns across distance brackets, calibration curves, and feature importances, see the [PuckLens xG Model Card](docs/models/xg_v1.md).
 
@@ -287,7 +291,7 @@ For comprehensive diagnostic breakdowns across distance brackets, calibration cu
 - **Skater Finishing Analytics**:
   - **Goals Above Expected ($G - xG$)**: Individual finishing impact relative to league-average shooter expectation.
   - **$xG/60$**: Expected goals generation rate per 60 minutes of individual TOI.
-  - **Expected Shooting Percentage ($xSh\% = xG / Shots \times 100$)**.
+  - **Expected Goal Conversion Rate**: Expected goals per unblocked shot attempt ($xG / \text{Unblocked Attempts} \times 100$).
 - **Line & Pairing Combinations**:
   - True 5v5 forward trios and defensive pairings report $xGF$, $xGA$, $xG\%$, $xGF/60$, and $xGA/60$.
 - **Cumulative Game xG Timeline**:
@@ -301,12 +305,12 @@ For comprehensive diagnostic breakdowns across distance brackets, calibration cu
   ```powershell
   python scripts/train_xg.py
   ```
-  Runs chronological splits, trains and evaluates candidate models, evaluates calibration curves, and serializes the production model to `models/xg/xg_v1.pkl` and `models/xg/metadata.json`.
+  Runs chronological splits, evaluates candidates strictly on validation log loss, refits on train+val (Option B), benchmarks once on the untouched test set, and serializes the model and rich metadata to `models/xg/xg_v1.pkl` and `models/xg/metadata.json`.
 - **Database Backfill**:
   ```powershell
   python scripts/backfill_xg.py
   ```
-  Applies schema migrations (`Shot.model_version`) and updates stored model predictions across all existing shots.
+  Applies schema migrations (`Shot.model_name`, `Shot.model_version`, `Shot.prediction_method`) and updates stored predictions and provenance across all existing shots.
 
 ---
 
@@ -338,7 +342,7 @@ The application preserves source values where practical. For example, the NHL ga
 ```powershell
 git clone https://github.com/david-turnbull/Hockey-game-analyzer.git
 cd Hockey-game-analyzer
-git checkout v1.1
+git checkout v1.2
 ```
 
 ### 2. Create a virtual environment
@@ -532,7 +536,18 @@ Diagnostics are intended for development, verification, and audit purposes, acce
 - probability-scaled rink shot maps with danger-level color gradients and rich tooltips
 - shot model data quality integrity checks in diagnostics suite
 - comprehensive model card documentation (`docs/models/xg_v1.md`)
-- 76 regression and predictive unit tests passing
+- automated regression and predictive unit tests passing
+
+### v1.2.1 — Predictive Analytics Hardening (Current)
+
+- validation Log Loss candidate model selection isolating held-out test data
+- production retraining (Option B) on combined train and validation partitions
+- comprehensive 3-part prediction provenance (`prediction_method`, `model_name`, `model_version`)
+- separate shot denominator semantics for actual shooting percentage vs expected conversion rate
+- raw Euclidean distance computation for cross-event sequences
+- controlled neutral imputation for missing play-by-play coordinates
+- explicit dependency version pinning and CI workflow branch matrix
+- rich model metadata serialization including package versions, game counts, and data split audits
 
 ### Future Modelling (v1.3+)
 
@@ -545,6 +560,6 @@ Diagnostics are intended for development, verification, and audit purposes, acce
 
 ## Project Status
 
-`v1.2.0`
+`v1.2.1`
 
-The emphasis of v1.2 is **delivering an end-to-end predictive analytics engine**, elevating PuckLens from descriptive boxscores to state-of-the-art expected goals, goaltender evaluation, and lineup shot-quality analysis.
+The emphasis of v1.2 and v1.2.1 is **delivering a rigorously validated predictive analytics engine**, elevating PuckLens from descriptive boxscores to methodologically sound, calibrated expected goals, goaltender evaluation, and lineup shot-quality analysis.

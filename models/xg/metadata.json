@@ -1,7 +1,8 @@
 {
   "name": "pucklens-xg-logistic",
   "version": "1.0.0",
-  "training_date": "2026-09-05T17:16:54.413651",
+  "model_type": "LogisticRegressionXGModel",
+  "training_date": "2026-09-05T18:33:24.888754+00:00",
   "features": [
     "distance",
     "angle",
@@ -20,19 +21,236 @@
     "is_lateral_movement",
     "is_power_play",
     "is_shorthanded",
+    "coordinates_missing",
     "shot_type",
     "strength_state",
     "prev_event_type"
   ],
   "metrics": {
-    "log_loss": 0.213,
-    "brier_score": 0.0564,
-    "roc_auc": 0.7498,
+    "log_loss": 0.2127,
+    "brier_score": 0.0563,
+    "roc_auc": 0.7493,
     "actual_goals": 147,
     "total_shots": 2226,
-    "expected_goals": 148.74,
+    "expected_goals": 150.44,
     "actual_goal_pct": 6.6,
-    "expected_goal_pct": 6.68
+    "expected_goal_pct": 6.76
   },
-  "model_type": "LogisticRegressionXGModel"
+  "algorithm": "LogisticRegressionXGModel",
+  "train_date": "2026-09-05T18:33:24.916641+00:00",
+  "scikit_learn_version": "1.9.0",
+  "numpy_version": "2.5.2",
+  "pandas_version": "3.0.5",
+  "numeric_features": [
+    "distance",
+    "angle",
+    "period",
+    "period_seconds",
+    "score_differential",
+    "is_home",
+    "empty_net",
+    "time_since_prev_event",
+    "distance_from_prev_event",
+    "angle_change",
+    "is_rebound",
+    "is_rush",
+    "is_turnover",
+    "is_after_faceoff",
+    "is_lateral_movement",
+    "is_power_play",
+    "is_shorthanded",
+    "coordinates_missing"
+  ],
+  "categorical_features": [
+    "shot_type",
+    "strength_state",
+    "prev_event_type"
+  ],
+  "target": "goal",
+  "selection_strategy": {
+    "metric": "validation_log_loss",
+    "test_set_isolation": "untouched_during_candidate_selection",
+    "candidate_metrics": {
+      "logistic": {
+        "log_loss": 0.2325,
+        "brier_score": 0.0635,
+        "roc_auc": 0.7486,
+        "actual_goals": 157,
+        "total_shots": 2176,
+        "expected_goals": 151.66,
+        "actual_goal_pct": 7.22,
+        "expected_goal_pct": 6.97
+      },
+      "boosted": {
+        "log_loss": 0.2328,
+        "brier_score": 0.0625,
+        "roc_auc": 0.7528,
+        "actual_goals": 157,
+        "total_shots": 2176,
+        "expected_goals": 137.3,
+        "actual_goal_pct": 7.22,
+        "expected_goal_pct": 6.31
+      }
+    },
+    "selected_candidate": "logistic",
+    "selection_reason": "Logistic Regression has lower validation log loss (0.2325 vs 0.2328)"
+  },
+  "retraining_strategy": {
+    "strategy": "option_b_train_plus_validation_refit",
+    "description": "Refit selected candidate configuration on combined train and validation set before single final evaluation on test set"
+  },
+  "split_info": {
+    "train_games": 113,
+    "val_games": 24,
+    "test_games": 25,
+    "train_shots": 9860,
+    "val_shots": 2176,
+    "test_shots": 2226,
+    "refit_shots": 12036,
+    "total_shots": 14262,
+    "method": "chronological_game_split"
+  },
+  "test_metrics": {
+    "log_loss": 0.2127,
+    "brier_score": 0.0563,
+    "roc_auc": 0.7493,
+    "actual_goals": 147,
+    "total_shots": 2226,
+    "expected_goals": 150.44,
+    "actual_goal_pct": 6.6,
+    "expected_goal_pct": 6.76
+  },
+  "calibration": {
+    "predicted_probabilities": [
+      0.0407,
+      0.1382,
+      0.2358,
+      0.3499,
+      0.4461,
+      0.5226,
+      0.693,
+      0.7379,
+      0.8531,
+      0.9171
+    ],
+    "observed_frequencies": [
+      0.0426,
+      0.1314,
+      0.1791,
+      0.1,
+      1.0,
+      0.5,
+      0.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "breakdown": {
+    "by_distance": {
+      "<15 ft": {
+        "shots": 487,
+        "actual_goals": 50,
+        "expected_goals": 64.11,
+        "actual_sh_pct": 10.27,
+        "expected_sh_pct": 13.16
+      },
+      "15-30 ft": {
+        "shots": 488,
+        "actual_goals": 45,
+        "expected_goals": 40.35,
+        "actual_sh_pct": 9.22,
+        "expected_sh_pct": 8.27
+      },
+      "30-45 ft": {
+        "shots": 574,
+        "actual_goals": 39,
+        "expected_goals": 30.74,
+        "actual_sh_pct": 6.79,
+        "expected_sh_pct": 5.35
+      },
+      "45+ ft": {
+        "shots": 677,
+        "actual_goals": 13,
+        "expected_goals": 15.25,
+        "actual_sh_pct": 1.92,
+        "expected_sh_pct": 2.25
+      }
+    },
+    "by_shot_type": {
+      "wrist": {
+        "shots": 1142,
+        "actual_goals": 70,
+        "expected_goals": 64.83,
+        "actual_sh_pct": 6.13,
+        "expected_sh_pct": 5.68
+      },
+      "tip-in": {
+        "shots": 260,
+        "actual_goals": 18,
+        "expected_goals": 22.13,
+        "actual_sh_pct": 6.92,
+        "expected_sh_pct": 8.51
+      },
+      "snap": {
+        "shots": 378,
+        "actual_goals": 36,
+        "expected_goals": 32.1,
+        "actual_sh_pct": 9.52,
+        "expected_sh_pct": 8.49
+      },
+      "slap": {
+        "shots": 264,
+        "actual_goals": 11,
+        "expected_goals": 13.53,
+        "actual_sh_pct": 4.17,
+        "expected_sh_pct": 5.13
+      },
+      "backhand": {
+        "shots": 143,
+        "actual_goals": 7,
+        "expected_goals": 13.38,
+        "actual_sh_pct": 4.9,
+        "expected_sh_pct": 9.35
+      },
+      "wrap-around": {
+        "shots": 15,
+        "actual_goals": 2,
+        "expected_goals": 1.4,
+        "actual_sh_pct": 13.33,
+        "expected_sh_pct": 9.35
+      },
+      "other": {
+        "shots": 24,
+        "actual_goals": 3,
+        "expected_goals": 3.08,
+        "actual_sh_pct": 12.5,
+        "expected_sh_pct": 12.82
+      }
+    },
+    "by_strength_state": {
+      "EV": {
+        "shots": 1824,
+        "actual_goals": 90,
+        "expected_goals": 105.46,
+        "actual_sh_pct": 4.93,
+        "expected_sh_pct": 5.78
+      },
+      "PP": {
+        "shots": 335,
+        "actual_goals": 38,
+        "expected_goals": 29.75,
+        "actual_sh_pct": 11.34,
+        "expected_sh_pct": 8.88
+      },
+      "SH": {
+        "shots": 67,
+        "actual_goals": 19,
+        "expected_goals": 15.24,
+        "actual_sh_pct": 28.36,
+        "expected_sh_pct": 22.74
+      }
+    }
+  },
+  "test_leakage_audit": "passed_clean_test_isolation"
 }

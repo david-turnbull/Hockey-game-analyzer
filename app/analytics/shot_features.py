@@ -28,7 +28,8 @@ FEATURE_COLUMNS = [
     'is_after_faceoff',
     'is_lateral_movement',
     'is_power_play',
-    'is_shorthanded'
+    'is_shorthanded',
+    'coordinates_missing'
 ]
 
 NUMERIC_FEATURES = [
@@ -48,7 +49,8 @@ NUMERIC_FEATURES = [
     'is_after_faceoff',
     'is_lateral_movement',
     'is_power_play',
-    'is_shorthanded'
+    'is_shorthanded',
+    'coordinates_missing'
 ]
 
 CATEGORICAL_FEATURES = [
@@ -124,8 +126,10 @@ def calculate_distance_and_angle(x_norm: Optional[float], y_norm: Optional[float
 def standardize_shot_type(raw_type: Optional[str]) -> str:
     """Standardizes NHL API shot type strings into consistent categories."""
     if not raw_type:
-        return 'wrist'
-    t = raw_type.lower()
+        return 'UNKNOWN'
+    t = str(raw_type).strip().lower()
+    if not t or t in ['unknown', 'none', 'null', 'nan']:
+        return 'UNKNOWN'
     if 'wrist' in t:
         return 'wrist'
     elif 'slap' in t:
@@ -142,11 +146,15 @@ def standardize_shot_type(raw_type: Optional[str]) -> str:
 
 
 def standardize_strength_state(state: Optional[str]) -> str:
-    """Standardizes strength state strings into 'EV', 'PP', or 'SH'."""
+    """Standardizes strength state strings into 'EV', 'PP', 'SH', or 'UNKNOWN'."""
     if not state:
+        return 'UNKNOWN'
+    s = str(state).strip().upper()
+    if not s or s in ['UNKNOWN', 'NONE', 'NULL', 'NAN']:
+        return 'UNKNOWN'
+    if s in ['5V5', 'EVEN', 'EV', '4V4', '3V3']:
         return 'EV'
-    s = state.upper()
-    if 'PP' in s or '5V4' in s or '5V3' in s or '4V3' in s:
+    elif 'PP' in s or '5V4' in s or '5V3' in s or '4V3' in s:
         return 'PP'
     elif 'SH' in s or '4V5' in s or '3V5' in s or '3V4' in s or 'PK' in s:
         return 'SH'
@@ -163,23 +171,32 @@ class ShotFeatureExtractor:
     def extract_features_from_dict(cls, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Creates a normalized feature dictionary from input values, suitable for model input.
-        Missing values are assigned clean, defensible defaults.
+        Missing values are assigned clean, defensible defaults with explicit missingness indicators.
         """
-        raw_x = data.get('x_coordinate') or data.get('x_coordinate_normalized')
-        raw_y = data.get('y_coordinate') or data.get('y_coordinate_normalized')
+        raw_x = data.get('x_coordinate') if data.get('x_coordinate') is not None else data.get('x_coordinate_normalized')
+        raw_y = data.get('y_coordinate') if data.get('y_coordinate') is not None else data.get('y_coordinate_normalized')
         
-        # If coordinates provided, compute distance and angle if not already present
         distance = data.get('distance')
         angle = data.get('angle')
+        coordinates_missing = 1 if data.get('coordinates_missing') else 0
+
         if distance is None or angle is None:
-            norm_x, norm_y = normalize_coordinates(
-                raw_x, raw_y,
-                home_defending_side=data.get('home_defending_side'),
-                is_home_team=bool(data.get('is_home', True))
-            )
-            calc_dist, calc_ang = calculate_distance_and_angle(norm_x, norm_y)
-            distance = distance if distance is not None else calc_dist
-            angle = angle if angle is not None else calc_ang
+            if raw_x is None or raw_y is None:
+                coordinates_missing = 1
+                distance = 45.0  # Controlled neutral imputation
+                angle = 0.0
+            else:
+                norm_x, norm_y = normalize_coordinates(
+                    raw_x, raw_y,
+                    home_defending_side=data.get('home_defending_side'),
+                    is_home_team=bool(data.get('is_home', True))
+                )
+                calc_dist, calc_ang = calculate_distance_and_angle(norm_x, norm_y)
+                distance = calc_dist
+                angle = calc_ang
+        else:
+            if raw_x is None and raw_y is None and data.get('coordinates_missing'):
+                coordinates_missing = 1
 
         shot_type = standardize_shot_type(data.get('shot_type'))
         strength = standardize_strength_state(data.get('strength_state'))
@@ -238,7 +255,8 @@ class ShotFeatureExtractor:
             'is_after_faceoff': is_faceoff,
             'is_lateral_movement': is_lateral,
             'is_power_play': is_pp,
-            'is_shorthanded': is_sh
+            'is_shorthanded': is_sh,
+            'coordinates_missing': coordinates_missing
         }
 
     @classmethod
@@ -321,8 +339,13 @@ class ShotFeatureExtractor:
                             strength_state = 'SH'
 
                 # Coordinates and normalization
-                norm_x, norm_y = normalize_coordinates(raw_x, raw_y, is_home_team=is_home_event)
-                dist, ang = calculate_distance_and_angle(norm_x, norm_y)
+                coords_missing = (raw_x is None or raw_y is None)
+                if not coords_missing:
+                    norm_x, norm_y = normalize_coordinates(raw_x, raw_y, is_home_team=is_home_event)
+                    dist, ang = calculate_distance_and_angle(norm_x, norm_y)
+                else:
+                    norm_x, norm_y = None, None
+                    dist, ang = 45.0, 0.0
 
                 # Previous event context
                 prev_type = 'none'
@@ -332,17 +355,26 @@ class ShotFeatureExtractor:
 
                 if prev_event is not None:
                     prev_type = prev_event.get('type', 'none')
-                    delta_t = max(0.0, float(period_seconds - prev_event.get('seconds', period_seconds)))
-                    prev_nx = prev_event.get('x_norm')
-                    prev_ny = prev_event.get('y_norm')
-                    if norm_x is not None and norm_y is not None and prev_nx is not None and prev_ny is not None:
-                        delta_d = math.sqrt((norm_x - prev_nx)**2 + (norm_y - prev_ny)**2)
-                        prev_dist, prev_ang = calculate_distance_and_angle(prev_nx, prev_ny)
+                    prev_sec = prev_event.get('seconds', period_seconds)
+                    delta_t = max(0.0, float(period_seconds - prev_sec))
+                    prev_raw_x = prev_event.get('raw_x')
+                    prev_raw_y = prev_event.get('raw_y')
+                    
+                    # Task 5: Physical distance uses raw coordinates
+                    if not coords_missing and prev_raw_x is not None and prev_raw_y is not None:
+                        delta_d = math.sqrt((raw_x - prev_raw_x)**2 + (raw_y - prev_raw_y)**2)
+                        
+                        # Normalize both from perspective of current shooting team
+                        prev_nx_shooter, prev_ny_shooter = normalize_coordinates(
+                            prev_raw_x, prev_raw_y, is_home_team=is_home_event
+                        )
+                        prev_dist, prev_ang = calculate_distance_and_angle(prev_nx_shooter, prev_ny_shooter)
                         angle_change = abs(ang - prev_ang)
 
                 feature_input = {
                     'distance': dist,
                     'angle': ang,
+                    'coordinates_missing': 1 if coords_missing else 0,
                     'shot_type': shot_type,
                     'period': period,
                     'period_seconds': period_seconds,
@@ -388,18 +420,13 @@ class ShotFeatureExtractor:
                 else:
                     away_score += 1
 
-            # Update prev_event record
-            if raw_x is not None and raw_y is not None:
-                p_nx, p_ny = normalize_coordinates(raw_x, raw_y, is_home_team=is_home_event)
-            else:
-                p_nx, p_ny = None, None
-
+            # Update prev_event record using raw coordinates
             prev_event = {
                 'type': type_desc,
                 'seconds': period_seconds,
                 'team_id': event_owner_team_id,
-                'x_norm': p_nx,
-                'y_norm': p_ny
+                'raw_x': raw_x,
+                'raw_y': raw_y
             }
 
         return shots

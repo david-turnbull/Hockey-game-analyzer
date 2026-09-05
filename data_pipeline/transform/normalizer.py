@@ -410,12 +410,12 @@ class DataNormalizer:
             is_goal = (event_type == 'goal')
             
             from app.services.xg_service import XGService
-            xg_val = XGService.calculate_shot_xg(
-                metrics["distance"],
-                metrics["angle"],
-                details.get("shotType"),
-                team_strength_state,
-                empty_net
+            xg_prediction = XGService.predict_shot_xg(
+                distance=metrics["distance"],
+                angle=metrics["angle"],
+                shot_type=details.get("shotType"),
+                strength_state=team_strength_state,
+                empty_net=empty_net
             )
             
             shot = Shot(
@@ -433,8 +433,10 @@ class DataNormalizer:
                 goal=is_goal,
                 strength_state=team_strength_state,
                 empty_net=empty_net,
-                xg=xg_val,
-                model_version=XGService.get_active_model_version()
+                xg=xg_prediction.xg,
+                model_name=xg_prediction.model_name,
+                model_version=xg_prediction.model_version,
+                prediction_method=xg_prediction.method
             )
             
         return event, shot

@@ -6,6 +6,10 @@ class SkaterStatsService:
     """Service for computing skater counting stats, Corsi/Fenwick metrics, and expected goals."""
 
     @classmethod
+    def get_skater_game_stats(cls, game_id: int, player_id: int) -> dict:
+        return cls.calculate_skater_stats(game_id, player_id)
+
+    @classmethod
     def calculate_skater_stats(cls, game_id: int, player_id: int) -> dict:
         goals = db.session.query(Event).filter(
             Event.game_id == game_id,
@@ -27,10 +31,18 @@ class SkaterStatsService:
         points = goals + assists
         
         # Skater shots on goal: outcome in ['Goal', 'Saved']
-        shots = db.session.query(Shot).join(Event).filter(
+        shots_on_goal = db.session.query(Shot).join(Event).filter(
             Event.game_id == game_id,
             Shot.shooter_id == player_id,
             Shot.outcome.in_(['Goal', 'Saved']),
+            or_(Event.period_type != 'SO', Event.period_type.is_(None))
+        ).count()
+        
+        # Unblocked shot attempts: outcome in ['Goal', 'Saved', 'Missed']
+        unblocked_attempts = db.session.query(Shot).join(Event).filter(
+            Event.game_id == game_id,
+            Shot.shooter_id == player_id,
+            Shot.outcome.in_(['Goal', 'Saved', 'Missed']),
             or_(Event.period_type != 'SO', Event.period_type.is_(None))
         ).count()
         
@@ -76,9 +88,9 @@ class SkaterStatsService:
         # Goals Above Expected (G - xG)
         goals_above_expected = round(goals - player_xg, 2)
 
-        # Shooting % vs Expected Shooting %
-        sh_pct = round((goals / shots * 100), 1) if shots > 0 else 0.0
-        exp_sh_pct = round((player_xg / shots * 100), 1) if shots > 0 else 0.0
+        # Actual Shooting % (goals / shots_on_goal) vs Expected Goal Rate (xG / unblocked_attempts)
+        actual_sh_pct = round((goals / shots_on_goal * 100), 1) if shots_on_goal > 0 else 0.0
+        exp_goal_rate = round((player_xg / unblocked_attempts * 100), 1) if unblocked_attempts > 0 else 0.0
 
         # Calculate TOI seconds for xG/60 rate
         from app.models import Shift
@@ -95,7 +107,9 @@ class SkaterStatsService:
             "goals": goals,
             "assists": assists,
             "points": points,
-            "shots": shots,
+            "shots": shots_on_goal,
+            "shots_on_goal": shots_on_goal,
+            "unblocked_attempts": unblocked_attempts,
             "hits": hits_delivered,
             "pim": pim,
             "faceoffs_won": faceoffs_won,
@@ -109,7 +123,9 @@ class SkaterStatsService:
             "ff_pct": p_poss.get("ff_pct", None),
             "xg": player_xg,
             "goals_above_expected": goals_above_expected,
-            "shooting_pct": sh_pct,
-            "expected_shooting_pct": exp_sh_pct,
+            "actual_shooting_pct": actual_sh_pct,
+            "shooting_pct": actual_sh_pct,
+            "expected_goal_rate_per_unblocked_attempt": exp_goal_rate,
+            "expected_shooting_pct": exp_goal_rate,
             "xg_per_60": xg_per_60
         }

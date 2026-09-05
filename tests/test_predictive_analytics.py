@@ -116,7 +116,7 @@ def test_event_context_feature_derivation():
     assert standardize_strength_state('5v4') == 'PP'
     assert standardize_strength_state('4v5') == 'SH'
     assert standardize_strength_state('5v5') == 'EV'
-    assert standardize_strength_state(None) == 'EV'
+    assert standardize_strength_state(None) == 'UNKNOWN'
 
 
 # ==========================================
@@ -230,3 +230,265 @@ def test_deterministic_regression_fixture():
     p2 = float(active_model.predict(shot2))
     assert p2 > p1
     assert p2 >= 0.15
+
+
+# ==========================================
+# 7. Hardening Regression Tests (v1.2.1)
+# ==========================================
+def test_model_metadata_persists_after_serialization(tmp_path):
+    """Task 2: Verify custom training metadata persists through save and reload."""
+    df = pd.DataFrame([{
+        'distance': 25.0, 'angle': 10.0, 'shot_type': 'wrist', 'strength_state': 'EV',
+        'period': 1, 'period_seconds': 100, 'score_differential': 0, 'is_home': 1,
+        'empty_net': 0, 'time_since_prev_event': 5.0, 'distance_from_prev_event': 10.0,
+        'angle_change': 5.0, 'is_rebound': 0, 'is_rush': 0, 'is_turnover': 0,
+        'is_after_faceoff': 0, 'is_lateral_movement': 0, 'is_power_play': 0,
+        'is_shorthanded': 0, 'coordinates_missing': 0, 'prev_event_type': 'none'
+    }, {
+        'distance': 10.0, 'angle': 0.0, 'shot_type': 'wrist', 'strength_state': 'EV',
+        'period': 1, 'period_seconds': 200, 'score_differential': 0, 'is_home': 1,
+        'empty_net': 0, 'time_since_prev_event': 2.0, 'distance_from_prev_event': 5.0,
+        'angle_change': 0.0, 'is_rebound': 1, 'is_rush': 0, 'is_turnover': 0,
+        'is_after_faceoff': 0, 'is_lateral_movement': 0, 'is_power_play': 0,
+        'is_shorthanded': 0, 'coordinates_missing': 0, 'prev_event_type': 'shot'
+    }])
+    y = np.array([0, 1])
+    model = LogisticRegressionXGModel(name="test-meta-model", version="2.0.0")
+    model.fit(df, y)
+
+    # Attach training metadata
+    model.metadata['split_info'] = {'train_shots': 100, 'val_shots': 20, 'test_shots': 20}
+    model.metadata['selection_metric'] = 'log_loss'
+    assert 'split_info' in model.metadata
+
+    # Save and reload
+    save_dir = str(tmp_path / "model_test")
+    try:
+        ModelRegistry.save_model(model, directory=save_dir)
+        loaded = ModelRegistry.load_model(directory=save_dir)
+
+        assert loaded is not None
+        assert loaded.metadata.get('selection_metric') == 'log_loss'
+        assert loaded.metadata.get('split_info', {}).get('train_shots') == 100
+    finally:
+        ModelRegistry.reset_active_model()
+
+
+def test_model_name_and_version_distinction():
+    """Task 3: Verify get_active_name() and get_active_version() return distinct, correct identifiers."""
+    name = ModelRegistry.get_active_name()
+    version = ModelRegistry.get_active_version()
+    assert name != version
+    assert "logistic" in name or "boosted" in name or "model" in name
+    assert version == "1.0.0" or version.count('.') >= 1
+
+
+def test_prediction_provenance_dataclass():
+    """Task 3: Verify XGPrediction returns complete 3-part provenance for ML predictions."""
+    shot_input = {
+        'distance': 20.0,
+        'angle': 10.0,
+        'shot_type': 'wrist',
+        'strength_state': 'EV',
+        'empty_net': False
+    }
+    pred = ModelRegistry.predict_shot_xg_with_provenance(shot_input)
+    assert hasattr(pred, 'xg')
+    assert hasattr(pred, 'model_name')
+    assert hasattr(pred, 'model_version')
+    assert hasattr(pred, 'method')
+    assert hasattr(pred, 'fallback_used')
+    assert 0.0 <= pred.xg <= 1.0
+    assert pred.method == 'ml'
+    assert pred.fallback_used is False
+    assert pred.model_name == ModelRegistry.get_active_name()
+    assert pred.model_version == ModelRegistry.get_active_version()
+
+
+def test_forced_inference_failure_fallback_provenance():
+    """Task 3: Verify inference failures gracefully use heuristic fallback with correct provenance."""
+    from app.analytics.xg_model import BaseXGModel
+    original_model = ModelRegistry._active_model
+
+    class BrokenInferenceModel(BaseXGModel):
+        def fit(self, X, y):
+            return self
+        def predict(self, X):
+            raise RuntimeError("Simulated ML inference failure")
+
+    try:
+        ModelRegistry._active_model = BrokenInferenceModel(name="broken-model", version="0.0.1")
+        pred = ModelRegistry.predict_shot_xg_with_provenance({'distance': 25.0, 'angle': 5.0})
+        assert pred.method == 'heuristic'
+        assert pred.fallback_used is True
+        assert pred.model_name == 'pucklens-xg-heuristic'
+        assert pred.model_version == '1.0.0'
+        assert 0.0 <= pred.xg <= 1.0
+    finally:
+        ModelRegistry._active_model = original_model
+
+
+def test_expected_shooting_percentage_unblocked_denominator(app):
+    """Task 4: Verify expected conversion rate uses unblocked attempts (goals + saves + misses)."""
+    with app.app_context():
+        # Setup mock teams, game, and player
+        t1 = db.session.get(Team, 101) or Team(team_id=101, name="Team A", abbreviation="TMA")
+        t2 = db.session.get(Team, 102) or Team(team_id=102, name="Team B", abbreviation="TMB")
+        db.session.add_all([t1, t2])
+        db.session.flush()
+
+        g = Game(game_id=99999, season="20232024", game_date=date(2023, 10, 15), home_team_id=101, away_team_id=102)
+        p = Player(player_id=77701, first_name="Sniper", last_name="Test")
+        db.session.add_all([g, p])
+        db.session.flush()
+
+        # Create 1 Goal (xG=0.20), 1 Saved (xG=0.10), 2 Missed (xG=0.15 each)
+        # Total unblocked = 4 attempts, SOG = 2. Total xG = 0.60.
+        evt_types = [('Goal', 'Goal', 0.20), ('Saved', 'Saved', 0.10), 
+                     ('Missed', 'Missed', 0.15), ('Missed', 'Missed', 0.15)]
+        for i, (evt_desc, outcome, xg_val) in enumerate(evt_types):
+            e = Event(event_id=f"evt_{i}", game_id=99999, event_type=evt_desc.lower(),
+                      period=1, period_time="05:00", elapsed_game_seconds=300,
+                      period_type="REG", primary_player_id=77701)
+            sh = Shot(shot_id=f"evt_{i}", game_id=99999, shooter_id=77701, team_id=101,
+                      x_coordinate_normalized=70.0, y_coordinate_normalized=0.0,
+                      outcome=outcome, goal=(outcome == 'Goal'), xg=xg_val,
+                      model_name="pucklens-xg-logistic", model_version="1.0.0", prediction_method="ml")
+            db.session.add_all([e, sh])
+        db.session.commit()
+
+        stats = SkaterStatsService.get_skater_game_stats(99999, 77701)
+        assert stats["shots_on_goal"] == 2
+        assert stats["unblocked_attempts"] == 4
+        assert stats["goals"] == 1
+        assert stats["actual_shooting_pct"] == 50.0  # (1 / 2) * 100
+        # Expected conversion rate must use 4 unblocked attempts, NOT 2 SOG!
+        # (0.60 / 4) * 100 = 15.0%
+        assert stats["expected_goal_rate_per_unblocked_attempt"] == 15.0
+        assert stats["expected_shooting_pct"] == 15.0
+        assert stats["goals_above_expected"] == 0.40  # 1.0 - 0.60
+
+
+def test_sequential_coordinates_raw_rink_distance():
+    """Task 5: Verify Euclidean distance between events uses raw coordinates across possession changes."""
+    # Synthetic PBP with Away giveaway followed by Home shot
+    pbp_sample = {
+        'id': 10001,
+        'season': '20232024',
+        'gameDate': '2023-10-15',
+        'homeTeam': {'id': 1},
+        'awayTeam': {'id': 2},
+        'plays': [
+            {
+                'eventId': 1,
+                'periodDescriptor': {'number': 1, 'periodType': 'REG'},
+                'timeInPeriod': '02:00',
+                'typeDescKey': 'giveaway',
+                'details': {
+                    'eventOwnerTeamId': 2,  # Away team giveaway
+                    'xCoord': 20.0,
+                    'yCoord': 10.0
+                }
+            },
+            {
+                'eventId': 2,
+                'periodDescriptor': {'number': 1, 'periodType': 'REG'},
+                'timeInPeriod': '02:03',
+                'typeDescKey': 'shot-on-goal',
+                'details': {
+                    'eventOwnerTeamId': 1,  # Home team shot
+                    'shootingPlayerId': 101,
+                    'xCoord': 60.0,
+                    'yCoord': 10.0,
+                    'shotType': 'wrist'
+                }
+            }
+        ]
+    }
+    shots = ShotFeatureExtractor.extract_shots_from_pbp_json(pbp_sample)
+    assert len(shots) == 1
+    shot = shots[0]
+    # Physical distance on rink from (20, 10) to (60, 10) is exactly 40.0 ft
+    assert shot['distance_from_prev_event'] == 40.0
+    assert shot['time_since_prev_event'] == 3.0
+    assert shot['is_turnover'] == 1
+
+
+def test_missing_data_semantics_explicit():
+    """Task 6: Verify coordinates_missing indicator and UNKNOWN categorical handling."""
+    # Missing coordinates
+    f_missing = ShotFeatureExtractor.extract_features_from_dict({
+        'shot_type': None,
+        'strength_state': None
+    })
+    assert f_missing['coordinates_missing'] == 1
+    assert f_missing['shot_type'] == 'UNKNOWN'
+    assert f_missing['strength_state'] == 'UNKNOWN'
+
+    # Present coordinates
+    f_present = ShotFeatureExtractor.extract_features_from_dict({
+        'x_coordinate': 75.0,
+        'y_coordinate': 0.0,
+        'shot_type': 'wrist',
+        'strength_state': '5v5'
+    })
+    assert f_present['coordinates_missing'] == 0
+    assert f_present['shot_type'] == 'wrist'
+    assert f_present['strength_state'] == 'EV'
+
+
+def test_xg_service_provenance_and_backward_compatibility():
+    """Task 3: Verify XGService returns full provenance object and float backward compatibility."""
+    pred = XGService.predict_shot_xg(distance=25.0, angle=10.0, shot_type='wrist', strength_state='EV')
+    assert hasattr(pred, 'xg')
+    assert hasattr(pred, 'model_name')
+    assert hasattr(pred, 'model_version')
+    assert hasattr(pred, 'method')
+    assert 0.0 <= pred.xg <= 1.0
+    assert pred.method in ['ml', 'heuristic']
+    assert isinstance(pred.model_name, str) and len(pred.model_name) > 0
+    assert isinstance(pred.model_version, str) and len(pred.model_version) > 0
+
+    # Backward-compatible float method
+    float_val = XGService.calculate_shot_xg(distance=25.0, angle=10.0, shot_type='wrist', strength_state='EV')
+    assert isinstance(float_val, float)
+    assert float_val == pred.xg
+
+
+def test_model_metadata_serialization_rich_audit():
+    """Task 2 & 9: Verify metadata contains required split info, candidate selection, and Option B refit."""
+    import os
+    import json
+    from app.analytics.model_registry import DEFAULT_MODEL_DIR
+
+    meta_path = os.path.join(DEFAULT_MODEL_DIR, "metadata.json")
+    assert os.path.exists(meta_path), "metadata.json must exist"
+
+    with open(meta_path, 'r', encoding='utf-8') as f:
+        meta = json.load(f)
+
+    # Validate split info
+    split = meta.get('split_info', {})
+    assert 'train_games' in split and split['train_games'] > 0
+    assert 'val_games' in split and split['val_games'] > 0
+    assert 'test_games' in split and split['test_games'] > 0
+    assert 'refit_shots' in split and split['refit_shots'] == split['train_shots'] + split['val_shots']
+    assert split.get('method') == 'chronological_game_split'
+
+    # Validate selection strategy (Task 1)
+    sel = meta.get('selection_strategy', {})
+    assert sel.get('metric') == 'validation_log_loss'
+    assert sel.get('test_set_isolation') == 'untouched_during_candidate_selection'
+    assert 'candidate_metrics' in sel
+    assert 'logistic' in sel['candidate_metrics']
+    assert 'boosted' in sel['candidate_metrics']
+
+    # Validate retraining strategy (Task 2 Option B)
+    retrain = meta.get('retraining_strategy', {})
+    assert retrain.get('strategy') == 'option_b_train_plus_validation_refit'
+
+    # Validate library versions (Task 7)
+    assert 'scikit_learn_version' in meta
+    assert 'numpy_version' in meta
+    assert 'pandas_version' in meta
+
