@@ -409,14 +409,27 @@ class DataNormalizer:
             outcome = outcome_mapping.get(event_type, 'Unknown')
             is_goal = (event_type == 'goal')
             
-            from app.services.xg_service import XGService
-            xg_prediction = XGService.predict_shot_xg(
-                distance=metrics["distance"],
-                angle=metrics["angle"],
-                shot_type=details.get("shotType"),
-                strength_state=team_strength_state,
-                empty_net=empty_net
-            )
+            # Blocked Shots Invariant (Priority 0):
+            # Blocked shots are strictly ineligible for xG (Shot.xg = None) and do not belong
+            # to the Fenwick / unblocked-attempt population.
+            if outcome in ['Goal', 'Saved', 'Missed']:
+                from app.services.xg_service import XGService
+                xg_prediction = XGService.predict_shot_xg(
+                    distance=metrics["distance"],
+                    angle=metrics["angle"],
+                    shot_type=details.get("shotType"),
+                    strength_state=team_strength_state,
+                    empty_net=empty_net
+                )
+                shot_xg = xg_prediction.xg
+                m_name = xg_prediction.model_name
+                m_version = xg_prediction.model_version
+                p_method = xg_prediction.method
+            else:
+                shot_xg = None
+                m_name = None
+                m_version = None
+                p_method = None
             
             shot = Shot(
                 shot_id=event_id,
@@ -433,10 +446,10 @@ class DataNormalizer:
                 goal=is_goal,
                 strength_state=team_strength_state,
                 empty_net=empty_net,
-                xg=xg_prediction.xg,
-                model_name=xg_prediction.model_name,
-                model_version=xg_prediction.model_version,
-                prediction_method=xg_prediction.method
+                xg=shot_xg,
+                model_name=m_name,
+                model_version=m_version,
+                prediction_method=p_method
             )
             
         return event, shot

@@ -23,6 +23,7 @@ def get_games():
     games = GameService.get_games_list(team_id, season)
     return jsonify(games)
 
+@api_bp.route('/games/<int:game_id>/shots')
 @api_bp.route('/game/<int:game_id>/shots')
 @api_bp.route('/shots')
 def get_shots(game_id=None):
@@ -67,8 +68,8 @@ def get_shots(game_id=None):
             "strength_state": s.strength_state,
             "manpower_state": s.event.manpower_state,
             "empty_net": s.empty_net,
-            "xg": round(s.xg, 4) if s.xg is not None else 0.0,
-            "model_version": s.model_version
+            "xg": round(s.xg, 4) if (s.xg is not None and s.outcome in ['Goal', 'Saved', 'Missed']) else None,
+            "model_version": s.model_version if s.outcome in ['Goal', 'Saved', 'Missed'] else None
         })
         
     return jsonify(formatted_shots)
@@ -303,7 +304,7 @@ def get_player_shots(game_id, player_id):
             "strength_state": s.strength_state,
             "manpower_state": s.event.manpower_state,
             "empty_net": s.empty_net,
-            "xg": round(s.xg, 4) if s.xg is not None else 0.0
+            "xg": round(s.xg, 4) if (s.xg is not None and s.outcome in ['Goal', 'Saved', 'Missed']) else None
         })
         
     return jsonify(formatted_shots)

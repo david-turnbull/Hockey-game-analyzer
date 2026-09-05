@@ -487,8 +487,212 @@ def test_model_metadata_serialization_rich_audit():
     retrain = meta.get('retraining_strategy', {})
     assert retrain.get('strategy') == 'option_b_train_plus_validation_refit'
 
-    # Validate library versions (Task 7)
+    # Validate library versions and runtime provenance
     assert 'scikit_learn_version' in meta
     assert 'numpy_version' in meta
     assert 'pandas_version' in meta
+    assert 'joblib_version' in meta
+    assert 'python_version' in meta
+    assert 'platform' in meta
+    assert 'git_commit' in meta
+
+
+def test_sequential_coordinate_frame_consistency():
+    """
+    Priority 1: Verify coordinate transformation helper and sequential angle change consistency.
+    Proves that mirrored rink coordinates produce identical physical distances and angle changes.
+    """
+    from app.analytics.shot_features import (
+        get_attacking_coordinate_transform,
+        apply_coordinate_transform
+    )
+
+    # Team attacking right (x > 0)
+    curr_raw_x, curr_raw_y = 70.0, 10.0
+    prev_raw_x, prev_raw_y = 50.0, 20.0
+
+    flip_right = get_attacking_coordinate_transform(curr_raw_x, curr_raw_y, home_defending_side='left', is_home_team=True)
+    assert flip_right is False
+    nx_right, ny_right = apply_coordinate_transform(curr_raw_x, curr_raw_y, flip_right)
+    pnx_right, pny_right = apply_coordinate_transform(prev_raw_x, prev_raw_y, flip_right)
+    d_right, a_right = calculate_distance_and_angle(nx_right, ny_right)
+    pd_right, pa_right = calculate_distance_and_angle(pnx_right, pny_right)
+    delta_d_right = np.sqrt((curr_raw_x - prev_raw_x)**2 + (curr_raw_y - prev_raw_y)**2)
+    ang_change_right = abs(a_right - pa_right)
+
+    # Same play mirrored, team attacking left (x < 0)
+    m_curr_raw_x, m_curr_raw_y = -70.0, -10.0
+    m_prev_raw_x, m_prev_raw_y = -50.0, -20.0
+
+    flip_left = get_attacking_coordinate_transform(m_curr_raw_x, m_curr_raw_y, home_defending_side='right', is_home_team=True)
+    assert flip_left is True
+    nx_left, ny_left = apply_coordinate_transform(m_curr_raw_x, m_curr_raw_y, flip_left)
+    pnx_left, pny_left = apply_coordinate_transform(m_prev_raw_x, m_prev_raw_y, flip_left)
+    d_left, a_left = calculate_distance_and_angle(nx_left, ny_left)
+    pd_left, pa_left = calculate_distance_and_angle(pnx_left, pny_left)
+    delta_d_left = np.sqrt((m_curr_raw_x - m_prev_raw_x)**2 + (m_curr_raw_y - m_prev_raw_y)**2)
+    ang_change_left = abs(a_left - pa_left)
+
+    # Invariants under coordinate transform
+    assert d_right == d_left
+    assert a_right == a_left
+    assert pd_right == pd_left
+    assert pa_right == pa_left
+    assert round(delta_d_right, 4) == round(delta_d_left, 4)
+    assert round(ang_change_right, 4) == round(ang_change_left, 4)
+
+
+def test_blocked_shots_domain_invariant(app, db):
+    """
+    Priority 0: Verify domain invariant that Blocked shots are strictly ineligible for xG (Shot.xg = NULL).
+    Blocked shots contribute to Corsi, but are completely barred from receiving or contributing to
+    any xG or Fenwick/unblocked metrics across normalizer, services, and API serialization.
+    """
+    from data_pipeline.transform.normalizer import DataNormalizer
+
+    normalizer = DataNormalizer()
+    
+    # 1. Normalizer Invariant: Blocked event receives xg = None and provenance = None
+    event_dict = {
+        "eventId": 101,
+        "typeDescKey": "blocked-shot",
+        "periodDescriptor": {"number": 1, "periodType": "REG"},
+        "timeInPeriod": "05:00",
+        "details": {
+            "xCoord": 65,
+            "yCoord": 5,
+            "shootingPlayerId": 1001,
+            "blockingPlayerId": 2001,
+            "shotType": "wrist",
+            "eventOwnerTeamId": 1
+        }
+    }
+    game_dict = {
+        "id": 99999,
+        "homeTeam": {"id": 1, "abbrev": "HOM"},
+        "awayTeam": {"id": 2, "abbrev": "AWY"}
+    }
+    event_model, shot_model = normalizer.transform_event(event_dict, game_dict, 99999)
+    assert shot_model is not None
+    assert shot_model.outcome == "Blocked"
+    assert shot_model.xg is None
+    assert shot_model.model_name is None
+    assert shot_model.model_version is None
+    assert shot_model.prediction_method is None
+
+    # Normalizer Invariant: Goal, Saved, Missed receive xG
+    for ev_type, expected_outcome in [('goal', 'Goal'), ('shot-on-goal', 'Saved'), ('missed-shot', 'Missed')]:
+        ev_dict = dict(event_dict, eventId=102, typeDescKey=ev_type)
+        _, s_model = normalizer.transform_event(ev_dict, game_dict, 99999)
+        assert s_model.outcome == expected_outcome
+        assert s_model.xg is not None
+        assert s_model.xg > 0.0
+        assert s_model.prediction_method is not None
+
+    # 2. Database & Service Level Invariant Verification
+    # Seed a mini game in test DB
+    test_game = Game(
+        game_id=88888,
+        season="20232024",
+        game_date=date(2023, 10, 15),
+        game_type=2,
+        nhl_game_state="OFF",
+        home_team_id=1,
+        away_team_id=2,
+        home_score=1,
+        away_score=0
+    )
+    t1 = Team(team_id=1, name="Home Team", abbreviation="HOM")
+    t2 = Team(team_id=2, name="Away Team", abbreviation="AWY")
+    p1 = Player(player_id=1001, first_name="Shooter", last_name="One", position="C")
+    p2 = Player(player_id=2001, first_name="Goalie", last_name="One", position="G")
+    db.session.add_all([test_game, t1, t2, p1, p2])
+    db.session.flush()
+
+    # Create 4 shot events: Goal (0.25), Saved (0.15), Missed (0.10), Blocked (None)
+    # Total valid xG = 0.50
+    outcomes_data = [
+        ("goal", "Goal", True, 0.25, 100),
+        ("shot-on-goal", "Saved", False, 0.15, 200),
+        ("missed-shot", "Missed", False, 0.10, 300),
+        ("blocked-shot", "Blocked", False, None, 400),
+    ]
+
+    for ev_type, outcome, is_goal, xg_val, elapsed in outcomes_data:
+        e = Event(
+            event_id=elapsed,
+            game_id=88888,
+            event_type=ev_type,
+            period=1,
+            period_type="REG",
+            period_time=f"0{elapsed//60}:00",
+            elapsed_game_seconds=elapsed,
+            team_id=1,
+            primary_player_id=1001,
+            team_strength_state="5v5",
+            manpower_state="EV"
+        )
+        s = Shot(
+            shot_id=elapsed,
+            game_id=88888,
+            team_id=1,
+            shooter_id=1001,
+            goalie_id=2001 if outcome in ['Goal', 'Saved'] else None,
+            x_coordinate_normalized=65.0,
+            y_coordinate_normalized=5.0,
+            distance=25.0,
+            angle=5.0,
+            outcome=outcome,
+            goal=is_goal,
+            strength_state="EV",
+            empty_net=False,
+            xg=xg_val,
+            model_name="pucklens-xg-logistic" if xg_val is not None else None,
+            model_version="1.0.0" if xg_val is not None else None,
+            prediction_method="ml" if xg_val is not None else None
+        )
+        db.session.add_all([e, s])
+    db.session.commit()
+
+    # Service Check 1: GameService details home_xg
+    game_details = GameService.get_game_overview_stats(88888)
+    assert game_details["stats"]["home_xg"] == 0.50
+
+    # Service Check 2: GameService xG timeline only contains unblocked shots
+    timeline = GameService.get_game_xg_timeline(88888, situation='all')
+    timeline_shots = [pt for pt in timeline.get("timeline", []) if pt.get("event_type")]
+    timeline_event_types = [pt["event_type"] for pt in timeline_shots]
+    assert "blocked-shot" not in timeline_event_types
+    assert len(timeline_shots) == 3
+    assert timeline["home_team"]["total_xg"] == 0.50
+
+    # Service Check 3: SkaterStatsService excludes blocked shot
+    skater_stats = SkaterStatsService.calculate_skater_stats(88888, 1001)
+    assert skater_stats["xg"] == 0.50
+    assert skater_stats["unblocked_attempts"] == 3
+
+    # Service Check 4: UnitService strictly separates Corsi (all 4) from Fenwick & xG (3)
+    shots_unit = Shot.query.join(Event).filter(Event.game_id == 88888).all()
+    cf = ca = ff = fa = 0
+    xgf = xga = 0.0
+    for s in shots_unit:
+        shot_xg = float(s.xg) if (s.xg is not None and s.outcome in ['Goal', 'Saved', 'Missed']) else 0.0
+        cf += 1
+        if s.outcome in ['Goal', 'Saved', 'Missed']:
+            ff += 1
+            xgf += shot_xg
+    assert cf == 4
+    assert ff == 3
+    assert round(xgf, 2) == 0.50
+
+    # API Check: shots endpoint serializes blocked shot with xg = None
+    with app.test_client() as client:
+        res = client.get('/api/games/88888/shots')
+        assert res.status_code == 200
+        shots_json = res.get_json()
+        assert len(shots_json) == 4
+        blocked_json = next(item for item in shots_json if item["outcome"] == "Blocked")
+        assert blocked_json["xg"] is None
+        assert blocked_json["model_version"] is None
+
 

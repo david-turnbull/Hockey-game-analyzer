@@ -77,14 +77,36 @@ class ModelRegistry:
             logger.warning(f"Trained model artifact not found at {model_path}. Using baseline fallback.")
             return None
 
-        try:
-            model = joblib.load(model_path)
-            meta_dict = {}
-            if os.path.exists(metadata_path):
+        # 1. Load metadata BEFORE deserialization for safety and compatibility pre-checks
+        meta_dict = {}
+        if os.path.exists(metadata_path):
+            try:
                 with open(metadata_path, 'r', encoding='utf-8') as f:
                     meta_dict = json.load(f)
-            else:
-                meta_dict = model.metadata if hasattr(model, 'metadata') else {}
+            except Exception as e:
+                logger.warning(f"Could not parse model metadata from {metadata_path}: {e}")
+
+        # 2. Check runtime library version compatibility prior to unpickling
+        if meta_dict:
+            saved_sklearn = meta_dict.get('scikit_learn_version')
+            if saved_sklearn:
+                try:
+                    import sklearn
+                    current_major = sklearn.__version__.split('.')[0]
+                    saved_major = str(saved_sklearn).split('.')[0]
+                    if current_major != saved_major:
+                        logger.warning(
+                            f"Model artifact was trained with scikit-learn {saved_sklearn}, "
+                            f"current runtime is {sklearn.__version__}. Major version mismatch may cause deserialization issues."
+                        )
+                except Exception:
+                    pass
+
+        # 3. Deserialize model artifact
+        try:
+            model = joblib.load(model_path)
+            if not meta_dict and hasattr(model, 'metadata'):
+                meta_dict = model.metadata or {}
             
             if hasattr(model, '_metadata'):
                 model._metadata = meta_dict
@@ -94,23 +116,15 @@ class ModelRegistry:
                 cls._active_model = model
                 cls._active_metadata = meta_dict
 
-            # Task 7: Check runtime library version compatibility
-            if meta_dict:
-                saved_sklearn = meta_dict.get('scikit_learn_version')
-                if saved_sklearn:
-                    import sklearn
-                    current_major = sklearn.__version__.split('.')[0]
-                    saved_major = str(saved_sklearn).split('.')[0]
-                    if current_major != saved_major:
-                        logger.warning(
-                            f"Model artifact was trained with scikit-learn {saved_sklearn}, "
-                            f"current runtime is {sklearn.__version__}. Major version mismatch may cause deserialization issues."
-                        )
-
-            logger.info(f"Successfully loaded model {meta_dict.get('name', 'xg_model')} from {model_path}")
+            logger.info(f"Successfully loaded model {meta_dict.get('name', getattr(model, 'name', 'xg_model'))} from {model_path}")
             return model
         except Exception as e:
-            logger.error(f"Failed to load model from {model_path}: {e}")
+            logger.error(
+                f"Failed to load model from {model_path}: {e}. "
+                f"Artifact metadata: {meta_dict.get('name', 'unknown')} v{meta_dict.get('version', 'unknown')} "
+                f"(trained with scikit-learn {meta_dict.get('scikit_learn_version', 'unknown')}, "
+                f"python {meta_dict.get('python_version', 'unknown')})."
+            )
             return None
 
     @classmethod

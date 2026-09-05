@@ -105,33 +105,37 @@ class GameService:
             or_(Event.period_type != 'SO', Event.period_type.is_(None))
         ).count()
         
-        # Calculate Expected Goals (xG) metrics (sum of shot xG, excluding shootouts)
+        # Calculate Expected Goals (xG) metrics (sum of shot xG for unblocked attempts, excluding shootouts)
         home_xg_val = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
             Event.game_id == game_id,
             Event.team_id == game.home_team_id,
+            Shot.outcome.in_(['Goal', 'Saved', 'Missed']),
             or_(Event.period_type != 'SO', Event.period_type.is_(None))
         ).scalar()
         
         away_xg_val = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
             Event.game_id == game_id,
             Event.team_id == game.away_team_id,
+            Shot.outcome.in_(['Goal', 'Saved', 'Missed']),
             or_(Event.period_type != 'SO', Event.period_type.is_(None))
         ).scalar()
         
         home_xg = round(home_xg_val, 2) if home_xg_val is not None else 0.0
         away_xg = round(away_xg_val, 2) if away_xg_val is not None else 0.0
 
-        # Calculate 5v5 Expected Goals
+        # Calculate 5v5 Expected Goals (unblocked attempts only)
         home_5v5_xg_val = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
             Event.game_id == game_id,
             Event.team_id == game.home_team_id,
             Event.team_strength_state == '5v5',
+            Shot.outcome.in_(['Goal', 'Saved', 'Missed']),
             or_(Event.period_type != 'SO', Event.period_type.is_(None))
         ).scalar()
         away_5v5_xg_val = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
             Event.game_id == game_id,
             Event.team_id == game.away_team_id,
             Event.team_strength_state == '5v5',
+            Shot.outcome.in_(['Goal', 'Saved', 'Missed']),
             or_(Event.period_type != 'SO', Event.period_type.is_(None))
         ).scalar()
         home_5v5_xg = round(home_5v5_xg_val, 2) if home_5v5_xg_val is not None else 0.0
@@ -142,7 +146,7 @@ class GameService:
         home_xg_pct = round((home_xg / tot_xg * 100), 1) if tot_xg > 0 else 50.0
         away_xg_pct = round((away_xg / tot_xg * 100), 1) if tot_xg > 0 else 50.0
 
-        # Period-by-period xG breakdown
+        # Period-by-period xG breakdown (unblocked attempts only)
         periods = [r[0] for r in db.session.query(Event.period).filter(
             Event.game_id == game_id,
             or_(Event.period_type != 'SO', Event.period_type.is_(None))
@@ -154,12 +158,14 @@ class GameService:
                 Event.game_id == game_id,
                 Event.team_id == game.home_team_id,
                 Event.period == p,
+                Shot.outcome.in_(['Goal', 'Saved', 'Missed']),
                 or_(Event.period_type != 'SO', Event.period_type.is_(None))
             ).scalar() or 0.0
             a_p_xg = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
                 Event.game_id == game_id,
                 Event.team_id == game.away_team_id,
                 Event.period == p,
+                Shot.outcome.in_(['Goal', 'Saved', 'Missed']),
                 or_(Event.period_type != 'SO', Event.period_type.is_(None))
             ).scalar() or 0.0
             label = f"P{p}" if p <= 3 else "OT"
@@ -502,6 +508,7 @@ class GameService:
 
         query = Shot.query.join(Event).filter(
             Event.game_id == game_id,
+            Shot.outcome.in_(['Goal', 'Saved', 'Missed']),
             or_(Event.period_type != 'SO', Event.period_type.is_(None)),
             Event.elapsed_game_seconds.isnot(None)
         )

@@ -159,7 +159,7 @@ class UnitService:
             shot_team_id = event.team_id
             is_goal = (event.event_type == 'goal')
             is_sog = event.event_type in ['shot-on-goal', 'goal']
-            shot_xg = float(event.shot.xg) if (event.shot and event.shot.xg is not None) else 0.0
+            shot_xg = float(event.shot.xg) if (event.shot and event.shot.xg is not None and event.shot.outcome in ['Goal', 'Saved', 'Missed']) else 0.0
 
             # Active combinations on ice at second t
             combinations = get_true_5v5_combinations(t)
@@ -452,22 +452,22 @@ class UnitService:
 
         for s in shots:
             is_for = (s.team_id == unit_team_id)
-            shot_xg = float(s.xg) if s.xg is not None else 0.0
+            shot_xg = float(s.xg) if (s.xg is not None and s.outcome in ['Goal', 'Saved', 'Missed']) else 0.0
             
-            # Corsi
+            # Corsi (all shot attempts including blocked)
             if is_for:
                 cf += 1
-                xgf += shot_xg
             else:
                 ca += 1
-                xga += shot_xg
 
-            # Fenwick (unblocked)
-            if s.outcome != 'Blocked':
+            # Fenwick (unblocked shot attempts) & Expected Goals (xG)
+            if s.outcome in ['Goal', 'Saved', 'Missed']:
                 if is_for:
                     ff += 1
+                    xgf += shot_xg
                 else:
                     fa += 1
+                    xga += shot_xg
 
             # Shots on goal
             if s.outcome in ['Goal', 'Saved']:
@@ -504,7 +504,7 @@ class UnitService:
                 "strength_state": s.strength_state,
                 "manpower_state": s.event.manpower_state,
                 "empty_net": s.empty_net,
-                "xg": round(s.xg, 4) if s.xg is not None else 0.0
+                "xg": round(s.xg, 4) if (s.xg is not None and s.outcome in ['Goal', 'Saved', 'Missed']) else None
             })
 
         cf_pct = round((cf / (cf + ca) * 100), 1) if (cf + ca) > 0 else 50.0

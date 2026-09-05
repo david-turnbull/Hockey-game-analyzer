@@ -105,7 +105,12 @@ def run_migrations(db):
             if "prediction_method" not in existing_shot_cols:
                 logger.info("Migrating: Adding column 'prediction_method' to 'shot' table")
                 connection.execute(text("ALTER TABLE shot ADD COLUMN prediction_method VARCHAR(20)"))
-            
+
+            # Priority 0 Invariant: Clear any existing contaminated blocked shot xG and provenance
+            connection.execute(text(
+                "UPDATE shot SET xg = NULL, model_name = NULL, model_version = NULL, prediction_method = NULL "
+                "WHERE outcome = 'Blocked' AND (xg IS NOT NULL OR model_name IS NOT NULL OR model_version IS NOT NULL OR prediction_method IS NOT NULL)"
+            ))
         db.session.commit()
         logger.info("Database migration check completed successfully.")
     except Exception as e:

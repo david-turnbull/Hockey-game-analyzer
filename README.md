@@ -540,14 +540,15 @@ Diagnostics are intended for development, verification, and audit purposes, acce
 
 ### v1.2.1 — Predictive Analytics Hardening (Current)
 
-- validation Log Loss candidate model selection isolating held-out test data
-- production retraining (Option B) on combined train and validation partitions
-- comprehensive 3-part prediction provenance (`prediction_method`, `model_name`, `model_version`)
-- separate shot denominator semantics for actual shooting percentage vs expected conversion rate
-- raw Euclidean distance computation for cross-event sequences
-- controlled neutral imputation for missing play-by-play coordinates
-- explicit dependency version pinning and CI workflow branch matrix
-- rich model metadata serialization including package versions, game counts, and data split audits
+- **inviolable blocked shots invariant**: blocked attempts (`outcome == 'Blocked'`) are strictly ineligible for xG (`Shot.xg = NULL`), preserving Corsi while barring blocked shots from receiving or contributing to any xG or Fenwick/unblocked-attempt-derived metrics
+- **validation Log Loss candidate model selection**: strictly isolating held-out test data until single final evaluation
+- **production retraining (Option B)**: refitting selected candidate on combined train and validation partitions before single test benchmark
+- **sequential coordinate frame consistency**: unified attacking transform helper (`get_attacking_coordinate_transform`) for net-angle changes while preserving raw Euclidean distance deltas
+- **training/serving missing-data standardization**: authoritative `ShotFeatureExtractor` with explicit `'UNKNOWN'` categories and neutral coordinate imputation
+- **deterministic offline metadata testing**: frozen test fixtures proving canonical season roster precedence over play-by-play defects without live network dependencies
+- **runtime provenance & pre-deserialization safety**: recording `joblib_version`, `python_version`, `platform`, and `git_commit` with pre-load version compatibility checks
+- **comprehensive 3-part prediction provenance**: storing `prediction_method`, `model_name`, and `model_version` independently
+- **separate shot denominator semantics**: actual shooting percentage (shots on goal) vs expected goal rate (unblocked attempts)
 
 ### Future Modelling (v1.3+)
 

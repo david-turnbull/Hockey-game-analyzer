@@ -67,16 +67,16 @@ In accordance with PuckLens predictive analytics hardening standards, candidate 
 
 | Metric | Logistic Regression (Candidate) | Gradient Boosting (Candidate) | Target Direction |
 | :--- | :--- | :--- | :--- |
-| **Validation Log Loss** | **0.2325** | 0.2328 | Lower is better (Primary Selection Metric) |
-| **Validation Brier Score** | 0.0635 | **0.0625** | Lower is better |
-| **Validation ROC AUC** | 0.7486 | **0.7528** | Higher is better |
-| **Validation Expected Goals** | 151.66 | 137.30 | Target: 157.0 Actual Goals |
-| **Validation Exp Goal %** | 6.97% | 6.31% | Target: 7.22% Actual |
+| **Validation Log Loss** | **0.2326** | 0.2341 | Lower is better (Primary Selection Metric) |
+| **Validation Brier Score** | 0.0635 | **0.0629** | Lower is better |
+| **Validation ROC AUC** | 0.7485 | **0.7515** | Higher is better |
+| **Validation Expected Goals** | 151.50 | 138.97 | Target: 157.0 Actual Goals |
+| **Validation Exp Goal %** | 6.96% | 6.39% | Target: 7.22% Actual |
 
 ### Selection Rationale:
 The **Logistic Regression** configuration was selected as the winning architecture because:
-1. It achieved the lowest **Validation Log Loss** (0.2325 vs 0.2328).
-2. It exhibited superior calibration on unseen validation games (predicting 151.66 xG vs 157 actual goals, a 3.4% delta, compared to 137.30 xG for gradient boosting).
+1. It achieved the lowest **Validation Log Loss** (0.2326 vs 0.2341).
+2. It exhibited superior calibration on unseen validation games (predicting 151.50 xG vs 157 actual goals, a 3.5% delta, compared to 138.97 xG for gradient boosting).
 3. It provides high interpretability, strict mathematical guarantees, and fast inference without black-box hyperparameter fragility.
 
 ---
@@ -96,12 +96,12 @@ The finalized refit model was evaluated **once** on the untouched chronological 
 | Final Test Metric | Production Model (`pucklens-xg-logistic` v1.0.0) | Target / Reference |
 | :--- | :--- | :--- |
 | **Test Log Loss** | **0.2127** | Lower is better |
-| **Test Brier Score** | **0.0563** | Lower is better |
-| **Test ROC AUC** | **0.7493** | Higher is better |
+| **Test Brier Score** | **0.0562** | Lower is better |
+| **Test ROC AUC** | **0.7494** | Higher is better |
 | **Actual Goals** | 147 | — |
-| **Total Expected Goals** | **150.44** | Target: 147.0 Actual Goals (+2.3% delta) |
+| **Total Expected Goals** | **150.27** | Target: 147.0 Actual Goals (+2.2% delta) |
 | **Actual Goal Rate** | 6.60% | — |
-| **Expected Goal Rate** | **6.76%** | Well-calibrated baseline |
+| **Expected Goal Rate** | **6.75%** | Well-calibrated baseline |
 
 ---
 

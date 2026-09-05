@@ -9,6 +9,9 @@ from typing import List, Dict, Any, Tuple, Optional
 import numpy as np
 import pandas as pd
 import sklearn
+import platform
+import subprocess
+import joblib
 
 # Append project root to path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -114,7 +117,8 @@ def main():
 
     y_train = train_df['goal'].values
     y_val = val_df['goal'].values
-    y_test = test_df['goal'].values
+    # Note (Priority 2): Held-out test set remains strictly sealed until Step 3 final evaluation.
+    # Do NOT unpack y_test or compute/log test goal rates before candidate selection and Option B refit.
 
     train_game_ids = {s.get('game_id') for s in train_shots}
     val_game_ids = {s.get('game_id') for s in val_shots}
@@ -122,7 +126,7 @@ def main():
 
     logger.info(f"Train Goal Rate: {np.mean(y_train)*100:.2f}% ({np.sum(y_train)}/{len(y_train)})")
     logger.info(f"Val Goal Rate:   {np.mean(y_val)*100:.2f}% ({np.sum(y_val)}/{len(y_val)})")
-    logger.info(f"Test Goal Rate:  {np.mean(y_test)*100:.2f}% ({np.sum(y_test)}/{len(y_test)})")
+    logger.info(f"Test Set:        {len(test_shots)} shots ({len(test_game_ids)} games) [strictly sealed for final benchmark]")
 
     # =========================================================================
     # Step 1: Candidate Model Evaluation on Validation Set Only (Task 1)
@@ -188,6 +192,8 @@ def main():
     # Step 3: Single Final Benchmark on Untouched Held-Out Test Set (Task 1 & 2)
     # =========================================================================
     logger.info("\n--- Final Single Benchmark on Untouched Held-Out Test Set ---")
+    y_test = test_df['goal'].values
+    logger.info(f"Test Goal Rate:  {np.mean(y_test)*100:.2f}% ({np.sum(y_test)}/{len(y_test)})")
     final_test_probs = final_model.predict_proba(test_df)
     final_test_metrics = ModelEvaluator.compute_metrics(y_test, final_test_probs)
     final_calibration = ModelEvaluator.compute_calibration(y_test, final_test_probs)
@@ -200,6 +206,15 @@ def main():
     # Step 4: Full Metadata Enrichment and Serialization (Task 9)
     # =========================================================================
     train_timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    
+    git_commit = "unknown"
+    try:
+        git_res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=PROJECT_ROOT)
+        if git_res.returncode == 0:
+            git_commit = git_res.stdout.strip()
+    except Exception:
+        pass
+
     final_model.update_metadata({
         'name': final_model.name,
         'version': final_model.version,
@@ -209,6 +224,10 @@ def main():
         'scikit_learn_version': sklearn.__version__,
         'numpy_version': np.__version__,
         'pandas_version': pd.__version__,
+        'joblib_version': getattr(joblib, '__version__', 'unknown'),
+        'python_version': platform.python_version(),
+        'platform': platform.platform(),
+        'git_commit': git_commit,
         'features': FEATURE_COLUMNS,
         'numeric_features': NUMERIC_FEATURES,
         'categorical_features': CATEGORICAL_FEATURES,
@@ -216,6 +235,8 @@ def main():
         'selection_strategy': {
             'metric': 'validation_log_loss',
             'test_set_isolation': 'untouched_during_candidate_selection',
+            'manual_override_used': bool(args.force_model),
+            'manual_override_choice': args.force_model,
             'candidate_metrics': {
                 'logistic': lr_val_metrics,
                 'boosted': gb_val_metrics

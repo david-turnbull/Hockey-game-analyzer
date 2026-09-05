@@ -77,10 +77,11 @@ class SkaterStatsService:
         possession = PossessionService.calculate_possession_stats(game_id, mode="5v5")
         p_poss = possession.get(player_id, {"cf": 0, "ca": 0, "cf_pct": None, "ff": 0, "fa": 0, "ff_pct": None})
         
-        # Calculate player Expected Goals (xG) and derived predictive metrics
+        # Calculate player Expected Goals (xG) and derived predictive metrics (unblocked attempts only)
         player_xg_val = db.session.query(db.func.sum(Shot.xg)).join(Event).filter(
             Event.game_id == game_id,
             Shot.shooter_id == player_id,
+            Shot.outcome.in_(['Goal', 'Saved', 'Missed']),
             or_(Event.period_type != 'SO', Event.period_type.is_(None))
         ).scalar()
         player_xg = round(player_xg_val, 2) if player_xg_val is not None else 0.0

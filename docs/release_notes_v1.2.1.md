@@ -1,92 +1,74 @@
 # PuckLens - Version 1.2.1 Release Notes
 
 **Release Date:** September 2026  
-**Theme:** Predictive Analytics Hardening, Provenance Tracking, and Methodological Rigor
+**Theme:** Predictive Analytics Hardening, Mathematical Rigor, and Test Isolation Pass
 
-PuckLens version 1.2.1 is a targeted engineering and statistical hardening release for the predictive analytics engine. It solidifies model validation methodology, isolates held-out test data, establishes granular prediction provenance, clarifies shooting population denominators, refines spatial and sequential feature extraction, strengthens dependency boundaries, and expands auditability across the platform.
-
----
-
-## 1. Methodological Rigor & Data Leakage Prevention
-
-### Validation Log Loss Model Selection
-- Candidate model comparison and configuration selection are now evaluated **strictly on the chronological validation set** (2,176 shots across 24 games).
-- Primary decision metric is **Validation Log Loss** (Logistic Regression candidate: 0.2325 vs Gradient Boosting candidate: 0.2328).
-- The held-out test set is kept completely isolated and is **never accessed** during candidate pruning or hyperparameter selection.
-
-### Production Retraining (Option B)
-- Following frozen configuration selection, the winning Logistic Regression pipeline is refitted on the combined training and validation set (12,036 unblocked shot attempts across 137 games).
-- The refitted production model is evaluated **exactly once** on the untouched chronological test set (2,226 shots across 25 games):
-  - **Test Log Loss:** 0.2127
-  - **Test Brier Score:** 0.0563
-  - **Test ROC AUC:** 0.7493
-  - **Expected Goals:** 150.44 vs 147.0 Actual Goals (+2.3% delta)
-- The serialized model artifact (`models/xg/xg_v1.pkl`) is preserved unchanged after this final evaluation.
+PuckLens version 1.2.1 is a focused release-hardening and mathematical integrity update following the v1.2.0 predictive analytics milestone. This pass eliminates coordinate-frame discrepancies, establishes an inviolable domain boundary for blocked shot attempts, resolves training/serving missingness skew, seals held-out test set evaluation, enriches runtime provenance, and removes live network dependencies from the automated test suite.
 
 ---
 
-## 2. Granular Prediction Provenance
+## 1. Priority 0: Blocked Shots Invariant Enforcement
 
-### Independent Provenance Tracking
-- Added independent storage of prediction provenance attributes to the `Shot` entity:
-  - `model_name`: Model identifier (e.g., `pucklens-xg-logistic`, `pucklens-xg-heuristic`)
-  - `model_version`: Semantic version string (e.g., `1.0.0`)
-  - `prediction_method`: Generation category (`ml` or `heuristic`)
-- Implemented `XGPrediction` immutable value object returned by `ModelRegistry` and `XGService`.
-- Automated database migration via `app/utils/db_migrator.py` ensuring backward and forward schema compatibility.
-- Database backfill utility (`scripts/backfill_xg.py`) populates full provenance without guessing historical rows where it cannot be reliably established.
-
----
-
-## 3. Statistical Population Clarity
-
-### Explicit Denominator Semantics
-- Clarified the distinction between actual shooting percentage and expected conversion rate in `app/services/skater_stats_service.py`:
-  - `shots_on_goal`: Count of goals and saves (NHL standard denominator for actual shooting percentage).
-  - `unblocked_attempts`: Count of goals, saves, and missed shots (Fenwick population and denominator for expected conversion).
-  - `actual_shooting_pct`: Calculated as `goals / shots_on_goal * 100`.
-  - `expected_goal_rate_per_unblocked_attempt`: Calculated as `player_xg / unblocked_attempts * 100`.
-- Provided backward-compatible aliases (`shooting_pct` and `expected_shooting_pct`) to maintain seamless operation across existing templates and consumers.
+### Domain Rule: `Blocked → xG = NULL`
+- **Fenwick Population Isolation:** Blocked shot attempts (`outcome == 'Blocked'`) are strictly ineligible for Expected Goals (`Shot.xg = None`, `Shot.model_name = None`, `Shot.model_version = None`, `Shot.prediction_method = None`).
+- **Metric Boundaries:**
+  - **Corsi ($CF$, $CA$, $CF\%$):** Retains all shot attempts including blocked shots.
+  - **Fenwick ($FF$, $FA$, $FF\%$) and Expected Goals ($xGF$, $xGA$, $xG\%$):** Blocked shots are completely barred from receiving or contributing to xG or Fenwick/unblocked-attempt-derived metrics across all ingestion paths, backfill utilities, database migrations, services, and API endpoints.
+- **Components Hardened:**
+  - `data_pipeline/transform/normalizer.py`: Normalizer only evaluates and assigns xG for unblocked attempts (`Goal`, `Saved`, `Missed`).
+  - `scripts/backfill_xg.py`: Exclusively calculates xG for unblocked attempts and explicitly purges any stale xG and provenance values from historical blocked rows.
+  - `app/utils/db_migrator.py`: Runs automated migration SQL cleanup clearing xG for blocked attempts on legacy databases.
+  - `app/services/game_service.py`: All team and 5v5 game xG totals, period breakdowns, and cumulative xG timeline series strictly filter for unblocked outcomes.
+  - `app/services/skater_stats_service.py`: Individual skater xG totals enforce unblocked outcome filtering.
+  - `app/services/unit_service.py`: Fixed xG accumulation to occur within the Fenwick/unblocked attempt branch rather than the Corsi branch.
+  - `app/routes/api.py`: Serializes `"xg": null` and `"model_version": null` for blocked shots.
+  - `scripts/database_diagnostics.py`: Added an automated integrity check detecting any blocked attempts with non-null xG.
 
 ---
 
-## 4. Feature Engineering & Spatial Geometry Hardening
+## 2. Priority 1: Coordinate-Frame Consistency & Neutral Imputation
 
-### Raw Physical Distance Across Possession Changes
-- Refactored `distance_from_prev_event` to use raw rink Euclidean coordinates ($\sqrt{\Delta x^2 + \Delta y^2}$), ensuring physical travel distance is correctly calculated even when preceding events belong to the opposing team.
-- Angle changes (`angle_change`) are normalized from the perspective of the current shooting team's attacking net.
+### Sequential Event Geometry
+- **Raw Physical Distance:** `distance_from_prev_event` ($\Delta d$) strictly calculates raw Euclidean distance between consecutive rink events:
+  $$\Delta d = \sqrt{(x_{curr} - x_{prev})^2 + (y_{curr} - y_{prev})^2}$$
+- **Unified Attacking Transform:** `get_attacking_coordinate_transform` inspects attacking direction once per shot attempt. The identical transform is applied to both current and previous coordinates when deriving relative net-angle changes (`angle_change`), guaranteeing complete symmetry regardless of rink orientation.
 
-### Controlled Neutral Imputation & Missingness Flags
-- Introduced `coordinates_missing` binary indicator feature.
-- Explicitly standardized missing values (`standardize_shot_type` and `standardize_strength_state` map `None` or empty inputs to `'UNKNOWN'`).
-- Missing coordinates use controlled neutral imputation (`distance = 45.0`, `angle = 0.0`, `coordinates_missing = 1`) rather than arbitrary zeros.
-
----
-
-## 5. Dependency & Pipeline Robustness
-
-### Dependency Version Pinning & Runtime Verification
-- Pinned bounded version ranges in `requirements.txt`:
-  - `scikit-learn>=1.4.0,<2.0.0`
-  - `numpy>=1.26.0,<3.0.0`
-  - `pandas>=2.1.0,<4.0.0`
-  - `joblib>=1.3.0,<2.0.0`
-- Added runtime scikit-learn major version check on model artifact deserialization in `ModelRegistry`.
-- Generalized CI workflow triggers in `.github/workflows/tests.yml` to test on `[ main, master, 'v*' ]`.
-
-### Rich Serialization Metadata
-- Extended `models/xg/metadata.json` with comprehensive audit trail:
-  - Game counts, shot counts, and goal rates across train, validation, and test partitions.
-  - Candidate validation comparison metrics.
-  - Retraining strategy specification (`option_b_train_plus_validation_refit`).
-  - Feature lists and orderings.
-  - Environment package versions (`scikit-learn`, `numpy`, `pandas`).
-  - Test set data leakage audit stamp.
+### Elimination of Training/Serving Missing-Data Skew
+- **Authoritative Standardization:** `ShotFeatureExtractor` serves as the authoritative feature extraction and imputation layer across all offline training and online inference paths.
+- **Explicit Unknown Categories:** Unmapped shot types and strength states standardize to explicit `'UNKNOWN'` categories rather than forcing arbitrary defaults like `'wrist'` or `'EV'`.
+- **Controlled Neutral Imputation:** Missing coordinates are cleanly imputed to neutral values ($45.0$ ft distance, $0.0^\circ$ angle, `coordinates_missing = 1`).
+- **No Bypassing Defaults:** Removed hardcoded defaults (`30.0`, `'wrist'`, `'EV'`) from `XGService.predict_shot_xg`, allowing raw arguments to delegate cleanly to `ShotFeatureExtractor`.
 
 ---
 
-## 6. Documentation & Verification
+## 3. Priority 1: Deterministic Offline Testing
 
-- Updated `docs/models/xg_v1.md` model card with the validated test set metrics, validation selection rationale, and Option B refit documentation.
-- Cleaned up terminology in `README.md` (fixing `git checkout v1.1` to `v1.2` and removing lingering prototype references).
-- Expanded regression and predictive unit test suite with 100% pass rate.
+### Player Metadata Ingestion Precedence
+- **Network Isolation:** Eliminated live HTTP calls to `api-web.nhle.com` in `tests/test_metadata.py`, resolving 403 Forbidden failures in fresh CI environments lacking disk cache.
+- **Roster Precedence Verification:** Implemented frozen fixtures proving canonical season roster metadata (`"L"`) takes precedence over play-by-play position defects (`"C"`) for Jonathan Huberdeau and defenseman position (`"D"`) for MacKenzie Weegar.
+- **PBP Fallback Integrity:** Added a dedicated test confirming that when a player is absent from the season roster or the roster feed is empty, the pipeline gracefully falls back to play-by-play metadata.
+
+---
+
+## 4. Priority 2: Held-Out Test Set Isolation & Runtime Provenance
+
+### Sealed Test Evaluation & Option B Retraining
+- **Zero Leakage Pipeline:** `app/analytics/train_xg.py` does not inspect, evaluate, or log test set goal rates prior to candidate selection.
+- **Option B Refit:** The selected Logistic Regression candidate architecture was refitted on the combined training and validation set (12,036 shots across 137 games) before a single, final evaluation on the untouched held-out test set (2,226 shots across 25 games).
+- **Final Test Metrics:**
+  - **Log Loss:** 0.2127
+  - **Brier Score:** 0.0562
+  - **ROC AUC:** 0.7494
+  - **Expected Goals:** 150.27 xG vs 147.0 actual goals (6.75% vs 6.60%).
+
+### Runtime Provenance & Pre-Deserialization Validation
+- **Rich Metadata Persistence:** `models/xg/metadata.json` now records `joblib_version`, `python_version`, `platform`, and `git_commit` alongside algorithm parameters and data split metrics.
+- **Pre-Deserialization Inspection:** `ModelRegistry.load_model()` parses `metadata.json` before unpickling artifacts with `joblib.load()`, verifying scikit-learn major version compatibility and providing diagnostic error logs if deserialization fails.
+
+---
+
+## 5. Verification & Test Suite Status
+
+- **Automated Tests:** 88 passed, 0 failures across the complete test suite.
+- **Execution Speed:** Full test suite runs offline in under 20 seconds.
+- **Database Status:** Production database rescored (557 unblocked shots populated, 194 blocked shots cleared).

@@ -5,7 +5,7 @@ NET_X = 89.0
 NET_Y = 0.0
 
 VALID_SHOT_TYPES = [
-    'wrist', 'slap', 'snap', 'backhand', 'tip-in', 'deflected', 'wrap-around', 'other'
+    'wrist', 'slap', 'snap', 'backhand', 'tip-in', 'deflected', 'wrap-around', 'other', 'UNKNOWN'
 ]
 
 FEATURE_COLUMNS = [
@@ -71,36 +71,53 @@ def parse_clock_to_seconds(clock_str: Optional[str]) -> int:
         return 0
 
 
+def get_attacking_coordinate_transform(shot_raw_x: Optional[float], shot_raw_y: Optional[float],
+                                       home_defending_side: Optional[str] = None,
+                                       is_home_team: bool = True) -> bool:
+    """
+    Determines whether coordinates should be flipped (-x, -y) to orient the attacking net at (+89, 0).
+    Returns True if coordinates should be flipped, False otherwise.
+    """
+    if home_defending_side:
+        side = str(home_defending_side).strip().lower()
+        if is_home_team:
+            # Home defends left (negative x) -> home attacks right (positive x). No flip needed.
+            # Home defends right (positive x) -> home attacks left (negative x). Flip needed.
+            return side == 'right'
+        else:
+            # Away team defends opposite side.
+            # If home defends left, away defends right and attacks left. Flip needed.
+            # If home defends right, away defends left and attacks right. No flip needed.
+            return side == 'left'
+
+    # Fallback when defending side not provided:
+    # Attacking shots are directed toward the opposing net.
+    # If shot_raw_x < 0, the attacking team is shooting towards the negative-x net, so coordinates must be flipped.
+    if shot_raw_x is not None and shot_raw_x < 0:
+        return True
+    return False
+
+
+def apply_coordinate_transform(x: Optional[float], y: Optional[float], should_flip: bool) -> Tuple[Optional[float], Optional[float]]:
+    """Applies coordinate flip transform if should_flip is True."""
+    if x is None or y is None:
+        return None, None
+    if should_flip:
+        return -x, -y
+    return x, y
+
+
 def normalize_coordinates(x: Optional[float], y: Optional[float], 
                           home_defending_side: Optional[str] = None, 
                           is_home_team: bool = True) -> Tuple[Optional[float], Optional[float]]:
     """
     Normalizes coordinates so that attacking direction is consistently towards the net at (89, 0).
-    If defending side is known, flips accordingly.
-    If defending side is unknown, assumes shots with x < 0 are directed at the left net and flips to right net.
+    Uses get_attacking_coordinate_transform and apply_coordinate_transform.
     """
     if x is None or y is None:
         return None, None
-
-    if home_defending_side:
-        side = home_defending_side.lower()
-        flip = False
-        if side == 'left':
-            # Home defends left (attacks right: x > 0). Away defends right (attacks left: x < 0).
-            if not is_home_team:
-                flip = True
-        elif side == 'right':
-            # Home defends right (attacks left). Away defends left (attacks right).
-            if is_home_team:
-                flip = True
-        if flip:
-            return -x, -y
-        return x, y
-
-    # Fallback when defending side not provided: attacking shots should point towards x > 0
-    if x < 0:
-        return -x, -y
-    return x, y
+    should_flip = get_attacking_coordinate_transform(x, y, home_defending_side=home_defending_side, is_home_team=is_home_team)
+    return apply_coordinate_transform(x, y, should_flip)
 
 
 def calculate_distance_and_angle(x_norm: Optional[float], y_norm: Optional[float]) -> Tuple[float, float]:
@@ -111,7 +128,7 @@ def calculate_distance_and_angle(x_norm: Optional[float], y_norm: Optional[float
     Behind the net shots have angle > 90.
     """
     if x_norm is None or y_norm is None:
-        return 35.0, 0.0
+        return 45.0, 0.0
 
     dx = NET_X - x_norm
     dy = y_norm - NET_Y
@@ -158,7 +175,7 @@ def standardize_strength_state(state: Optional[str]) -> str:
         return 'PP'
     elif 'SH' in s or '4V5' in s or '3V5' in s or '3V4' in s or 'PK' in s:
         return 'SH'
-    return 'EV'
+    return 'UNKNOWN'
 
 
 class ShotFeatureExtractor:
@@ -312,7 +329,7 @@ class ShotFeatureExtractor:
                 shooter_id = play.get('details', {}).get('scoringPlayerId') or play.get('details', {}).get('shootingPlayerId')
                 goalie_id = play.get('details', {}).get('goalieInNetId')
                 is_goal = (type_desc == 'goal')
-                shot_type = play.get('details', {}).get('shotType', 'wrist')
+                shot_type = play.get('details', {}).get('shotType')
 
                 # Calculate score differential at the instant of the shot
                 shooter_score = home_score if is_home_event else away_score
@@ -320,30 +337,36 @@ class ShotFeatureExtractor:
                 score_diff = shooter_score - defending_score
 
                 # Determine situation / strength state
-                situation_code = str(play.get('situationCode', '1551'))
+                situation_code = play.get('situationCode')
                 empty_net = False
-                strength_state = 'EV'
-                if len(situation_code) == 4 and situation_code.isdigit():
-                    away_g, away_s, home_s, home_g = [int(c) for c in situation_code]
+                strength_state = 'UNKNOWN'
+                if situation_code and len(str(situation_code)) == 4 and str(situation_code).isdigit():
+                    away_g, away_s, home_s, home_g = [int(c) for c in str(situation_code)]
                     if is_home_event:
                         empty_net = (away_g == 0)
                         if home_s > away_s:
                             strength_state = 'PP'
                         elif home_s < away_s:
                             strength_state = 'SH'
+                        else:
+                            strength_state = 'EV'
                     else:
                         empty_net = (home_g == 0)
                         if away_s > home_s:
                             strength_state = 'PP'
                         elif away_s < home_s:
                             strength_state = 'SH'
+                        else:
+                            strength_state = 'EV'
 
                 # Coordinates and normalization
                 coords_missing = (raw_x is None or raw_y is None)
                 if not coords_missing:
-                    norm_x, norm_y = normalize_coordinates(raw_x, raw_y, is_home_team=is_home_event)
+                    should_flip = get_attacking_coordinate_transform(raw_x, raw_y, is_home_team=is_home_event)
+                    norm_x, norm_y = apply_coordinate_transform(raw_x, raw_y, should_flip)
                     dist, ang = calculate_distance_and_angle(norm_x, norm_y)
                 else:
+                    should_flip = False
                     norm_x, norm_y = None, None
                     dist, ang = 45.0, 0.0
 
@@ -360,13 +383,13 @@ class ShotFeatureExtractor:
                     prev_raw_x = prev_event.get('raw_x')
                     prev_raw_y = prev_event.get('raw_y')
                     
-                    # Task 5: Physical distance uses raw coordinates
                     if not coords_missing and prev_raw_x is not None and prev_raw_y is not None:
+                        # 1. Physical Euclidean distance remains raw Euclidean distance (unflipped)
                         delta_d = math.sqrt((raw_x - prev_raw_x)**2 + (raw_y - prev_raw_y)**2)
                         
-                        # Normalize both from perspective of current shooting team
-                        prev_nx_shooter, prev_ny_shooter = normalize_coordinates(
-                            prev_raw_x, prev_raw_y, is_home_team=is_home_event
+                        # 2. Sequential angle change applies one unified attacking frame transform
+                        prev_nx_shooter, prev_ny_shooter = apply_coordinate_transform(
+                            prev_raw_x, prev_raw_y, should_flip
                         )
                         prev_dist, prev_ang = calculate_distance_and_angle(prev_nx_shooter, prev_ny_shooter)
                         angle_change = abs(ang - prev_ang)

@@ -60,12 +60,12 @@ class XGService:
                     fallback_used=is_heuristic
                 )
 
-        # Construct feature dictionary for ML model
+        # Construct feature dictionary for ML model (delegate neutral imputation to ShotFeatureExtractor)
         shot_features = {
-            'distance': distance if distance is not None else 30.0,
-            'angle': angle if angle is not None else 0.0,
-            'shot_type': shot_type or 'wrist',
-            'strength_state': strength_state or 'EV',
+            'distance': distance,
+            'angle': angle,
+            'shot_type': shot_type,
+            'strength_state': strength_state,
             'empty_net': empty_net,
             **kwargs
         }
