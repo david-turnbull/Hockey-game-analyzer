@@ -314,6 +314,12 @@ def get_player_shots(game_id, player_id):
 def get_shot_xg_explanation(shot_id: str):
     """Returns interpretable feature contribution analysis and factors for a shot attempt."""
     from app.analytics.explainability import XGExplainer
+    shot = db.session.get(Shot, shot_id)
+    if not shot:
+        return jsonify({"error": f"Shot {shot_id} not found"}), 404
+    if shot.outcome == 'Blocked':
+        return jsonify({"error": "Blocked shot attempts are excluded from expected goals (xG = NULL) in accordance with PuckLens domain rules."}), 400
+
     explanation = XGExplainer.explain_shot_by_id(shot_id)
     if not explanation:
         return jsonify({"error": f"Shot {shot_id} not found"}), 404
