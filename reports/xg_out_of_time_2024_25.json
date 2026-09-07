@@ -1,0 +1,229 @@
+{
+  "evaluation_season": "20242025",
+  "evaluation_date": "2026-09-07T15:13:45.030939+00:00",
+  "model": {
+    "name": "pucklens-xg-logistic",
+    "version": "1.0.0",
+    "model_type": "LogisticRegressionXGModel"
+  },
+  "metrics": {
+    "shot_count": 2190,
+    "goal_count": 136,
+    "actual_goal_rate": 6.21,
+    "predicted_xg": 145.86,
+    "expected_goal_rate": 6.66,
+    "log_loss": 0.2057,
+    "brier_score": 0.0544,
+    "roc_auc": 0.7603
+  },
+  "calibration": [
+    {
+      "prediction_band": "[0.00, 0.05]",
+      "shot_count": 1154,
+      "mean_predicted_probability": 0.0235,
+      "observed_goal_rate": 0.0182
+    },
+    {
+      "prediction_band": "[0.05, 0.10]",
+      "shot_count": 571,
+      "mean_predicted_probability": 0.0714,
+      "observed_goal_rate": 0.0806
+    },
+    {
+      "prediction_band": "[0.10, 0.15]",
+      "shot_count": 268,
+      "mean_predicted_probability": 0.1211,
+      "observed_goal_rate": 0.097
+    },
+    {
+      "prediction_band": "[0.15, 0.20]",
+      "shot_count": 110,
+      "mean_predicted_probability": 0.168,
+      "observed_goal_rate": 0.1636
+    },
+    {
+      "prediction_band": "[0.20, 0.30]",
+      "shot_count": 68,
+      "mean_predicted_probability": 0.2435,
+      "observed_goal_rate": 0.2353
+    },
+    {
+      "prediction_band": "[0.30, 0.50]",
+      "shot_count": 8,
+      "mean_predicted_probability": 0.3482,
+      "observed_goal_rate": 0.375
+    },
+    {
+      "prediction_band": "[0.50, 1.00]",
+      "shot_count": 11,
+      "mean_predicted_probability": 0.6958,
+      "observed_goal_rate": 0.5455
+    }
+  ],
+  "segment_evaluation": {
+    "distance": {
+      "<15 ft": {
+        "shots": 439,
+        "goals": 47,
+        "xg": 56.51,
+        "actual_goal_pct": 10.71,
+        "expected_goal_pct": 12.87
+      },
+      "15-30 ft": {
+        "shots": 509,
+        "goals": 44,
+        "xg": 44.15,
+        "actual_goal_pct": 8.64,
+        "expected_goal_pct": 8.67
+      },
+      "30-45 ft": {
+        "shots": 566,
+        "goals": 26,
+        "xg": 28.87,
+        "actual_goal_pct": 4.59,
+        "expected_goal_pct": 5.1
+      },
+      "45+ ft": {
+        "shots": 676,
+        "goals": 19,
+        "xg": 16.33,
+        "actual_goal_pct": 2.81,
+        "expected_goal_pct": 2.42
+      }
+    },
+    "strength": {
+      "EV": {
+        "shots": 1770,
+        "goals": 80,
+        "xg": 101.52,
+        "actual_goal_pct": 4.52,
+        "expected_goal_pct": 5.74
+      },
+      "PP": {
+        "shots": 356,
+        "goals": 42,
+        "xg": 30.19,
+        "actual_goal_pct": 11.8,
+        "expected_goal_pct": 8.48
+      },
+      "SH": {
+        "shots": 64,
+        "goals": 14,
+        "xg": 14.15,
+        "actual_goal_pct": 21.88,
+        "expected_goal_pct": 22.11
+      }
+    },
+    "shot_type": {
+      "wrist": {
+        "shots": 1187,
+        "goals": 69,
+        "xg": 69.33,
+        "actual_goal_pct": 5.81,
+        "expected_goal_pct": 5.84
+      },
+      "snap": {
+        "shots": 303,
+        "goals": 26,
+        "xg": 24.13,
+        "actual_goal_pct": 8.58,
+        "expected_goal_pct": 7.96
+      },
+      "tip-in": {
+        "shots": 234,
+        "goals": 14,
+        "xg": 18.41,
+        "actual_goal_pct": 5.98,
+        "expected_goal_pct": 7.87
+      },
+      "slap": {
+        "shots": 275,
+        "goals": 15,
+        "xg": 16.6,
+        "actual_goal_pct": 5.45,
+        "expected_goal_pct": 6.04
+      },
+      "backhand": {
+        "shots": 158,
+        "goals": 11,
+        "xg": 12.81,
+        "actual_goal_pct": 6.96,
+        "expected_goal_pct": 8.11
+      },
+      "wrap-around": {
+        "shots": 11,
+        "goals": 1,
+        "xg": 1.07,
+        "actual_goal_pct": 9.09,
+        "expected_goal_pct": 9.71
+      },
+      "other": {
+        "shots": 22,
+        "goals": 0,
+        "xg": 3.51,
+        "actual_goal_pct": 0.0,
+        "expected_goal_pct": 15.97
+      }
+    },
+    "home_away": {
+      "Home": {
+        "shots": 1116,
+        "goals": 80,
+        "xg": 74.09,
+        "actual_goal_pct": 7.17,
+        "expected_goal_pct": 6.64
+      },
+      "Away": {
+        "shots": 1074,
+        "goals": 56,
+        "xg": 71.77,
+        "actual_goal_pct": 5.21,
+        "expected_goal_pct": 6.68
+      }
+    },
+    "team": {
+      "UNK": {
+        "shots": 2190,
+        "goals": 136,
+        "xg": 145.86,
+        "actual_goal_pct": 6.21,
+        "expected_goal_pct": 6.66
+      }
+    },
+    "context_factors": {
+      "rebound": {
+        "shots": 208,
+        "goals": 22,
+        "xg": 24.19,
+        "actual_goal_pct": 10.58,
+        "expected_goal_pct": 11.63
+      },
+      "rush": {
+        "shots": 206,
+        "goals": 8,
+        "xg": 8.09,
+        "actual_goal_pct": 3.88,
+        "expected_goal_pct": 3.93
+      },
+      "turnover": {
+        "shots": 116,
+        "goals": 3,
+        "xg": 6.6,
+        "actual_goal_pct": 2.59,
+        "expected_goal_pct": 5.69
+      },
+      "lateral_movement": {
+        "shots": 374,
+        "goals": 16,
+        "xg": 23.34,
+        "actual_goal_pct": 4.28,
+        "expected_goal_pct": 6.24
+      }
+    }
+  },
+  "model_decision": {
+    "verdict": "healthy",
+    "rationale": "Model maintains strong discriminative ability (ROC AUC = 0.7603) and well-calibrated probabilities (Log Loss = 0.2057, Brier = 0.0544). Expected goal rate (6.66%) closely matches observed goal rate (6.21%).",
+    "action": "maintain_current_model_unchanged"
+  }
+}
