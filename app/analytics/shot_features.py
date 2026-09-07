@@ -290,6 +290,8 @@ class ShotFeatureExtractor:
         game_date = pbp_data.get('gameDate', '')
         home_team_id = pbp_data.get('homeTeam', {}).get('id')
         away_team_id = pbp_data.get('awayTeam', {}).get('id')
+        home_team_abbrev = pbp_data.get('homeTeam', {}).get('abbrev', 'UNK')
+        away_team_abbrev = pbp_data.get('awayTeam', {}).get('abbrev', 'UNK')
 
         raw_plays = pbp_data.get('plays', [])
         shots = []
@@ -442,6 +444,7 @@ class ShotFeatureExtractor:
                         'period_seconds': period_seconds,
                         'shooter_id': shooter_id,
                         'shooter_team_id': event_owner_team_id,
+                        'team_abbrev': home_team_abbrev if is_home_event else away_team_abbrev,
                         'defending_team_id': away_team_id if is_home_event else home_team_id,
                         'goalie_id': goalie_id,
                         'event_type': type_desc,
