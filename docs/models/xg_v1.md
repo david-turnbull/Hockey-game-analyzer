@@ -44,6 +44,11 @@ All features are normalized relative to the attacking net located at $(x = 89, y
 | `period_seconds` | Numeric | Elapsed seconds within current period (0 to 1200). |
 | `is_home` | Binary | 1 if shooting team is the home team, 0 if away. |
 | `empty_net` | Binary | 1 if defending goaltender is pulled, 0 otherwise. |
+| `coordinates_missing` | Binary | 1 if coordinates were missing from PBP; neutrally imputed to 45 ft and 0°. |
+
+### Missing Coordinate & Categorical Robustness:
+- **Missing Coordinates (`coordinates_missing = 1`)**: When raw play coordinates are absent, neutral values ($45.0$ ft distance, $0.0^\circ$ angle) are assigned and `coordinates_missing` is set to 1. In the database, coordinate fields remain `NULL`, but the shot is scored by the model.
+- **`'UNKNOWN'` Categories**: Unrecognized or missing categorical values (`shot_type`, `strength_state`, `prev_event_type`) map cleanly to standardized `'UNKNOWN'` categories rather than failing.
 
 ### Sequential & Contextual Derived Features:
 | Feature | Type | Description |
@@ -107,18 +112,63 @@ The finalized refit model was evaluated **once** on the untouched chronological 
 
 ## 6. Performance by Hockey Segments (Held-Out Test Games)
 
-Calibration across shot distance brackets and game situations on the untouched test set:
-- **Inner Slot (<15 ft)**: 487 shots | 50 actual goals (10.27%) | 64.11 xG (13.16%)
-- **High Slot (15–30 ft)**: 488 shots | 45 actual goals (9.22%) | 40.35 xG (8.27%)
-- **Perimeter (30–45 ft)**: 574 shots | 39 actual goals (6.79%) | 30.74 xG (5.35%)
-- **Point / Deep (45+ ft)**: 677 shots | 13 actual goals (1.92%) | 15.25 xG (2.25%)
-- **Even Strength (EV)**: 1,824 shots | 90 actual goals (4.93%) | 105.46 xG (5.78%)
+Calibration across shot distance brackets, shot types, and game situations on the untouched test set (matching `metadata.json` exactly):
+
+### By Distance Bracket:
+- **Inner Slot (<15 ft)**: 487 shots | 50 actual goals (10.27%) | 64.02 xG (13.15%)
+- **High Slot (15–30 ft)**: 488 shots | 45 actual goals (9.22%) | 40.33 xG (8.26%)
+- **Perimeter (30–45 ft)**: 574 shots | 39 actual goals (6.79%) | 30.72 xG (5.35%)
+- **Point / Deep (45+ ft)**: 677 shots | 13 actual goals (1.92%) | 15.20 xG (2.25%)
+
+### By Game Situation / Strength State:
+- **Even Strength (EV)**: 1,824 shots | 90 actual goals (4.93%) | 105.35 xG (5.78%)
 - **Power Play (PP)**: 335 shots | 38 actual goals (11.34%) | 29.75 xG (8.88%)
-- **Shorthanded (SH)**: 67 shots | 19 actual goals (28.36%) | 15.24 xG (22.74%)
+- **Shorthanded (SH)**: 67 shots | 19 actual goals (28.36%) | 15.16 xG (22.63%)
+
+### By Shot Type:
+| Shot Type | Shots | Actual Goals (Act %) | Expected Goals (xG %) |
+| :--- | :--- | :--- | :--- |
+| `wrist` | 1,141 | 69 (6.05%) | 64.72 (5.67%) |
+| `snap` | 378 | 36 (9.52%) | 32.01 (8.47%) |
+| `slap` | 264 | 11 (4.17%) | 13.57 (5.14%) |
+| `tip-in` | 260 | 18 (6.92%) | 21.74 (8.36%) |
+| `backhand` | 143 | 7 (4.90%) | 13.54 (9.47%) |
+| `other` | 24 | 3 (12.50%) | 3.08 (12.84%) |
+| `wrap-around` | 15 | 2 (13.33%) | 1.37 (9.16%) |
+| `UNKNOWN` | 1 | 1 (100.0%) | 0.24 (23.69%) |
 
 ---
 
-## 7. Known Limitations
+## 7. Calibration Curve & Bin Counts (Held-Out Test Set)
+
+Uniform probability bin breakdown on the untouched test set (2,226 shots):
+
+| Bin Range | Mean Predicted xG | Observed Goal Frequency | Shot Count |
+| :--- | :--- | :--- | :--- |
+| **0.0 – 0.1** | 4.05% | 4.15% | 1,781 |
+| **0.1 – 0.2** | 13.76% | 13.28% | 354 |
+| **0.2 – 0.3** | 23.39% | 20.31% | 64 |
+| **0.3 – 0.4** | 33.89% | 7.69% | 13 |
+| **0.4 – 0.5** | 46.21% | 66.67% | 3 |
+| **0.5 – 0.6** | 53.06% | 100.0% | 1 |
+| **0.6 – 0.7** | 68.44% | 0.0% | 1 |
+| **0.7 – 0.8** | 73.20% | 100.0% | 3 |
+| **0.8 – 0.9** | 85.21% | 100.0% | 3 |
+| **0.9 – 1.0** | 91.75% | 100.0% | 3 |
+
+---
+
+## 8. Prediction Provenance Architecture
+
+Every scored shot in PuckLens carries independent provenance fields:
+- `prediction_method`: `'ml'` for model predictions, `'heuristic'` for rule-based fallbacks.
+- `model_name`: Formal registry name of the scoring model (`pucklens-xg-logistic`).
+- `model_version`: Exact semantic version (`1.0.0`).
+- **Blocked Shot Invariant**: Blocked attempts are strictly ineligible for xG scoring. They retain `outcome = 'Blocked'`, with `xg = NULL`, `model_name = NULL`, `model_version = NULL`, and `prediction_method = NULL`.
+
+---
+
+## 9. Known Limitations
 
 1. **Play-by-Play Coordinate Inaccuracies**: Official NHL play-by-play coordinates are recorded manually by arena official scorers and may exhibit venue-specific clustering or scorer bias.
 2. **Absence of Player Tracking**: Optical tracking data (exact positions of all 10 skaters, goalie stance, stick blades) is proprietary to NHL EDGE and unavailable in standard public feeds.
