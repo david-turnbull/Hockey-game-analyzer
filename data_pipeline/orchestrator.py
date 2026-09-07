@@ -189,12 +189,19 @@ class PipelineOrchestrator:
                     game_players_list.append(self.normalizer.transform_game_player(game_id, p.player_id, tid, pos, num))
 
             
+            # Pre-extract full 21-feature contextual representations for unblocked shots
+            from app.analytics.shot_features import ShotFeatureExtractor
+            pbp_shots = ShotFeatureExtractor.extract_shots_from_pbp_json(pbp_raw, unblocked_only=True)
+            xg_features_by_event_id = {s['event_id']: s for s in pbp_shots}
+
             # Events & Shots
             events_list = []
             shots_list = []
             for play in pbp_raw.get("plays", []):
+                play_event_id = f"{game_id}_{play.get('eventId')}"
+                feat = xg_features_by_event_id.get(play_event_id)
                 event_model, shot_model = self.normalizer.transform_event(
-                    play, game_id, home_team_raw["id"]
+                    play, game_id, home_team_raw["id"], xg_features=feat
                 )
                 events_list.append(event_model)
                 if shot_model:

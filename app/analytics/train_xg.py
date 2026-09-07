@@ -208,10 +208,14 @@ def main():
     train_timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
     
     git_commit = "unknown"
+    git_dirty = False
     try:
         git_res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=PROJECT_ROOT)
         if git_res.returncode == 0:
             git_commit = git_res.stdout.strip()
+        status_res = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, cwd=PROJECT_ROOT)
+        if status_res.returncode == 0:
+            git_dirty = bool(status_res.stdout.strip())
     except Exception:
         pass
 
@@ -228,6 +232,7 @@ def main():
         'python_version': platform.python_version(),
         'platform': platform.platform(),
         'git_commit': git_commit,
+        'git_dirty': git_dirty,
         'features': FEATURE_COLUMNS,
         'numeric_features': NUMERIC_FEATURES,
         'categorical_features': CATEGORICAL_FEATURES,

@@ -24,6 +24,7 @@ from app.services.goalie_stats_service import GoalieStatsService
 from app.services.unit_service import UnitService
 from app.services.data_integrity_service import DataIntegrityService
 from app.models import db, Game, Team, Player, Event, Shot, Shift, GamePlayer
+from data_pipeline.transform.normalizer import DataNormalizer
 
 
 # ==========================================
@@ -572,7 +573,7 @@ def test_blocked_shots_domain_invariant(app, db):
         "homeTeam": {"id": 1, "abbrev": "HOM"},
         "awayTeam": {"id": 2, "abbrev": "AWY"}
     }
-    event_model, shot_model = normalizer.transform_event(event_dict, game_dict, 99999)
+    event_model, shot_model = normalizer.transform_event(event_dict, 99999, 1)
     assert shot_model is not None
     assert shot_model.outcome == "Blocked"
     assert shot_model.xg is None
@@ -583,7 +584,7 @@ def test_blocked_shots_domain_invariant(app, db):
     # Normalizer Invariant: Goal, Saved, Missed receive xG
     for ev_type, expected_outcome in [('goal', 'Goal'), ('shot-on-goal', 'Saved'), ('missed-shot', 'Missed')]:
         ev_dict = dict(event_dict, eventId=102, typeDescKey=ev_type)
-        _, s_model = normalizer.transform_event(ev_dict, game_dict, 99999)
+        _, s_model = normalizer.transform_event(ev_dict, 99999, 1)
         assert s_model.outcome == expected_outcome
         assert s_model.xg is not None
         assert s_model.xg > 0.0
@@ -694,5 +695,225 @@ def test_blocked_shots_domain_invariant(app, db):
         blocked_json = next(item for item in shots_json if item["outcome"] == "Blocked")
         assert blocked_json["xg"] is None
         assert blocked_json["model_version"] is None
+
+
+def test_sequential_features_rebound_and_rush():
+    """Task 8: Verifies sequential features (rebound and rush) extraction from play sequence."""
+    pbp_mock = {
+        "id": 10001,
+        "season": "20232024",
+        "gameDate": "2023-11-01",
+        "homeTeam": {"id": 1, "abbrev": "HOM"},
+        "awayTeam": {"id": 2, "abbrev": "AWY"},
+        "plays": [
+            {
+                "eventId": 1,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "02:00",
+                "typeDescKey": "shot-on-goal",
+                "details": {"xCoord": 65.0, "yCoord": 5.0, "eventOwnerTeamId": 1, "shootingPlayerId": 101, "goalieInNetId": 201, "shotType": "wrist"}
+            },
+            {
+                "eventId": 2,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "02:02",
+                "typeDescKey": "shot-on-goal",
+                "details": {"xCoord": 80.0, "yCoord": 2.0, "eventOwnerTeamId": 1, "shootingPlayerId": 102, "goalieInNetId": 201, "shotType": "backhand"}
+            },
+            {
+                "eventId": 3,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "05:00",
+                "typeDescKey": "takeaway",
+                "details": {"xCoord": -60.0, "yCoord": 0.0, "eventOwnerTeamId": 1, "playerId": 103}
+            },
+            {
+                "eventId": 4,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "05:03",
+                "typeDescKey": "shot-on-goal",
+                "details": {"xCoord": 60.0, "yCoord": 5.0, "eventOwnerTeamId": 1, "shootingPlayerId": 103, "goalieInNetId": 201, "shotType": "wrist"}
+            }
+        ]
+    }
+    shots = ShotFeatureExtractor.extract_shots_from_pbp_json(pbp_mock, unblocked_only=True)
+    assert len(shots) == 3
+
+    # Shot 1 (eventId 1): Initial shot, not rebound, not rush
+    assert shots[0]["is_rebound"] == 0
+
+    # Shot 2 (eventId 2): 2 seconds after initial shot -> is_rebound must be 1
+    assert shots[1]["is_rebound"] == 1
+    assert shots[1]["time_since_prev_event"] == 2.0
+    assert shots[1]["prev_event_type"] == "shot-on-goal"
+
+    # Shot 3 (eventId 4): 3 seconds after takeaway with delta_d >= 40 ft -> is_rush must be 1, is_turnover must be 1
+    assert shots[2]["is_rush"] == 1
+    assert shots[2]["is_turnover"] == 1
+    assert shots[2]["time_since_prev_event"] == 3.0
+    assert shots[2]["distance_from_prev_event"] >= 40.0
+
+
+def test_sequential_features_turnover_and_faceoff():
+    """Task 8: Verifies turnover and faceoff sequential feature identification."""
+    pbp_mock = {
+        "id": 10002,
+        "season": "20232024",
+        "gameDate": "2023-11-01",
+        "homeTeam": {"id": 1, "abbrev": "HOM"},
+        "awayTeam": {"id": 2, "abbrev": "AWY"},
+        "plays": [
+            {
+                "eventId": 10,
+                "periodDescriptor": {"number": 2, "periodType": "REG"},
+                "timeInPeriod": "08:15",
+                "typeDescKey": "faceoff",
+                "details": {"xCoord": 69.0, "yCoord": 22.0, "eventOwnerTeamId": 1}
+            },
+            {
+                "eventId": 11,
+                "periodDescriptor": {"number": 2, "periodType": "REG"},
+                "timeInPeriod": "08:17",
+                "typeDescKey": "shot-on-goal",
+                "details": {"xCoord": 60.0, "yCoord": 10.0, "eventOwnerTeamId": 1, "shootingPlayerId": 105, "goalieInNetId": 201, "shotType": "slap"}
+            }
+        ]
+    }
+    shots = ShotFeatureExtractor.extract_shots_from_pbp_json(pbp_mock, unblocked_only=True)
+    assert len(shots) == 1
+    assert shots[0]["is_after_faceoff"] == 1
+    assert shots[0]["prev_event_type"] == "faceoff"
+    assert shots[0]["time_since_prev_event"] == 2.0
+
+
+def test_missing_coordinates_shot_handling(app, db):
+    """Task 5: Verifies that shot with missing coordinates creates valid Shot record, nullable DB columns, and neutral xG."""
+    normalizer = DataNormalizer()
+    missing_coord_play = {
+        "eventId": 999,
+        "periodDescriptor": {"number": 1, "periodType": "REG"},
+        "timeInPeriod": "14:20",
+        "typeDescKey": "shot-on-goal",
+        "situationCode": "1551",
+        "details": {
+            "shootingPlayerId": 1001,
+            "goalieInNetId": 2001,
+            "shotType": "wrist",
+            "eventOwnerTeamId": 1
+            # Note: xCoord and yCoord are intentionally omitted (None)
+        }
+    }
+
+    event_model, shot_model = normalizer.transform_event(missing_coord_play, 88889, 1)
+
+    assert event_model is not None
+    assert shot_model is not None
+    assert shot_model.outcome == "Saved"
+    # Coordinates in DB must remain None (NULL)
+    assert shot_model.x_coordinate_normalized is None
+    assert shot_model.y_coordinate_normalized is None
+    assert shot_model.distance is None
+    assert shot_model.angle is None
+    # Model scoring must succeed with neutral imputation
+    assert shot_model.xg is not None
+    assert 0.0 < shot_model.xg < 1.0
+    assert shot_model.prediction_method == "ml"
+    assert shot_model.model_name is not None
+
+    # Seed parent game, team, shooter, goalie for foreign keys
+    test_game = Game(
+        game_id=88889,
+        season="20232024",
+        game_date=date(2023, 10, 15),
+        game_type=2,
+        nhl_game_state="OFF",
+        home_team_id=1,
+        away_team_id=2,
+        home_score=0,
+        away_score=0
+    )
+    t1 = Team(team_id=1, name="Home Team", abbreviation="HOM")
+    t2 = Team(team_id=2, name="Away Team", abbreviation="AWY")
+    p1 = Player(player_id=1001, first_name="Shooter", last_name="One", position="C")
+    p2 = Player(player_id=2001, first_name="Goalie", last_name="One", position="G")
+    db.session.add_all([test_game, t1, t2, p1, p2])
+    db.session.flush()
+
+    # Verify SQLite database persistence with NULL coordinates
+    db.session.add(event_model)
+    db.session.add(shot_model)
+    db.session.flush()
+
+    retrieved = db.session.get(Shot, shot_model.shot_id)
+    assert retrieved is not None
+    assert retrieved.x_coordinate_normalized is None
+    assert retrieved.y_coordinate_normalized is None
+    assert retrieved.xg == shot_model.xg
+
+
+def test_training_serving_feature_parity():
+    """Task 9: Verifies full 21-feature identical parity between training extraction and serving normalizer."""
+    from app.analytics.shot_features import FEATURE_COLUMNS
+
+    pbp_mock = {
+        "id": 10003,
+        "season": "20232024",
+        "gameDate": "2023-11-01",
+        "homeTeam": {"id": 1, "abbrev": "HOM"},
+        "awayTeam": {"id": 2, "abbrev": "AWY"},
+        "plays": [
+            {
+                "eventId": 50,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "01:00",
+                "typeDescKey": "hit",
+                "details": {"xCoord": 40.0, "yCoord": 10.0, "eventOwnerTeamId": 2}
+            },
+            {
+                "eventId": 51,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "01:02",
+                "typeDescKey": "shot-on-goal",
+                "situationCode": "1551",
+                "details": {
+                    "xCoord": 75.0,
+                    "yCoord": 12.0,
+                    "eventOwnerTeamId": 1,
+                    "shootingPlayerId": 101,
+                    "goalieInNetId": 201,
+                    "shotType": "snap"
+                }
+            }
+        ]
+    }
+
+    # 1. Training extraction path
+    extracted = ShotFeatureExtractor.extract_shots_from_pbp_json(pbp_mock, unblocked_only=True)
+    assert len(extracted) == 1
+    training_shot_features = extracted[0]
+
+    # 2. Serving normalizer pipeline path
+    normalizer = DataNormalizer()
+    play = pbp_mock["plays"][1]
+    event_id = f"10003_{play['eventId']}"
+    assert training_shot_features["event_id"] == event_id
+
+    # Normalizer receives pre-extracted feature dict
+    event_model, shot_model = normalizer.transform_event(
+        play, 10003, 1, xg_features=training_shot_features
+    )
+    assert shot_model is not None
+
+    # Predict directly with training extracted features vs shot_model score
+    direct_prediction = XGService.predict_shot_xg(features=training_shot_features)
+    assert shot_model.xg == direct_prediction.xg
+    assert shot_model.model_name == direct_prediction.model_name
+    assert shot_model.model_version == direct_prediction.model_version
+    assert shot_model.prediction_method == direct_prediction.method
+
+    # Confirm all 21 FEATURE_COLUMNS exist in the training extracted record
+    for col in FEATURE_COLUMNS:
+        assert col in training_shot_features, f"Missing feature column: {col}"
+
 
 

@@ -10,8 +10,8 @@ class Shot(db.Model):
     shot_type = db.Column(db.String(50))  # e.g., Slap, Wrist, Snap, Backhand, Tip-In
     
     # Coordinates (already normalized to positive/negative values or standardized direction)
-    x_coordinate_normalized = db.Column(db.Float, nullable=False)
-    y_coordinate_normalized = db.Column(db.Float, nullable=False)
+    x_coordinate_normalized = db.Column(db.Float, nullable=True)
+    y_coordinate_normalized = db.Column(db.Float, nullable=True)
 
     @property
     def x_coordinate(self):

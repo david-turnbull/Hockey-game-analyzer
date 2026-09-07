@@ -39,16 +39,24 @@ class ModelEvaluator:
         }
 
     @staticmethod
-    def compute_calibration(y_true: np.ndarray, y_prob: np.ndarray, n_bins: int = 10) -> Dict[str, List[float]]:
+    def compute_calibration(y_true: np.ndarray, y_prob: np.ndarray, n_bins: int = 10) -> Dict[str, Any]:
         """
-        Computes calibration curves comparing predicted goal probabilities against observed goal frequencies.
+        Computes calibration curves comparing predicted goal probabilities against observed goal frequencies,
+        including shot counts in each probability bin.
         """
         clipped_prob = np.clip(y_prob, 1e-7, 1.0 - 1e-7)
         prob_true, prob_pred = calibration_curve(y_true, clipped_prob, n_bins=n_bins, strategy='uniform')
         
+        bins = np.linspace(0.0, 1.0 + 1e-8, n_bins + 1)
+        binids = np.digitize(clipped_prob, bins) - 1
+        bin_total = np.bincount(binids, minlength=len(bins))
+        nonzero = bin_total != 0
+        bin_counts = [int(c) for c in bin_total[nonzero]]
+        
         return {
             'predicted_probabilities': [round(float(p), 4) for p in prob_pred],
-            'observed_frequencies': [round(float(f), 4) for f in prob_true]
+            'observed_frequencies': [round(float(f), 4) for f in prob_true],
+            'bin_counts': bin_counts
         }
 
     @staticmethod

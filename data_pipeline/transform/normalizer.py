@@ -1,6 +1,7 @@
 import math
 import logging
 from datetime import datetime
+from typing import Optional, Dict, Any
 from app.models import Team, Player, Game, Event, Shot, Shift, GamePlayer
 
 logger = logging.getLogger(__name__)
@@ -273,7 +274,7 @@ class DataNormalizer:
             nhl_game_state=nhl_game_state
         )
 
-    def transform_event(self, play: dict, game_id: int, home_team_id: int) -> tuple:
+    def transform_event(self, play: dict, game_id: int, home_team_id: int, xg_features: Optional[Dict[str, Any]] = None) -> tuple:
         """
         Transforms a play dict into an Event model, and if it's a shot attempt,
         also constructs a Shot model.
@@ -396,8 +397,14 @@ class DataNormalizer:
         shot = None
         # Let's map shot types
         shot_event_types = ['shot-on-goal', 'goal', 'missed-shot', 'blocked-shot']
-        if event_type in shot_event_types and norm_x is not None and norm_y is not None:
-            metrics = calculate_shot_metrics(norm_x, norm_y)
+        if event_type in shot_event_types:
+            if norm_x is not None and norm_y is not None:
+                metrics = calculate_shot_metrics(norm_x, norm_y)
+                dist = metrics["distance"]
+                ang = metrics["angle"]
+            else:
+                dist = None
+                ang = None
             
             # Map outcome description
             outcome_mapping = {
@@ -414,13 +421,16 @@ class DataNormalizer:
             # to the Fenwick / unblocked-attempt population.
             if outcome in ['Goal', 'Saved', 'Missed']:
                 from app.services.xg_service import XGService
-                xg_prediction = XGService.predict_shot_xg(
-                    distance=metrics["distance"],
-                    angle=metrics["angle"],
-                    shot_type=details.get("shotType"),
-                    strength_state=team_strength_state,
-                    empty_net=empty_net
-                )
+                if xg_features is not None:
+                    xg_prediction = XGService.predict_shot_xg(features=xg_features)
+                else:
+                    xg_prediction = XGService.predict_shot_xg(
+                        distance=dist,
+                        angle=ang,
+                        shot_type=details.get("shotType"),
+                        strength_state=team_strength_state,
+                        empty_net=empty_net
+                    )
                 shot_xg = xg_prediction.xg
                 m_name = xg_prediction.model_name
                 m_version = xg_prediction.model_version
@@ -440,8 +450,8 @@ class DataNormalizer:
                 shot_type=details.get("shotType"),
                 x_coordinate_normalized=norm_x,
                 y_coordinate_normalized=norm_y,
-                distance=metrics["distance"],
-                angle=metrics["angle"],
+                distance=dist,
+                angle=ang,
                 outcome=outcome,
                 goal=is_goal,
                 strength_state=team_strength_state,
