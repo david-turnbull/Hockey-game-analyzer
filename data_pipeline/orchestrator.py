@@ -206,10 +206,19 @@ class PipelineOrchestrator:
             # Events & Shots
             events_list = []
             shots_list = []
+            seen_raw_event_ids = set()
             for play in pbp_raw.get("plays", []):
                 raw_eid = play.get("eventId")
-                play_event_id = f"{game_id}_{raw_eid}" if raw_eid is not None else None
-                feat = xg_features_by_event_id.get(play_event_id) if play_event_id else None
+                if raw_eid is None:
+                    logger.warning("Play missing eventId in game %s; skipping", game_id)
+                    continue
+                if raw_eid in seen_raw_event_ids:
+                    logger.warning("Duplicate play eventId %s in game %s; preserving first occurrence", raw_eid, game_id)
+                    continue
+                seen_raw_event_ids.add(raw_eid)
+
+                play_event_id = f"{game_id}_{raw_eid}"
+                feat = xg_features_by_event_id.get(play_event_id)
                 event_model, shot_model = self.normalizer.transform_event(
                     play, game_id, home_team_raw["id"], xg_features=feat, require_full_xg_context=True
                 )

@@ -25,6 +25,7 @@ from app.services.unit_service import UnitService
 from app.services.data_integrity_service import DataIntegrityService
 from app.models import db, Game, Team, Player, Event, Shot, Shift, GamePlayer
 from data_pipeline.transform.normalizer import DataNormalizer
+from data_pipeline.orchestrator import PipelineOrchestrator
 
 
 # ==========================================
@@ -1042,6 +1043,66 @@ def test_backfill_skipping_policy(app, db, tmp_path):
     
     assert summary["shots_skipped_missing_pbp"] >= 1
     assert summary["blocked_shots_cleared"] >= 1
+
+
+def test_orchestrator_skips_missing_and_duplicate_play_event_ids(monkeypatch, app, db):
+    """Verifies that PipelineOrchestrator skips plays with eventId is None and duplicate eventIds before transform_event."""
+    orchestrator = PipelineOrchestrator(session=db.session)
+    
+    mock_pbp = {
+        "id": 99901,
+        "season": "20232024",
+        "gameDate": "2023-11-01",
+        "gameType": 2,
+        "gameState": "OFF",
+        "homeTeam": {"id": 1, "name": {"default": "Home"}, "commonName": {"default": "Home"}, "placeName": {"default": "Home"}, "abbrev": "HOM", "score": 0},
+        "awayTeam": {"id": 2, "name": {"default": "Away"}, "commonName": {"default": "Away"}, "placeName": {"default": "Away"}, "abbrev": "AWY", "score": 0},
+        "rosterSpots": [],
+        "plays": [
+            {
+                "eventId": None,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "01:00",
+                "typeDescKey": "hit",
+                "details": {"eventOwnerTeamId": 1}
+            },
+            {
+                "eventId": 50,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "02:00",
+                "typeDescKey": "hit",
+                "details": {"eventOwnerTeamId": 1}
+            },
+            {
+                "eventId": 50,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "02:10",
+                "typeDescKey": "hit",
+                "details": {"eventOwnerTeamId": 1}
+            },
+            {
+                "eventId": 51,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "03:00",
+                "typeDescKey": "hit",
+                "details": {"eventOwnerTeamId": 1}
+            }
+        ]
+    }
+    
+    monkeypatch.setattr(orchestrator.api_client, "get_play_by_play", lambda gid, force_refresh=False: mock_pbp)
+    monkeypatch.setattr(orchestrator.api_client, "get_shifts", lambda gid, force_refresh=False: {"data": [], "total": 0})
+    monkeypatch.setattr(orchestrator.api_client, "get_boxscore", lambda gid, force_refresh=False: {})
+    
+    success, summary = orchestrator.ingest_game(99901)
+    assert success is True
+    
+    events = Event.query.filter_by(game_id=99901).all()
+    event_ids = [e.event_id for e in events]
+    assert len(event_ids) == 2
+    assert "99901_50" in event_ids
+    assert "99901_51" in event_ids
+
 
 
 
