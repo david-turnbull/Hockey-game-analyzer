@@ -15,7 +15,6 @@ class Shift(db.Model):
     end_elapsed_seconds = db.Column(db.Integer, nullable=True, index=True)
     duration = db.Column(db.Integer, nullable=True)  # shift duration in seconds, nullable for invalid duration
     
-    # Milestone 5.5: Data Correctness & Hardening fields
     period_type = db.Column(db.String(10), nullable=True)
     team_id = db.Column(db.Integer, db.ForeignKey('team.team_id'), nullable=True, index=True)
     is_anomaly = db.Column(db.Boolean, default=False, nullable=False)

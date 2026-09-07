@@ -17,15 +17,19 @@ class Event(db.Model):
     secondary_player_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=True)
     assist1_player_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=True)
     assist2_player_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=True)
+    served_by_player_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), nullable=True)
     
     penalty_duration = db.Column(db.Integer, nullable=True)  # in minutes
     penalty_description = db.Column(db.String(100), nullable=True)
+    penalty_type_code = db.Column(db.String(10), nullable=True)
+    zone_code = db.Column(db.String(10), nullable=True)
     
     x_coordinate = db.Column(db.Float, nullable=True)
     y_coordinate = db.Column(db.Float, nullable=True)
+    x_coordinate_normalized = db.Column(db.Float, nullable=True)
+    y_coordinate_normalized = db.Column(db.Float, nullable=True)
     strength_state = db.Column(db.String(20), nullable=True)  # e.g., '5v5', '5v4', 'PP', 'SH'
     
-    # Milestone 5.5: Data Correctness & Hardening fields
     period_type = db.Column(db.String(10), nullable=True)
     raw_situation_code = db.Column(db.String(4), nullable=True)
     home_skaters = db.Column(db.Integer, nullable=True)
@@ -46,6 +50,7 @@ class Event(db.Model):
     secondary_player = db.relationship('Player', foreign_keys=[secondary_player_id])
     assist1_player = db.relationship('Player', foreign_keys=[assist1_player_id])
     assist2_player = db.relationship('Player', foreign_keys=[assist2_player_id])
+    served_by_player = db.relationship('Player', foreign_keys=[served_by_player_id])
     
     # One-to-one or optional one-to-one relationship with Shot
     shot = db.relationship('Shot', back_populates='event', uselist=False, cascade='all, delete-orphan')

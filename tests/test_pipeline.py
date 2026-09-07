@@ -6,7 +6,7 @@ from data_pipeline.transform.normalizer import (
     parse_situation_code,
     DataNormalizer
 )
-from data_pipeline.validation.quality_checker import DataQualityChecker
+from data_pipeline.validation.ingestion_validator import IngestionValidator
 from data_pipeline.loaders.db_loader import DatabaseLoader
 from app.models import Team, Player, Game, Event, Shot, Shift
 
@@ -84,7 +84,7 @@ def test_situation_code_parsing():
     assert not empty
 
 def test_data_quality_checker():
-    checker = DataQualityChecker()
+    checker = IngestionValidator()
     
     # Check invalid coordinates warning
     invalid_event = Event(
@@ -105,7 +105,7 @@ def test_data_quality_checker():
     assert any("X Coordinate out of bounds" in w["message"] for w in summary["warnings"])
     
     # Check shift durations and overlaps
-    checker_shift = DataQualityChecker()
+    checker_shift = IngestionValidator()
     shift1 = Shift(
         shift_id="shift_1",
         game_id=1,
@@ -138,7 +138,7 @@ def test_database_loader_idempotency(app, db):
     
     # Create sample game records
     cgy = Team(team_id=20, abbreviation='CGY', name='Calgary Flames')
-    player = Player(player_id=8476458, first_name='Jonathan', last_name='Huberdeau', position='LW', current_team=cgy)
+    player = Player(player_id=8476456, first_name='Jonathan', last_name='Huberdeau', position='L', current_team=cgy)
     
     game = Game(
         game_id=2023020007,
@@ -174,7 +174,7 @@ def test_database_loader_idempotency(app, db):
     )
     
     shift = Shift(
-        shift_id="2023020007_8476458_1_0",
+        shift_id="2023020007_8476456_1_0",
         game_id=game.game_id,
         player_id=player.player_id,
         period=1,
@@ -195,7 +195,7 @@ def test_database_loader_idempotency(app, db):
     assert db.session.get(Game, 2023020007) is not None
     assert db.session.get(Event, "2023020007_1") is not None
     assert db.session.get(Shot, "2023020007_1") is not None
-    assert db.session.get(Shift, "2023020007_8476458_1_0") is not None
+    assert db.session.get(Shift, "2023020007_8476456_1_0") is not None
     
     # Re-load (identical data) - should not cause duplicate PK errors or expand list
     # Construct new instances to match real-world pipeline reload scenario
@@ -233,7 +233,7 @@ def test_database_loader_idempotency(app, db):
     )
     
     shift_reload = Shift(
-        shift_id="2023020007_8476458_1_0",
+        shift_id="2023020007_8476456_1_0",
         game_id=game_reload.game_id,
         player_id=player.player_id,
         period=1,

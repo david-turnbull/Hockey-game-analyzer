@@ -12,7 +12,15 @@ class Game(db.Model):
     away_team_id = db.Column(db.Integer, db.ForeignKey('team.team_id'), nullable=False)
     home_score = db.Column(db.Integer, default=0, nullable=False)
     away_score = db.Column(db.Integer, default=0, nullable=False)
-    game_status = db.Column(db.String(20))             # Final, Live, Preview, etc.
+    nhl_game_state = db.Column(db.String(20))             # Raw NHL game state code (e.g. OFF, LIVE, FUT)
+
+    @property
+    def game_status(self):
+        return self.nhl_game_state
+
+    @game_status.setter
+    def game_status(self, value):
+        self.nhl_game_state = value
 
     # Relationships
     home_team = db.relationship('Team', foreign_keys=[home_team_id], back_populates='home_games')

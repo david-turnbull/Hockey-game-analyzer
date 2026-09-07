@@ -1,13 +1,31 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ stats.away_team_abbrev }} @ {{ stats.home_team_abbrev }} - NHL Hockey Analytics Platform{% endblock %}
+{% block title %}{{ stats.away_team_abbrev }} @ {{ stats.home_team_abbrev }} - PuckLens{% endblock %}
 
 {% block content %}
-<!-- Back link & Page header -->
-<div style="margin-bottom: 1.5rem;">
+<!-- Back link & Navigation row -->
+<div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
     <a href="/" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-hover)'" onmouseout="this.style.color='var(--accent-color)'">
         &larr; Back to Game Selector
     </a>
+    
+    <div style="display: flex; gap: 1rem; align-items: center;">
+        {% if prev_game %}
+        <a href="/game/{{ prev_game.game_id }}?team_id={{ context_team_id }}" style="display: flex; flex-direction: column; align-items: flex-start; text-decoration: none; padding: 0.4rem 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.75rem; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-color)'" onmouseout="this.style.borderColor='var(--border-color)'">
+            <span style="color: var(--accent-color); font-weight: 600;">&larr; Previous Game</span>
+            <span style="color: var(--text-primary); margin-top: 0.1rem;">{{ prev_game.away_team.abbreviation }} {{ prev_game.away_score }} @ {{ prev_game.home_team.abbreviation }} {{ prev_game.home_score }}</span>
+            <span style="color: var(--text-muted); font-size: 0.65rem; margin-top: 0.1rem;" class="font-mono">{{ prev_game.game_date.strftime("%b %d, %Y") }}</span>
+        </a>
+        {% endif %}
+        
+        {% if next_game %}
+        <a href="/game/{{ next_game.game_id }}?team_id={{ context_team_id }}" style="display: flex; flex-direction: column; align-items: flex-end; text-decoration: none; padding: 0.4rem 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.75rem; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-color)'" onmouseout="this.style.borderColor='var(--border-color)'">
+            <span style="color: var(--accent-color); font-weight: 600;">Next Game &rarr;</span>
+            <span style="color: var(--text-primary); margin-top: 0.1rem;">{{ next_game.away_team.abbreviation }} {{ next_game.away_score }} @ {{ next_game.home_team.abbreviation }} {{ next_game.home_score }}</span>
+            <span style="color: var(--text-muted); font-size: 0.65rem; margin-top: 0.1rem;" class="font-mono">{{ next_game.game_date.strftime("%b %d, %Y") }}</span>
+        </a>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Scoreboard Header -->
@@ -61,7 +79,10 @@
 <div class="tabs-container" style="margin-bottom: 2rem; display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
     <button class="tab-button active" onclick="switchTab(event, 'tab-overview')" style="background: none; border: none; color: var(--text-primary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Game Summary</button>
     <button class="tab-button" onclick="switchTab(event, 'tab-shotmap')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Interactive Shot Map</button>
+    <button class="tab-button" onclick="switchTab(event, 'tab-timeline')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">xG Timeline</button>
     <button class="tab-button" onclick="switchTab(event, 'tab-lines')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">Line Combinations</button>
+    <button class="tab-button" onclick="switchTab(event, 'tab-onice-explorer')" style="background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 0.5rem 1rem; position: relative;">On-Ice Explorer</button>
+    <a href="/game/{{ stats.game_id }}/compare?team_id={{ context_team_id }}" class="tab-button" style="text-decoration: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; padding: 0.5rem 1rem;">Player Comparison &rarr;</a>
 </div>
 
 <!-- Tab 1: Game Summary -->
@@ -114,7 +135,7 @@
             <!-- Expected Goals (xG) Stat -->
             <div class="stat-label-row">
                 <span class="stat-value font-mono">{{ stats.stats.away_xg }}</span>
-                <span style="color: var(--text-secondary);" title="Prototype Expected Goals (excluding shootouts)">Prototype Expected Goals (xG)</span>
+                <span style="color: var(--text-secondary);" title="All-Situations Expected Goals">Expected Goals (xG)</span>
                 <span class="stat-value font-mono">{{ stats.stats.home_xg }}</span>
             </div>
             <div class="stat-bar-container">
@@ -127,6 +148,53 @@
                 <div class="stat-bar-home" style="width: 50%"></div>
                 {% endif %}
             </div>
+
+            <!-- 5v5 Expected Goals Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value font-mono">{{ stats.stats.away_5v5_xg }}</span>
+                <span style="color: var(--text-secondary);" title="5v5 Strength State Expected Goals">5v5 Expected Goals</span>
+                <span class="stat-value font-mono">{{ stats.stats.home_5v5_xg }}</span>
+            </div>
+            <div class="stat-bar-container">
+                {% set total_5v5 = stats.stats.away_5v5_xg + stats.stats.home_5v5_xg %}
+                {% if total_5v5 > 0 %}
+                <div class="stat-bar-away" style="width: {{ (stats.stats.away_5v5_xg / total_5v5) * 100 }}%"></div>
+                <div class="stat-bar-home" style="width: {{ (stats.stats.home_5v5_xg / total_5v5) * 100 }}%"></div>
+                {% else %}
+                <div class="stat-bar-away" style="width: 50%"></div>
+                <div class="stat-bar-home" style="width: 50%"></div>
+                {% endif %}
+            </div>
+
+            <!-- Expected Goals Share (xG%) Stat -->
+            <div class="stat-label-row">
+                <span class="stat-value font-mono">{{ stats.stats.away_xg_pct }}%</span>
+                <span style="color: var(--text-secondary);" title="Expected Goals Share: xGF / (xGF + xGA)">xG Share (xG%)</span>
+                <span class="stat-value font-mono">{{ stats.stats.home_xg_pct }}%</span>
+            </div>
+            <div class="stat-bar-container">
+                <div class="stat-bar-away" style="width: {{ stats.stats.away_xg_pct }}%"></div>
+                <div class="stat-bar-home" style="width: {{ stats.stats.home_xg_pct }}%"></div>
+            </div>
+
+            <!-- Period by Period xG Breakdown -->
+            {% if stats.stats.xg_by_period %}
+            <div style="margin: 1.5rem 0 1rem 0; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.75rem;">Expected Goals by Period</div>
+                <div style="display: grid; grid-template-columns: repeat({{ stats.stats.xg_by_period|length }}, 1fr); gap: 0.5rem; text-align: center;">
+                    {% for p_label, p_data in stats.stats.xg_by_period.items() %}
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.4rem 0.2rem;">
+                        <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">{{ p_label }}</div>
+                        <div style="font-size: 0.8rem; font-family: monospace; margin-top: 0.2rem;">
+                            <span style="color: #f97316;">{{ p_data.away }}</span>
+                            <span style="color: var(--text-muted); font-size: 0.65rem;">&ndash;</span>
+                            <span style="color: #38bdf8;">{{ p_data.home }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
             <!-- PPG Stat -->
             <div class="stat-label-row">
@@ -198,8 +266,24 @@
         </div>
 
         <!-- Column 2: Game Chronological Timeline Card -->
+        <style>
+            .badge-hit { background-color: rgba(147, 51, 234, 0.1); color: #a855f7; }
+            .badge-faceoff { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+            .badge-block { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
+            .badge-miss { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        </style>
         <div class="card">
             <h2 class="card-title">Scoring & Penalties Timeline</h2>
+            
+            <!-- Timeline Category Filters -->
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.5rem; padding: 0.5rem; background: rgba(255, 255, 255, 0.02); border-radius: 4px; font-size: 0.8rem; border: 1px solid var(--border-color);">
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-goal" checked onchange="filterTimeline()"> Goals</label>
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-penalty" checked onchange="filterTimeline()"> Penalties</label>
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-hit" onchange="filterTimeline()"> Hits</label>
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-faceoff" onchange="filterTimeline()"> Faceoffs</label>
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-blocked-shot" onchange="filterTimeline()"> Blocks</label>
+                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-secondary);"><input type="checkbox" id="tl-show-missed-shot" onchange="filterTimeline()"> Misses</label>
+            </div>
             
             {% if not stats.timeline %}
             <p style="color: var(--text-muted); text-align: center; padding: 2rem;">No timeline events recorded for this game.</p>
@@ -210,7 +294,7 @@
                 <h3 class="timeline-period-title">{{ period_label }}</h3>
                 
                 {% for event in events %}
-                <div class="timeline-item">
+                <div class="timeline-item" data-event-type="{{ event.event_type }}" style="display: {% if event.event_type in ['goal', 'penalty'] %}flex{% else %}none{% endif %};">
                     <div class="timeline-time">{{ event.period_time }}</div>
                     
                     {% if event.event_type == 'goal' %}
@@ -224,7 +308,8 @@
                         <div class="timeline-assists">{{ event.assists }}</div>
                     </div>
                     <div class="timeline-score-tracker">{{ event.running_score }}</div>
-                    {% else %}
+                    
+                    {% elif event.event_type == 'penalty' %}
                     <div class="timeline-badge badge-penalty">Penalty</div>
                     <div class="timeline-content">
                         <span class="timeline-scorer">{{ event.player }}</span>
@@ -234,6 +319,49 @@
                             {% if event.drawn_by %}
                             <span style="color: var(--text-muted);"> (Drawn by: {{ event.drawn_by }})</span>
                             {% endif %}
+                            {% if event.served_by %}
+                            <span style="color: var(--text-muted);"> (Served by: {{ event.served_by }})</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% elif event.event_type == 'hit' %}
+                    <div class="timeline-badge badge-hit">Hit</div>
+                    <div class="timeline-content">
+                        <span class="timeline-scorer">{{ event.hitter }}</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">({{ event.team_abbrev }})</span>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            Hit: {{ event.hittee }}
+                        </div>
+                    </div>
+                    
+                    {% elif event.event_type == 'faceoff' %}
+                    <div class="timeline-badge badge-faceoff">Faceoff</div>
+                    <div class="timeline-content">
+                        <span class="timeline-scorer">{{ event.winner }}</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">({{ event.team_abbrev }})</span>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            Won vs {{ event.loser }} {% if event.zone %}(Zone: {{ event.zone }}){% endif %}
+                        </div>
+                    </div>
+                    
+                    {% elif event.event_type == 'blocked-shot' %}
+                    <div class="timeline-badge badge-block">Block</div>
+                    <div class="timeline-content">
+                        <span class="timeline-scorer">{{ event.blocker }}</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">({{ event.team_abbrev }})</span>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            Blocked shot by {{ event.shooter }}
+                        </div>
+                    </div>
+                    
+                    {% elif event.event_type == 'missed-shot' %}
+                    <div class="timeline-badge badge-miss">Miss</div>
+                    <div class="timeline-content">
+                        <span class="timeline-scorer">{{ event.shooter }}</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">({{ event.team_abbrev }})</span>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            Shot missed net
                         </div>
                     </div>
                     {% endif %}
@@ -511,7 +639,11 @@
                         {% else %}
                         {% for line in stats.line_combinations.away.lines %}
                         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
-                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ line.players }}</td>
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">
+                                <a href="/game/{{ stats.game_id }}/line?players={{ line.player_ids | join(',') }}&team_id={{ context_team_id }}" style="color: var(--accent-color); text-decoration: none;">
+                                    {{ line.players }}
+                                </a>
+                            </td>
                             <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ line.toi }}</td>
                             <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ line.goals_for }}</td>
                             <td style="padding: 0.5rem; text-align: center;">{{ line.goals_against }}</td>
@@ -545,7 +677,11 @@
                         {% else %}
                         {% for pair in stats.line_combinations.away.pairings %}
                         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
-                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ pair.players }}</td>
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">
+                                <a href="/game/{{ stats.game_id }}/line?players={{ pair.player_ids | join(',') }}&team_id={{ context_team_id }}" style="color: var(--accent-color); text-decoration: none;">
+                                    {{ pair.players }}
+                                </a>
+                            </td>
                             <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ pair.toi }}</td>
                             <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ pair.goals_for }}</td>
                             <td style="padding: 0.5rem; text-align: center;">{{ pair.goals_against }}</td>
@@ -584,7 +720,11 @@
                         {% else %}
                         {% for line in stats.line_combinations.home.lines %}
                         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
-                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ line.players }}</td>
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">
+                                <a href="/game/{{ stats.game_id }}/line?players={{ line.player_ids | join(',') }}&team_id={{ context_team_id }}" style="color: var(--accent-color); text-decoration: none;">
+                                    {{ line.players }}
+                                </a>
+                            </td>
                             <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ line.toi }}</td>
                             <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ line.goals_for }}</td>
                             <td style="padding: 0.5rem; text-align: center;">{{ line.goals_against }}</td>
@@ -618,7 +758,11 @@
                         {% else %}
                         {% for pair in stats.line_combinations.home.pairings %}
                         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.02)'" onmouseout="this.style.backgroundColor='transparent'">
-                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">{{ pair.players }}</td>
+                            <td style="padding: 0.5rem; font-weight: 500; color: var(--text-primary);">
+                                <a href="/game/{{ stats.game_id }}/line?players={{ pair.player_ids | join(',') }}&team_id={{ context_team_id }}" style="color: var(--accent-color); text-decoration: none;">
+                                    {{ pair.players }}
+                                </a>
+                            </td>
                             <td style="padding: 0.5rem; text-align: center;" class="font-mono">{{ pair.toi }}</td>
                             <td style="padding: 0.5rem; text-align: center; color: var(--accent-color); font-weight: 600;">{{ pair.goals_for }}</td>
                             <td style="padding: 0.5rem; text-align: center;">{{ pair.goals_against }}</td>
@@ -634,10 +778,136 @@
     </div>
 </div>
 
+<!-- Tab 4: On-Ice Player & Event Explorer -->
+<div id="tab-onice-explorer" class="tab-content" style="display: none;">
+    <style>
+        .explorer-event-item:hover {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border-color: var(--accent-hover) !important;
+        }
+        .explorer-event-item.active {
+            background: rgba(56, 189, 248, 0.08) !important;
+            border-color: var(--accent-color) !important;
+        }
+    </style>
+    <div class="grid-2" style="align-items: start;">
+        <!-- Column 1: Chronological Event Explorer Timeline -->
+        <div class="card" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+            <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Click Event to Inspect On-Ice Lineup</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Select any key event below to reconstruct exactly who was on the ice at that moment.</p>
+            
+            <div style="max-height: 500px; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.75rem;" id="explorer-events-list">
+                <!-- Group events by period -->
+                {% for period_label, events in stats.timeline.items() %}
+                <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent-color); margin-top: 0.5rem; border-left: 2px solid var(--accent-color); padding-left: 0.5rem;">
+                    {{ period_label }}
+                </div>
+                {% for event in events %}
+                <div class="explorer-event-item" 
+                     data-period="{{ event.period }}" 
+                     data-time="{{ event.period_time }}" 
+                     onclick="selectExplorerEvent(this)"
+                     style="display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0.75rem; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; transition: all 0.2s;">
+                    
+                    <div style="font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono); width: 50px;">{{ event.period_time }}</div>
+                    
+                    <div style="flex-grow: 1; font-size: 0.85rem;">
+                        {% if event.event_type == 'goal' %}
+                        <span style="color: #10b981; font-weight: 600;">Goal:</span> {{ event.scorer }} ({{ event.team_abbrev }})
+                        {% elif event.event_type == 'penalty' %}
+                        <span style="color: #ef4444; font-weight: 600;">Penalty:</span> {{ event.player }} ({{ event.team_abbrev }}) - {{ event.infraction }}
+                        {% elif event.event_type == 'hit' %}
+                        <span style="color: #f59e0b; font-weight: 600;">Hit:</span> {{ event.description }}
+                        {% elif event.event_type == 'faceoff' %}
+                        <span style="color: #3b82f6; font-weight: 600;">Faceoff:</span> {{ event.description }}
+                        {% elif event.event_type == 'blocked-shot' %}
+                        <span style="color: var(--text-secondary); font-weight: 600;">Block:</span> {{ event.description }}
+                        {% elif event.event_type == 'missed-shot' %}
+                        <span style="color: var(--text-muted); font-weight: 600;">Miss:</span> {{ event.description }}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Column 2: On-Ice Players List & Custom Time Selector -->
+        <div class="card" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+            <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0;">On-Ice Player Reconstruct</h3>
+                
+                <!-- Manual time selection form -->
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <select id="explorer-period" style="padding: 0.25rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; font-size: 0.8rem; cursor: pointer;">
+                        <option value="1">Period 1</option>
+                        <option value="2">Period 2</option>
+                        <option value="3">Period 3</option>
+                        <option value="4">Overtime</option>
+                    </select>
+                    <input type="text" id="explorer-time" value="00:00" placeholder="MM:SS" style="width: 60px; padding: 0.25rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; font-family: var(--font-mono); font-size: 0.8rem; text-align: center;">
+                    <button class="btn-analyze" onclick="fetchOnIcePlayers()" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">Query</button>
+                </div>
+            </div>
+
+            <!-- Active time display banner -->
+            <div id="explorer-active-time-banner" style="padding: 0.75rem 1rem; background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.15); border-radius: 4px; font-size: 0.85rem; color: var(--accent-color); font-weight: 600; text-align: center;">
+                Select an event or query a custom time to load active lineups
+            </div>
+
+            <!-- Side-by-side lineups -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;" id="explorer-lineups-container">
+                <!-- Home Team Lineup -->
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.25rem;" id="explorer-home-title">{{ stats.home_team_abbrev }}</h4>
+                    <div id="explorer-home-players" style="display: flex; flex-direction: column; gap: 0.5rem; min-height: 200px; color: var(--text-muted); font-size: 0.85rem; justify-content: center; align-items: center; border: 1px dashed var(--border-color); border-radius: 4px;">
+                        No lineup loaded
+                    </div>
+                </div>
+
+                <!-- Away Team Lineup -->
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.25rem;" id="explorer-away-title">{{ stats.away_team_abbrev }}</h4>
+                    <div id="explorer-away-players" style="display: flex; flex-direction: column; gap: 0.5rem; min-height: 200px; color: var(--text-muted); font-size: 0.85rem; justify-content: center; align-items: center; border: 1px dashed var(--border-color); border-radius: 4px;">
+                        No lineup loaded
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab 5: Expected Goals Timeline -->
+<div id="tab-timeline" class="tab-content" style="display: none;">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h2 class="card-title" style="margin-bottom: 0.25rem;">Expected Goals (xG) Timeline</h2>
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">
+                    Cumulative shot quality progression over game time with actual goal events.
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;" id="timeline-situation-filters">
+                <button class="tab-button active" data-xg-situation="all" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid var(--border-color);">All Situations</button>
+                <button class="tab-button" data-xg-situation="5v5" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid var(--border-color);">5v5 Only</button>
+                <button class="tab-button" data-xg-situation="pp" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid var(--border-color);">Power Play</button>
+            </div>
+        </div>
+        
+        <div id="xg-timeline-plot" style="width: 100%; height: 480px;"></div>
+        
+        <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 1.5rem; justify-content: flex-end;">
+            <span><span style="color: #38bdf8; font-weight: bold;">&#9644;&#9644;</span> {{ stats.home_team_abbrev }} Cumulative</span>
+            <span><span style="color: #f97316; font-weight: bold;">&#9644;&#9644;</span> {{ stats.away_team_abbrev }} Cumulative</span>
+            <span><span style="color: #ffffff;">&#9733;</span> Actual Goal</span>
+        </div>
+    </div>
+</div>
+
 <!-- Scripts -->
 <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
 <script>
     const GAME_ID = {{ stats.game_id }};
 </script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/game_dashboard.js') }}"></script>
 {% endblock %}

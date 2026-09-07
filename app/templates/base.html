@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="NHL Hockey Operations Analytics Platform - Internal analytical tools for player and game evaluation.">
-    <title>{% block title %}NHL Hockey Analytics Platform{% endblock %}</title>
+    <meta name="description" content="PuckLens - NHL Hockey Operations Analytics Platform - Internal analytical tools for player and game evaluation.">
+    <title>{% block title %}PuckLens{% endblock %}</title>
     <!-- Google Fonts integration inside styles.css -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     {% block extra_css %}{% endblock %}
@@ -12,8 +12,8 @@
 <body>
     <header>
         <div class="logo-section">
-            <span class="logo-badge">HOCKEY-OPS</span>
-            <span class="logo-text">Hockey Analytics Platform</span>
+            <span class="logo-badge">PUCKLENS</span>
+            <span class="logo-text">PuckLens</span>
         </div>
         <nav class="nav-links">
             <a href="/" class="{% if request.path == '/' %}active{% endif %}">Game Selector</a>

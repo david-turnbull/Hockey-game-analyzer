@@ -8,6 +8,7 @@ class GamePlayer(db.Model):
     player_id = db.Column(db.Integer, db.ForeignKey('player.player_id'), primary_key=True, nullable=False)
     team_id = db.Column(db.Integer, db.ForeignKey('team.team_id'), nullable=False, index=True)
     position = db.Column(db.String(10), nullable=True)
+    sweater_number = db.Column(db.Integer, nullable=True)
 
     # Relationships
     game = db.relationship('Game', back_populates='roster_entries')

@@ -3,8 +3,8 @@ from app.models import Game, Team, Player, Event, Shot, Shift
 
 logger = logging.getLogger(__name__)
 
-class DataQualityChecker:
-    """Validates hockey game data records and outputs structured quality reports."""
+class IngestionValidator:
+    """Validates hockey game data records during ingestion and outputs structured quality reports."""
 
     def __init__(self):
         self.warnings = []
@@ -94,6 +94,8 @@ class DataQualityChecker:
             self.add_warning("EVENT_INTEGRITY", f"Primary player {event.primary_player_id} not in roster", event.event_id)
         if event.secondary_player_id and event.secondary_player_id not in known_player_ids:
             self.add_warning("EVENT_INTEGRITY", f"Secondary player {event.secondary_player_id} not in roster", event.event_id)
+        if event.served_by_player_id and event.served_by_player_id not in known_player_ids:
+            self.add_warning("EVENT_INTEGRITY", f"Serving player {event.served_by_player_id} not in roster", event.event_id)
             
         # Shot event shooter validation (fatal error)
         if event.event_type in ['shot-on-goal', 'goal', 'missed-shot', 'blocked-shot']:

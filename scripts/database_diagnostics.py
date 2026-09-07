@@ -93,12 +93,16 @@ def run_diagnostics():
         ).count()
         
         shots_without_shooters = db.session.query(Shot).filter(Shot.shooter_id.is_(None)).count()
+        blocked_shots_with_xg = db.session.query(Shot).filter(
+            Shot.outcome == 'Blocked',
+            (Shot.xg.isnot(None) | Shot.model_name.isnot(None) | Shot.prediction_method.isnot(None))
+        ).count()
         events_with_invalid_clocks = db.session.query(Event).filter(Event.elapsed_game_seconds.is_(None)).count()
         
         integrity_issues_sum = (orphan_events_count + orphan_shots_count + orphan_shifts_count + 
                                 orphan_game_players + invalid_player_refs + negative_duration_shifts + 
                                 shots_without_shooters + shift_team_mismatches + missing_game_player_relations +
-                                duplicate_game_players)
+                                duplicate_game_players + blocked_shots_with_xg)
         warnings_sum = zero_duration_shifts + unknown_period_types + invalid_manpower_states + events_with_invalid_clocks
         
         if integrity_issues_sum > 0:

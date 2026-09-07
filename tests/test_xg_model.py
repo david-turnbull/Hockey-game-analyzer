@@ -5,13 +5,16 @@ from app.services.xg_service import XGService
 from app.services.game_service import GameService
 from app.services.player_game_service import PlayerGameService
 
-def test_xg_service_logic():
+from app.services.xg_models import HeuristicXGModel
+
+def test_heuristic_xg_model_logic():
     """
-    Verifies the mathematical correctness and features adjustments of the Expected Goals model.
+    Verifies the mathematical correctness and features adjustments of the Heuristic Expected Goals model.
     """
+    model = HeuristicXGModel()
     # 1. Close wrist shot vs Far slap shot
-    close_wrist = XGService.calculate_shot_xg(distance=10.0, angle=0.0, shot_type="wrist", strength_state="EV")
-    far_slap = XGService.calculate_shot_xg(distance=60.0, angle=45.0, shot_type="slap", strength_state="EV")
+    close_wrist = model.predict(distance=10.0, angle=0.0, shot_type="wrist", strength_state="EV")
+    far_slap = model.predict(distance=60.0, angle=45.0, shot_type="slap", strength_state="EV")
     
     # Close wrist shot should have significantly higher xG
     assert close_wrist > far_slap
@@ -19,21 +22,39 @@ def test_xg_service_logic():
     assert 0.0 < far_slap < 1.0
     
     # 2. Deflection/tip-in bonus
-    standard_wrist = XGService.calculate_shot_xg(distance=15.0, angle=10.0, shot_type="wrist", strength_state="EV")
-    tip_in = XGService.calculate_shot_xg(distance=15.0, angle=10.0, shot_type="tip-in", strength_state="EV")
+    standard_wrist = model.predict(distance=15.0, angle=10.0, shot_type="wrist", strength_state="EV")
+    tip_in = model.predict(distance=15.0, angle=10.0, shot_type="tip-in", strength_state="EV")
     assert tip_in > standard_wrist
     
     # 3. Manpower state adjustments (PP vs SH)
-    pp_shot = XGService.calculate_shot_xg(distance=25.0, angle=15.0, shot_type="wrist", strength_state="PP")
-    sh_shot = XGService.calculate_shot_xg(distance=25.0, angle=15.0, shot_type="wrist", strength_state="SH")
+    pp_shot = model.predict(distance=25.0, angle=15.0, shot_type="wrist", strength_state="PP")
+    sh_shot = model.predict(distance=25.0, angle=15.0, shot_type="wrist", strength_state="SH")
     assert pp_shot > sh_shot
     
     # 4. Empty Net override
-    close_empty = XGService.calculate_shot_xg(distance=30.0, angle=0.0, empty_net=True)
-    far_empty = XGService.calculate_shot_xg(distance=150.0, angle=0.0, empty_net=True)
+    close_empty = model.predict(distance=30.0, angle=0.0, empty_net=True)
+    far_empty = model.predict(distance=150.0, angle=0.0, empty_net=True)
     assert close_empty > far_empty
     assert close_empty == 0.85 # 1.0 - 30 * 0.005 = 0.85
     assert far_empty == 0.25 # 1.0 - 150 * 0.005 = 0.25
+
+def test_xg_service_ml_logic():
+    """
+    Verifies that XGService uses the production machine learning model
+    and satisfies fundamental hockey physics and probabilistic bounds.
+    """
+    close_shot = XGService.calculate_shot_xg(distance=8.0, angle=5.0, shot_type="wrist", strength_state="EV")
+    point_shot = XGService.calculate_shot_xg(distance=60.0, angle=40.0, shot_type="slap", strength_state="EV")
+    
+    # Fundamental hockey logic: shots right in the crease have higher xG than point shots
+    assert close_shot > point_shot
+    assert 0.0 < close_shot <= 1.0
+    assert 0.0 < point_shot <= 1.0
+    
+    # Empty net attempts have high expected goal probabilities
+    empty_net_shot = XGService.calculate_shot_xg(distance=30.0, angle=0.0, empty_net=True)
+    assert empty_net_shot > 0.70
+    assert empty_net_shot <= 1.0
 
 def test_xg_game_integration(app, db, client):
     """

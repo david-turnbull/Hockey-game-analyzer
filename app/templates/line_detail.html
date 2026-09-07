@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PuckLens - Line Detail View</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+        .metric-tooltip {
+            border-bottom: 1px dashed var(--text-muted);
+            cursor: help;
+            position: relative;
+            display: inline-block;
+        }
+        .metric-tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 130%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            white-space: normal;
+            width: 200px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 100;
+            text-align: center;
+            font-weight: 400;
+        }
+        .metric-tooltip:hover::after {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-2px);
+        }
+    </style>
+</head>
+<body style="background-color: var(--bg-dark); color: var(--text-primary); font-family: 'Inter', sans-serif;">
+    <header class="header">
+        <div class="logo">
+            <a href="/" style="color: var(--accent-color); text-decoration: none;">PuckLens</a>
+            <span style="color: var(--text-muted); margin: 0 0.5rem;">/</span>
+            <a href="/game/{{ game_id }}?team_id={{ context_team_id }}" style="color: var(--text-secondary); text-decoration: none;">Game Dashboard</a>
+            <span style="color: var(--text-muted); margin: 0 0.5rem;">/</span>
+            <span style="color: var(--text-primary); font-weight: 600;">Line Combination Details</span>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted);">
+            Season 5v5 observed analysis
+        </div>
+    </header>
+
+    <main class="dashboard-container" style="max-width: 1300px; margin: 2rem auto; padding: 0 1.5rem;">
+        <!-- Unit Members Header Card -->
+        <div class="card" style="padding: 2rem; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <span style="background: rgba(56, 189, 248, 0.1); color: var(--accent-color); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+                        {% if unit.players | length == 3 %}Forward Line{% else %}Defensive Pairing{% endif %}
+                    </span>
+                    <h1 style="font-family: 'Outfit', sans-serif; font-size: 2.25rem; font-weight: 800; margin: 0.5rem 0 0.25rem 0; color: var(--text-primary);">
+                        {{ unit.team.name }}
+                    </h1>
+                    <div style="color: var(--text-muted); font-size: 0.95rem;">
+                        On-Ice deployment vs. <strong>{{ unit.opponent.name }}</strong> (5v5 Strength State)
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">Total 5v5 TOI Together</div>
+                    <div style="font-size: 2.5rem; font-weight: 800; color: var(--accent-color); font-family: 'Outfit', sans-serif;" class="font-mono">
+                        {{ unit.toi }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Mugshots List -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+                {% for player in unit.players %}
+                <div style="display: flex; align-items: center; gap: 1.25rem; background: rgba(255, 255, 255, 0.02); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                    <div style="width: 70px; height: 70px; border-radius: 50%; overflow: hidden; background: #1e293b; border: 2px solid var(--border-color); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                        {% if player.headshot_url %}
+                        <img src="{{ player.headshot_url }}" alt="{{ player.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                        {% else %}
+                        <span style="font-size: 1.5rem; font-weight: 700; color: var(--text-muted);">#</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">
+                            <a href="/game/{{ game_id }}/player/{{ player.player_id }}" style="color: var(--text-primary); text-decoration: none; hover: underline;">
+                                {{ player.name }}
+                            </a>
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+                            #{{ player.number | default('?') }} &nbsp;•&nbsp; 
+                            Position: <strong>{{ player.position }}</strong> &nbsp;•&nbsp; 
+                            Shoots: <strong>{{ player.shoots_catches | default('?') }}</strong>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Analytical Stats Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+            <div class="card" style="text-align: center; padding: 1.5rem;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Goals (GF / GA)</div>
+                <div style="font-size: 1.85rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;" class="font-mono">
+                    {{ unit.stats.gf }} - {{ unit.stats.ga }}
+                </div>
+            </div>
+            <div class="card" style="text-align: center; padding: 1.5rem;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Shots On Goal</div>
+                <div style="font-size: 1.85rem; font-weight: 800; color: var(--text-primary); margin-top: 0.5rem;" class="font-mono">
+                    {{ unit.stats.sf }} - {{ unit.stats.sa }}
+                </div>
+            </div>
+            <div class="card" style="text-align: center; padding: 1.5rem;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; display: flex; justify-content: center; gap: 0.25rem;">
+                    <span class="metric-tooltip" data-tooltip="Corsi For Percentage: percentage of total shot attempts (goals, saves, missed, blocked) belonging to the player's team while they were on-ice.">CF%</span>
+                </div>
+                <div style="font-size: 1.85rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">
+                    {{ unit.stats.cf_pct }}%
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                    CF: {{ unit.stats.cf }} &nbsp; CA: {{ unit.stats.ca }}
+                </div>
+            </div>
+            <div class="card" style="text-align: center; padding: 1.5rem;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; display: flex; justify-content: center; gap: 0.25rem;">
+                    <span class="metric-tooltip" data-tooltip="Fenwick For Percentage: percentage of unblocked shot attempts (goals, saves, missed) belonging to the player's team while they were on-ice.">FF%</span>
+                </div>
+                <div style="font-size: 1.85rem; font-weight: 800; color: var(--accent-color); margin-top: 0.5rem;" class="font-mono">
+                    {{ unit.stats.ff_pct }}%
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                    FF: {{ unit.stats.ff }} &nbsp; FA: {{ unit.stats.fa }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Row for Shot Map and Left Column info -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; margin-bottom: 3rem; flex-wrap: wrap;">
+            
+            <!-- Left Column: Shared Shifts and Timeline -->
+            <div style="display: flex; flex-direction: column; gap: 2rem;">
+                
+                <!-- Shared Shift Intervals Card -->
+                <div class="card" style="padding: 1.5rem;">
+                    <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem;">Observed Shared Shifts</h3>
+                    <div style="max-height: 250px; overflow-y: auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">
+                                    <th style="padding: 0.5rem;">Period</th>
+                                    <th style="padding: 0.5rem;">Start Time</th>
+                                    <th style="padding: 0.5rem;">End Time</th>
+                                    <th style="padding: 0.5rem; text-align: right;">Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for interval in unit.intervals %}
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.02); font-size: 0.9rem;">
+                                    <td style="padding: 0.65rem 0.5rem;" class="font-mono">P{{ interval.period }}</td>
+                                    <td style="padding: 0.65rem 0.5rem;" class="font-mono">{{ interval.start }}</td>
+                                    <td style="padding: 0.65rem 0.5rem;" class="font-mono">{{ interval.end }}</td>
+                                    <td style="padding: 0.65rem 0.5rem; text-align: right;" class="font-mono">{{ interval.duration_str }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+                                        No shared shift intervals found.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- On-Ice Events Timeline Card -->
+                <div class="card" style="padding: 1.5rem;">
+                    <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem;">Events Occurred While Together</h3>
+                    <div style="max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+                        {% for event in unit.timeline %}
+                        <div style="display: flex; gap: 1rem; padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.02); background: rgba(255, 255, 255, 0.01);">
+                            <div style="text-align: center; flex-shrink: 0; min-width: 55px;">
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">P{{ event.period }}</div>
+                                <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);" class="font-mono">{{ event.period_time }}</div>
+                            </div>
+                            <div style="flex-grow: 1;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: var(--accent-color);">
+                                        {{ event.event_type | replace('-', ' ') }}
+                                    </span>
+                                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">
+                                        {{ event.team_abbrev }}
+                                    </span>
+                                </div>
+                                <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                    {{ event.description }}
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                            No events recorded while this unit was deployed.
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Interactive Shot Map -->
+            <div class="card" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0;">On-Ice Shot Attempts Map</h3>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Shots taken/faced by unit at 5v5</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="toggle-normalize" checked style="accent-color: var(--accent-color);">
+                        <label for="toggle-normalize" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">Normalize attack side</label>
+                    </div>
+                </div>
+
+                <div id="shot-map-plot" style="width: 100%; height: 420px; border-radius: 8px; overflow: hidden; background: #0b0f19;"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        const SHOTS_DATA = {{ unit.shots | tojson }};
+        const UNIT_TEAM_ID = {{ unit.team.id | default('null') }};
+        
+        document.addEventListener("DOMContentLoaded", () => {
+            initShotMap();
+            document.getElementById("toggle-normalize").addEventListener("change", renderPlot);
+        });
+
+        function initShotMap() {
+            renderPlot();
+        }
+
+        function renderPlot() {
+            const plotContainer = document.getElementById("shot-map-plot");
+            if (!plotContainer || !window.Plotly) return;
+
+            const normalize = document.getElementById("toggle-normalize").checked;
+
+            // Separate shots into unit's attempts ("For") and opponent's attempts ("Against")
+            // Goals and non-goals
+            const goalsFor = SHOTS_DATA.filter(s => s.team_id === UNIT_TEAM_ID && s.outcome === 'Goal');
+            const savesFor = SHOTS_DATA.filter(s => s.team_id === UNIT_TEAM_ID && s.outcome === 'Saved');
+            const otherFor = SHOTS_DATA.filter(s => s.team_id === UNIT_TEAM_ID && s.outcome !== 'Goal' && s.outcome !== 'Saved');
+
+            const goalsAgainst = SHOTS_DATA.filter(s => s.team_id !== UNIT_TEAM_ID && s.outcome === 'Goal');
+            const savesAgainst = SHOTS_DATA.filter(s => s.team_id !== UNIT_TEAM_ID && s.outcome === 'Saved');
+            const otherAgainst = SHOTS_DATA.filter(s => s.team_id !== UNIT_TEAM_ID && s.outcome !== 'Goal' && s.outcome !== 'Saved');
+
+            const getCoords = (list) => {
+                return {
+                    x: list.map(s => normalize ? s.norm_x : s.raw_x),
+                    y: list.map(s => normalize ? s.norm_y : s.raw_y),
+                    text: list.map(s => {
+                        const isGoal = s.outcome === 'Goal' ? '<b>GOAL!</b><br>' : '';
+                        return `${isGoal}Shooter: ${s.shooter_name} (${s.team_abbrev})<br>` +
+                               `Goalie: ${s.goalie_name}<br>` +
+                               `Dist: ${Math.round(s.distance)} ft &nbsp; Angle: ${Math.round(s.angle)}°<br>` +
+                               `P${s.period} - ${s.period_time} &nbsp; xG: ${s.xg.toFixed(3)}`;
+                    })
+                };
+            };
+
+            const gfC = getCoords(goalsFor);
+            const sfC = getCoords(savesFor);
+            const ofC = getCoords(otherFor);
+
+            const gaC = getCoords(goalsAgainst);
+            const saC = getCoords(savesAgainst);
+            const oaC = getCoords(otherAgainst);
+
+            const traces = [
+                // Unit For attempts
+                { x: gfC.x, y: gfC.y, text: gfC.text, mode: 'markers', name: 'GF (Goal For)', hoverinfo: 'text', marker: { symbol: 'star', size: 12, color: '#10b981', line: { width: 1, color: '#ffffff' } } },
+                { x: sfC.x, y: sfC.y, text: sfC.text, mode: 'markers', name: 'SF (Shot For)', hoverinfo: 'text', marker: { symbol: 'circle', size: 8, color: '#38bdf8' } },
+                { x: ofC.x, y: ofC.y, text: ofC.text, mode: 'markers', name: 'Miss/Block For', hoverinfo: 'text', marker: { symbol: 'diamond', size: 7, color: 'rgba(56, 189, 248, 0.4)' } },
+                
+                // Opponent attempts
+                { x: gaC.x, y: gaC.y, text: gaC.text, mode: 'markers', name: 'GA (Goal Against)', hoverinfo: 'text', marker: { symbol: 'star', size: 12, color: '#ef4444', line: { width: 1, color: '#ffffff' } } },
+                { x: saC.x, y: saC.y, text: saC.text, mode: 'markers', name: 'SA (Shot Against)', hoverinfo: 'text', marker: { symbol: 'circle', size: 8, color: '#f59e0b' } },
+                { x: oaC.x, y: oaC.y, text: oaC.text, mode: 'markers', name: 'Miss/Block Against', hoverinfo: 'text', marker: { symbol: 'diamond', size: 7, color: 'rgba(245, 158, 11, 0.4)' } }
+            ];
+
+            const shapes = [];
+            // Rink outer boundary
+            shapes.push({ type: 'rect', x0: -100, y0: -42.5, x1: 100, y1: 42.5, line: { color: 'rgba(255, 255, 255, 0.2)', width: 2 } });
+            
+            if (!normalize) {
+                // Red center line
+                shapes.push({ type: 'line', x0: 0, y0: -42.5, x1: 0, y1: 42.5, line: { color: 'rgba(239, 68, 68, 0.4)', width: 3 } });
+                // Blue lines
+                shapes.push({ type: 'line', x0: -25, y0: -42.5, x1: -25, y1: 42.5, line: { color: 'rgba(56, 189, 248, 0.4)', width: 3 } });
+                shapes.push({ type: 'line', x0: 25, y0: -42.5, x1: 25, y1: 42.5, line: { color: 'rgba(56, 189, 248, 0.4)', width: 3 } });
+                // Left goal line & net
+                shapes.push({ type: 'line', x0: -89, y0: -42.5, x1: -89, y1: 42.5, line: { color: 'rgba(239, 68, 68, 0.3)', width: 1.5 } });
+                shapes.push({ type: 'rect', x0: -92, y0: -3, x1: -89, y1: 3, line: { color: 'rgba(255, 255, 255, 0.3)', width: 1 } });
+            } else {
+                shapes.push({ type: 'line', x0: 0, y0: -42.5, x1: 0, y1: 42.5, line: { color: 'rgba(255, 255, 255, 0.2)', width: 1.5 } });
+            }
+
+            // Right goal line & net crease
+            shapes.push({ type: 'line', x0: 89, y0: -42.5, x1: 89, y1: 42.5, line: { color: 'rgba(239, 68, 68, 0.4)', width: 1.5 } });
+            shapes.push({ type: 'rect', x0: 89, y0: -3, x1: 92, y1: 3, line: { color: 'rgba(255, 255, 255, 0.3)', width: 1 } });
+            
+            const layout = {
+                plot_bgcolor: '#0f172a',
+                paper_bgcolor: '#0b0f19',
+                shapes: shapes,
+                xaxis: { range: normalize ? [0, 100] : [-100, 100], showgrid: false, zeroline: false, showticklabels: false, fixedrange: true },
+                yaxis: { range: [-42.5, 42.5], showgrid: false, zeroline: false, showticklabels: false, scaleanchor: 'x', scaleratio: 1, fixedrange: true },
+                margin: { l: 10, r: 10, t: 10, b: 10 },
+                legend: { font: { color: '#cbd5e1', size: 10 }, orientation: 'h', x: 0.5, xanchor: 'center', y: -0.08 }
+            };
+
+            const config = { responsive: true, displayModeBar: false };
+            Plotly.newPlot(plotContainer, traces, layout, config);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PuckLens - Player Comparison Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+        .metric-tooltip {
+            border-bottom: 1px dashed var(--text-muted);
+            cursor: help;
+            position: relative;
+            display: inline-block;
+        }
+        .metric-tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 130%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            white-space: normal;
+            width: 220px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 100;
+            text-align: center;
+            font-weight: 400;
+        }
+        .metric-tooltip:hover::after {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-2px);
+        }
+        .compare-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        @media (max-width: 800px) {
+            .compare-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .table-compare th, .table-compare td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .table-compare tr:hover {
+            background: rgba(255, 255, 255, 0.01);
+        }
+    </style>
+</head>
+<body style="background-color: var(--bg-dark); color: var(--text-primary); font-family: 'Inter', sans-serif;">
+    <header class="header">
+        <div class="logo">
+            <a href="/" style="color: var(--accent-color); text-decoration: none;">PuckLens</a>
+            <span style="color: var(--text-muted); margin: 0 0.5rem;">/</span>
+            <a href="/game/{{ game.game_id }}?team_id={{ context_team_id }}" style="color: var(--text-secondary); text-decoration: none;">Game Dashboard</a>
+            <span style="color: var(--text-muted); margin: 0 0.5rem;">/</span>
+            <span style="color: var(--text-primary); font-weight: 600;">Player Comparison</span>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted);">
+            Side-by-side single-game performance comparison
+        </div>
+    </header>
+
+    <main class="dashboard-container" style="max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem;">
+        
+        <!-- Player Selectors Header Card -->
+        <div class="card" style="padding: 1.5rem; margin-bottom: 2rem;">
+            <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1.25rem;">Compare Skaters / Goalies</h2>
+            <form action="/game/{{ game.game_id }}/compare" method="GET" style="display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-end;">
+                <input type="hidden" name="team_id" value="{{ context_team_id }}">
+                
+                <!-- Player 1 Selector -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 250px; flex-grow: 1;">
+                    <label for="player1" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Player A</label>
+                    <select name="player1" id="player1" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.6rem; border-radius: 6px; font-family: var(--font-sans); cursor: pointer; width: 100%;">
+                        <option value="">-- Select Player A --</option>
+                        <optgroup label="{{ home_team_abbr }} (Home)">
+                            {% for p in home_players %}
+                            <option value="{{ p.player_id }}" {% if player1 and player1.player_id == p.player_id %}selected{% endif %}>#{{ p.sweater_number }} {{ p.name }} ({{ p.position }})</option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="{{ away_team_abbr }} (Away)">
+                            {% for p in away_players %}
+                            <option value="{{ p.player_id }}" {% if player1 and player1.player_id == p.player_id %}selected{% endif %}>#{{ p.sweater_number }} {{ p.name }} ({{ p.position }})</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+
+                <!-- Compare vs Badge -->
+                <div style="font-weight: 700; color: var(--text-muted); padding-bottom: 0.75rem; font-size: 0.9rem;">VS</div>
+
+                <!-- Player 2 Selector -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 250px; flex-grow: 1;">
+                    <label for="player2" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Player B</label>
+                    <select name="player2" id="player2" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.6rem; border-radius: 6px; font-family: var(--font-sans); cursor: pointer; width: 100%;">
+                        <option value="">-- Select Player B --</option>
+                        <optgroup label="{{ home_team_abbr }} (Home)">
+                            {% for p in home_players %}
+                            <option value="{{ p.player_id }}" {% if player2 and player2.player_id == p.player_id %}selected{% endif %}>#{{ p.sweater_number }} {{ p.name }} ({{ p.position }})</option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="{{ away_team_abbr }} (Away)">
+                            {% for p in away_players %}
+                            <option value="{{ p.player_id }}" {% if player2 and player2.player_id == p.player_id %}selected{% endif %}>#{{ p.sweater_number }} {{ p.name }} ({{ p.position }})</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-analyze" style="background: var(--accent-color); border: none; cursor: pointer; height: 38px; padding: 0 1.5rem; font-weight: 600; border-radius: 6px;">Compare</button>
+            </form>
+        </div>
+
+        {% if player1 and player2 %}
+        <!-- Side-by-side Player Profile Headers -->
+        <div class="compare-grid" style="margin-bottom: 2rem;">
+            <!-- Player A Profile Header -->
+            <div class="card" style="padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem;">
+                <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: #1e293b; border: 2px solid var(--border-color); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                    {% if player1.headshot_url %}
+                    <img src="{{ player1.headshot_url }}" alt="{{ player1.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                    {% else %}
+                    <span style="font-size: 1.75rem; font-weight: 700; color: var(--text-muted);">#</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.35rem; font-weight: 800; margin: 0; color: var(--text-primary);">{{ player1.name }}</h2>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+                        #{{ player1.sweater_number }} &nbsp;•&nbsp; 
+                        Position: <strong>{{ player1.position }}</strong> &nbsp;•&nbsp; 
+                        Team: <strong>{{ player1.team_abbrev }}</strong>
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+                        Height: <strong>{{ player1.height_str | default('?') }}</strong> &nbsp;•&nbsp; 
+                        Weight: <strong>{{ player1.weight_str | default('?') }}</strong> &nbsp;•&nbsp; 
+                        Shoots/Catches: <strong>{{ player1.shoots_catches | default('?') }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player B Profile Header -->
+            <div class="card" style="padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem;">
+                <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: #1e293b; border: 2px solid var(--border-color); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                    {% if player2.headshot_url %}
+                    <img src="{{ player2.headshot_url }}" alt="{{ player2.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                    {% else %}
+                    <span style="font-size: 1.75rem; font-weight: 700; color: var(--text-muted);">#</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.35rem; font-weight: 800; margin: 0; color: var(--text-primary);">{{ player2.name }}</h2>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+                        #{{ player2.sweater_number }} &nbsp;•&nbsp; 
+                        Position: <strong>{{ player2.position }}</strong> &nbsp;•&nbsp; 
+                        Team: <strong>{{ player2.team_abbrev }}</strong>
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+                        Height: <strong>{{ player2.height_str | default('?') }}</strong> &nbsp;•&nbsp; 
+                        Weight: <strong>{{ player2.weight_str | default('?') }}</strong> &nbsp;•&nbsp; 
+                        Shoots/Catches: <strong>{{ player2.shoots_catches | default('?') }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric Side-by-side Table Comparison Card -->
+        <div class="card" style="padding: 1.5rem; margin-bottom: 3rem;">
+            <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Analytical Metrics Head-to-Head</h3>
+            
+            <table class="table-compare" style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                    <tr style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">
+                        <th style="width: 35%;">Metric</th>
+                        <th style="width: 32.5%; text-align: center; color: var(--accent-color); font-weight: 700;">{{ player1.name }} (A)</th>
+                        <th style="width: 32.5%; text-align: center; color: var(--accent-color); font-weight: 700;">{{ player2.name }} (B)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <!-- Section: General Metadata -->
+                    <tr style="background: rgba(255, 255, 255, 0.02); font-weight: 700; font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary);">
+                        <td colspan="3" style="padding: 0.5rem 1rem;">General & Time Deployment</td>
+                    </tr>
+                    <tr>
+                        <td>Time on Ice (TOI)</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.toi }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.toi }}</td>
+                    </tr>
+                    <tr>
+                        <td>Total Shift Count</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.shifts_count }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.shifts_count }}</td>
+                    </tr>
+                    <tr>
+                        <td>Average Shift Duration</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.avg_shift }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.avg_shift }}</td>
+                    </tr>
+
+                    <!-- Section: Individual Statistics -->
+                    <tr style="background: rgba(255, 255, 255, 0.02); font-weight: 700; font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary);">
+                        <td colspan="3" style="padding: 0.5rem 1rem;">Individual Statistics</td>
+                    </tr>
+                    {% if player1.position != 'G' and player2.position != 'G' %}
+                    <!-- Skater vs Skater stats -->
+                    <tr>
+                        <td>Goals (G)</td>
+                        <td style="text-align: center; font-weight: 600;" class="font-mono">{{ player1.goals }}</td>
+                        <td style="text-align: center; font-weight: 600;" class="font-mono">{{ player2.goals }}</td>
+                    </tr>
+                    <tr>
+                        <td>Assists (A)</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.assists }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.assists }}</td>
+                    </tr>
+                    <tr>
+                        <td>Points (PTS)</td>
+                        <td style="text-align: center; font-weight: 600;" class="font-mono">{{ player1.points }}</td>
+                        <td style="text-align: center; font-weight: 600;" class="font-mono">{{ player2.points }}</td>
+                    </tr>
+                    <tr>
+                        <td>Shots on Goal (SOG)</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.shots }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.shots }}</td>
+                    </tr>
+                    <tr>
+                        <td>Hits Delivered</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.hits }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.hits }}</td>
+                    </tr>
+                    <tr>
+                        <td>Penalty Minutes (PIM)</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.pim }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.pim }}</td>
+                    </tr>
+                    <tr>
+                        <td>Faceoff Win %</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.faceoff_pct }}% ({{ player1.faceoffs_won }}/{{ player1.faceoffs_won + player1.faceoffs_lost }})</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.faceoff_pct }}% ({{ player2.faceoffs_won }}/{{ player2.faceoffs_won + player2.faceoffs_lost }})</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="metric-tooltip" data-tooltip="Expected Goals (xG): experimental/heuristic projection of shot quality. Note that PuckLens xG is an independent, non-NHL prototype.">Experimental Expected Goals (xG)</span>
+                        </td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.xg }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.xg }}</td>
+                    </tr>
+                    {% elif player1.position == 'G' and player2.position == 'G' %}
+                    <!-- Goalie vs Goalie stats -->
+                    <tr>
+                        <td>Shots Faced (SOG)</td>
+                        <td style="text-align: center; font-weight: 600;" class="font-mono">{{ player1.shots_faced }}</td>
+                        <td style="text-align: center; font-weight: 600;" class="font-mono">{{ player2.shots_faced }}</td>
+                    </tr>
+                    <tr>
+                        <td>Goals Allowed</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.goals_against }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.goals_against }}</td>
+                    </tr>
+                    <tr>
+                        <td>Saves</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.saves }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.saves }}</td>
+                    </tr>
+                    <tr>
+                        <td>Save Percentage (SV%)</td>
+                        <td style="text-align: center; font-weight: 700; color: var(--accent-color);" class="font-mono">{{ player1.save_pct }}%</td>
+                        <td style="text-align: center; font-weight: 700; color: var(--accent-color);" class="font-mono">{{ player2.save_pct }}%</td>
+                    </tr>
+                    <tr>
+                        <td>Shorthanded Shots Faced</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.shots_faced_pp }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.shots_faced_pp }}</td>
+                    </tr>
+                    {% else %}
+                    <!-- Mixed Position Comparison warning -->
+                    <tr style="color: var(--text-muted);">
+                        <td colspan="3" style="text-align: center; padding: 1rem;">
+                            Positions differ (Skater vs. Goalie). Comparison metrics are limited.
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Section: On-Ice Statistics (5v5 Strength State) -->
+                    <tr style="background: rgba(255, 255, 255, 0.02); font-weight: 700; font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary);">
+                        <td colspan="3" style="padding: 0.5rem 1rem;">On-Ice Statistics (5v5 Even Strength)</td>
+                    </tr>
+                    {% if player1.position != 'G' and player2.position != 'G' %}
+                    <tr>
+                        <td>On-Ice Goals For / Against</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.cf | default('0') }} / {{ player1.ca | default('0') }} (placeholder)</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.cf | default('0') }} / {{ player2.ca | default('0') }} (placeholder)</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="metric-tooltip" data-tooltip="Corsi For (CF): on-ice team shot attempts (goals, saves, missed, blocked).">Corsi For (CF)</span>
+                        </td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.cf }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.cf }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="metric-tooltip" data-tooltip="Corsi Against (CA): on-ice team shot attempts allowed.">Corsi Against (CA)</span>
+                        </td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.ca }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.ca }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="metric-tooltip" data-tooltip="Corsi For Percentage: percentage of on-ice team shot attempts belonging to the player's team.">Corsi For Percentage (CF%)</span>
+                        </td>
+                        <td style="text-align: center; font-weight: 700; color: var(--accent-color);" class="font-mono">{{ player1.cf_pct }}%</td>
+                        <td style="text-align: center; font-weight: 700; color: var(--accent-color);" class="font-mono">{{ player2.cf_pct }}%</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="metric-tooltip" data-tooltip="Fenwick For (FF): on-ice team unblocked shot attempts.">Fenwick For (FF)</span>
+                        </td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.ff }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.ff }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="metric-tooltip" data-tooltip="Fenwick Against (FA): on-ice team unblocked shot attempts allowed.">Fenwick Against (FA)</span>
+                        </td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.fa }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.fa }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="metric-tooltip" data-tooltip="Fenwick For Percentage: percentage of on-ice team unblocked shot attempts belonging to the player's team.">Fenwick For Percentage (FF%)</span>
+                        </td>
+                        <td style="text-align: center; font-weight: 700; color: var(--accent-color);" class="font-mono">{{ player1.ff_pct }}%</td>
+                        <td style="text-align: center; font-weight: 700; color: var(--accent-color);" class="font-mono">{{ player2.ff_pct }}%</td>
+                    </tr>
+                    {% elif player1.position == 'G' and player2.position == 'G' %}
+                    <!-- Goalie 5v5 splits -->
+                    <tr>
+                        <td>5v5 Shots Faced</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.shots_faced_5v5 }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.shots_faced_5v5 }}</td>
+                    </tr>
+                    <tr>
+                        <td>5v5 Goals Against</td>
+                        <td style="text-align: center;" class="font-mono">{{ player1.goals_against_5v5 }}</td>
+                        <td style="text-align: center;" class="font-mono">{{ player2.goals_against_5v5 }}</td>
+                    </tr>
+                    <tr>
+                        <td>5v5 Save Percentage</td>
+                        <td style="text-align: center; font-weight: 700; color: var(--accent-color);" class="font-mono">{{ player1.save_pct_5v5 }}%</td>
+                        <td style="text-align: center; font-weight: 700; color: var(--accent-color);" class="font-mono">{{ player2.save_pct_5v5 }}%</td>
+                    </tr>
+                    {% endif %}
+
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Row for Side-by-side Plotly Shot Maps -->
+        <div class="card" style="padding: 1.5rem; margin-bottom: 3rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0;">Shot Attempt Distributions</h3>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">Side-by-side spatial comparison</div>
+                </div>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <!-- Strength State Dropdown -->
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <label for="strength-filter" style="font-size: 0.85rem; color: var(--text-secondary);">Strength:</label>
+                        <select id="strength-filter" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.4rem 0.8rem; border-radius: 6px; font-family: var(--font-sans); cursor: pointer;">
+                            <option value="all">All Situations</option>
+                            <option value="5v5">5v5 Even Strength</option>
+                            <option value="pp">Power Play (PP)</option>
+                            <option value="pk">Penalty Kill (PK)</option>
+                        </select>
+                    </div>
+
+                    <!-- Normalize Toggle -->
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="toggle-normalize" checked style="cursor: pointer; width: 15px; height: 15px; accent-color: var(--accent-color);">
+                        <label for="toggle-normalize" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">Normalize (Right)</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side-by-Side Maps -->
+            <div class="compare-grid">
+                <div>
+                    <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); text-align: center; margin-bottom: 0.5rem;">{{ player1.name }}</h4>
+                    <div id="shot-map-p1" style="width: 100%; height: 380px; border-radius: 8px; overflow: hidden; background: #0b0f19;"></div>
+                </div>
+                <div>
+                    <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); text-align: center; margin-bottom: 0.5rem;">{{ player2.name }}</h4>
+                    <div id="shot-map-p2" style="width: 100%; height: 380px; border-radius: 8px; overflow: hidden; background: #0b0f19;"></div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Store player IDs and shot arrays
+            const P1_ID = {{ player1.player_id }};
+            const P2_ID = {{ player2.player_id }};
+            const P1_IS_GOALIE = "{{ player1.position }}" === "G";
+            const P2_IS_GOALIE = "{{ player2.position }}" === "G";
+
+            let p1Shots = [];
+            let p2Shots = [];
+
+            document.addEventListener("DOMContentLoaded", async () => {
+                // Fetch shots data for both players from standard API endpoints
+                try {
+                    const [res1, res2] = await Promise.all([
+                        fetch(`/api/game/{{ game.game_id }}/player/${P1_ID}/shots`),
+                        fetch(`/api/game/{{ game.game_id }}/player/${P2_ID}/shots`)
+                    ]);
+                    p1Shots = await res1.json();
+                    p2Shots = await res2.json();
+                    
+                    renderPlots();
+                } catch (err) {
+                    console.error("Failed to load compare shots:", err);
+                }
+
+                // Register listeners
+                document.getElementById("strength-filter").addEventListener("change", renderPlots);
+                document.getElementById("toggle-normalize").addEventListener("change", renderPlots);
+            });
+
+            function renderPlots() {
+                const strength = document.getElementById("strength-filter").value;
+                const normalize = document.getElementById("toggle-normalize").checked;
+
+                const filterShots = (list, isGoalie) => {
+                    return list.filter(s => {
+                        // Apply strength state filter
+                        if (strength === '5v5') {
+                            if (s.manpower_state !== 'EV') return false;
+                        } else if (strength === 'pp') {
+                            // Attacking team is on PP (so shooter team is on PP, or goalie team is on PK)
+                            if (s.manpower_state !== 'PP') return false;
+                        } else if (strength === 'pk') {
+                            if (s.manpower_state !== 'PK') return false;
+                        }
+
+                        // Goalie: exclude missed & blocked attempts
+                        if (isGoalie) {
+                            if (s.outcome !== 'Goal' && s.outcome !== 'Saved') return false;
+                        }
+
+                        return true;
+                    });
+                };
+
+                const fP1 = filterShots(p1Shots, P1_IS_GOALIE);
+                const fP2 = filterShots(p2Shots, P2_IS_GOALIE);
+
+                const getTraces = (list, isGoalie) => {
+                    const goals = list.filter(s => s.outcome === 'Goal');
+                    const saves = list.filter(s => s.outcome === 'Saved');
+                    const missed = list.filter(s => s.outcome === 'Missed');
+                    const blocked = list.filter(s => s.outcome === 'Blocked');
+
+                    const getCoords = (sublist) => {
+                        return {
+                            x: sublist.map(s => normalize ? s.norm_x : s.raw_x),
+                            y: sublist.map(s => normalize ? s.norm_y : s.raw_y),
+                            text: sublist.map(s => {
+                                const isG = s.outcome === 'Goal' ? '<b>GOAL!</b><br>' : '';
+                                return `${isG}Shooter: ${s.shooter_name}<br>` +
+                                       `Goalie: ${s.goalie_name}<br>` +
+                                       `Shot: ${s.shot_type}<br>` +
+                                       `Dist: ${Math.round(s.distance)} ft &nbsp; Angle: ${Math.round(s.angle)}°<br>` +
+                                       `P${s.period} - ${s.period_time} &nbsp; xG: ${s.xg.toFixed(3)}`;
+                            })
+                        };
+                    };
+
+                    const gC = getCoords(goals);
+                    const sC = getCoords(saves);
+                    const mC = getCoords(missed);
+                    const bC = getCoords(blocked);
+
+                    const traces = [
+                        { x: gC.x, y: gC.y, text: gC.text, mode: 'markers', name: 'Goal', hoverinfo: 'text', marker: { symbol: 'star', size: 11, color: '#10b981', line: { width: 1, color: '#ffffff' } } },
+                        { x: sC.x, y: sC.y, text: sC.text, mode: 'markers', name: 'Save', hoverinfo: 'text', marker: { symbol: 'circle', size: 7, color: '#38bdf8' } }
+                    ];
+
+                    if (!isGoalie) {
+                        traces.push(
+                            { x: mC.x, y: mC.y, text: mC.text, mode: 'markers', name: 'Miss', hoverinfo: 'text', marker: { symbol: 'diamond', size: 7, color: '#f59e0b' } },
+                            { x: bC.x, y: bC.y, text: bC.text, mode: 'markers', name: 'Blocked', hoverinfo: 'text', marker: { symbol: 'x', size: 7, color: '#ef4444' } }
+                        );
+                    }
+
+                    return traces;
+                };
+
+                const buildRinkShapes = () => {
+                    const shapes = [];
+                    shapes.push({ type: 'rect', x0: -100, y0: -42.5, x1: 100, y1: 42.5, line: { color: 'rgba(255, 255, 255, 0.2)', width: 2 } });
+                    
+                    if (!normalize) {
+                        shapes.push({ type: 'line', x0: 0, y0: -42.5, x1: 0, y1: 42.5, line: { color: 'rgba(239, 68, 68, 0.4)', width: 3 } });
+                        shapes.push({ type: 'line', x0: -25, y0: -42.5, x1: -25, y1: 42.5, line: { color: 'rgba(56, 189, 248, 0.4)', width: 3 } });
+                        shapes.push({ type: 'line', x0: 25, y0: -42.5, x1: 25, y1: 42.5, line: { color: 'rgba(56, 189, 248, 0.4)', width: 3 } });
+                        shapes.push({ type: 'line', x0: -89, y0: -42.5, x1: -89, y1: 42.5, line: { color: 'rgba(239, 68, 68, 0.3)', width: 1.5 } });
+                        shapes.push({ type: 'rect', x0: -92, y0: -3, x1: -89, y1: 3, line: { color: 'rgba(255, 255, 255, 0.3)', width: 1 } });
+                    } else {
+                        shapes.push({ type: 'line', x0: 0, y0: -42.5, x1: 0, y1: 42.5, line: { color: 'rgba(255, 255, 255, 0.2)', width: 1.5 } });
+                    }
+
+                    shapes.push({ type: 'line', x0: 89, y0: -42.5, x1: 89, y1: 42.5, line: { color: 'rgba(239, 68, 68, 0.4)', width: 1.5 } });
+                    shapes.push({ type: 'rect', x0: 89, y0: -3, x1: 92, y1: 3, line: { color: 'rgba(255, 255, 255, 0.3)', width: 1 } });
+                    return shapes;
+                };
+
+                const plot = (containerId, list, isGoalie) => {
+                    const container = document.getElementById(containerId);
+                    if (!container) return;
+
+                    const traces = getTraces(list, isGoalie);
+                    const shapes = buildRinkShapes();
+
+                    const layout = {
+                        plot_bgcolor: '#0f172a',
+                        paper_bgcolor: '#0b0f19',
+                        shapes: shapes,
+                        xaxis: { range: normalize ? [0, 100] : [-100, 100], showgrid: false, zeroline: false, showticklabels: false, fixedrange: true },
+                        yaxis: { range: [-42.5, 42.5], showgrid: false, zeroline: false, showticklabels: false, scaleanchor: 'x', scaleratio: 1, fixedrange: true },
+                        margin: { l: 5, r: 5, t: 5, b: 5 },
+                        legend: { font: { color: '#cbd5e1', size: 9 }, orientation: 'h', x: 0.5, xanchor: 'center', y: -0.08 }
+                    };
+
+                    const config = { responsive: true, displayModeBar: false };
+                    Plotly.newPlot(container, traces, layout, config);
+                };
+
+                plot("shot-map-p1", fP1, P1_IS_GOALIE);
+                plot("shot-map-p2", fP2, P2_IS_GOALIE);
+            }
+        </script>
+        {% else %}
+        <!-- Empty Selection Dashboard View -->
+        <div class="card" style="padding: 4rem 2rem; text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 1.5rem; color: var(--text-muted);">👥</div>
+            <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.5rem 0;">No Players Compared</h3>
+            <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto;">Select two players from the dropdown forms above and click **Compare** to view their head-to-head single-game stats and shot distributions side-by-side.</p>
+        </div>
+        {% endif %}
+
+    </main>
+</body>
+</html>

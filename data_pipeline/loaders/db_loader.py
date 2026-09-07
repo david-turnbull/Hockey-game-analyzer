@@ -41,6 +41,13 @@ class DatabaseLoader:
                     existing_player.position = player.position
                     existing_player.shoots_catches = player.shoots_catches
                     existing_player.current_team_id = player.current_team_id
+                    existing_player.headshot_url = player.headshot_url
+                    existing_player.sweater_number = player.sweater_number
+                    existing_player.height_in_inches = player.height_in_inches
+                    existing_player.weight_in_pounds = player.weight_in_pounds
+                    existing_player.birth_date = player.birth_date
+                    existing_player.birth_city = player.birth_city
+                    existing_player.birth_country = player.birth_country
                 else:
                     self.session.add(player)
             
@@ -77,7 +84,7 @@ class DatabaseLoader:
                 existing_game.away_team_id = game.away_team_id
                 existing_game.home_score = game.home_score
                 existing_game.away_score = game.away_score
-                existing_game.game_status = game.game_status
+                existing_game.nhl_game_state = game.nhl_game_state
             else:
                 self.session.add(game)
                 

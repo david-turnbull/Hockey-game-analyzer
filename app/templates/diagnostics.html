@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Diagnostics - NHL Hockey Analytics Platform{% endblock %}
+{% block title %}Diagnostics - PuckLens{% endblock %}
 
 {% block content %}
 <h1 class="page-title">Platform Diagnostics</h1>
@@ -100,10 +100,70 @@
         {% if tables|length == 0 %}
         <div class="alert-box alert-info" style="margin-top: 1rem;">
             No tables initialized yet. Please run the database initialization script:
-            <code class="font-mono" style="display: block; margin-top: 0.5rem; background: rgba(0,0,0,0.2); padding: 0.25rem 0.5rem; border-radius: 4px;">python scripts/initialise_database.py</code>
+            <code class="font-mono" style="display: block; margin-top: 0.5rem; background: rgba(0,0,0,0.2); padding: 0.25rem 0.5rem; border-radius: 4px;">python scripts/initialize_database.py</code>
         </div>
         {% endif %}
         {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-top: 2rem;">
+    <h2 class="card-title">Platform Validation Checks</h2>
+    <p style="margin-bottom: 1.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+        Validates system data integrity, player metadata, shift overlaps, boxscores, and 5v5 reconstruction.
+    </p>
+    
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 70%;">Category</th>
+                    <th style="width: 30%;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for name, check in checks.items() %}
+                <tr>
+                    <td><strong>{{ name.replace('_', ' ').title() }}</strong></td>
+                    <td>
+                        {% if check.status == 'PASS' %}
+                        <span class="status-indicator status-connected">PASS</span>
+                        {% elif check.status == 'WARNING' %}
+                        <span class="status-indicator" style="background-color: rgba(245, 158, 11, 0.1); color: #f59e0b;">WARNING</span>
+                        {% else %}
+                        <span class="status-indicator status-failed">FAIL</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if check.summary %}
+                <tr>
+                    <td colspan="2" style="background: rgba(255, 255, 255, 0.015); padding: 0.75rem 1rem;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Summary Statistics</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                            {% for s_key, s_val in check.summary.items() %}
+                            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem 0.75rem;">
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ s_key.replace('_', ' ').title() }}</div>
+                                <div style="font-size: 1.1rem; font-weight: 700; font-family: monospace; color: var(--text-primary); margin-top: 0.25rem;">{{ s_val }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+                {% if check.details %}
+                <tr>
+                    <td colspan="2" style="background: rgba(255, 255, 255, 0.02); padding: 0.75rem 1rem;">
+                        <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+                            {% for detail in check.details %}
+                            <div style="margin-bottom: 0.5rem; border-left: 2px solid {% if check.status == 'WARNING' %}#f59e0b{% else %}var(--danger){% endif %}; padding-left: 0.75rem; white-space: pre-wrap;">{{ detail }}</div>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 

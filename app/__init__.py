@@ -64,6 +64,12 @@ def create_app(config_name=None):
     # Initialize DB extension
     db.init_app(app)
     
+    # Run automatic database migrations
+    with app.app_context():
+        from app.utils.db_migrator import run_migrations
+        run_migrations(db)
+
+    
     # Register blueprints
     from app.routes.main import main_bp
     from app.routes.api import api_bp

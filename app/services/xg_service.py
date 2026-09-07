@@ -1,83 +1,109 @@
-import math
+from typing import Optional, Dict, Any, Union
+from app.analytics.model_registry import ModelRegistry, XGPrediction
+from app.services.xg_models import HeuristicXGModel, ExpectedGoalsModel
+
 
 class XGService:
-    @staticmethod
-    def calculate_shot_xg(distance, angle, shot_type=None, strength_state=None, empty_net=False) -> float:
+    """
+    Service class that acts as the entrypoint for expected goals (xG) calculations,
+    delegating to the active registered predictive machine learning model.
+    Maintains compatibility with legacy heuristic callers and provides full prediction provenance.
+    """
+    _override_model: Optional[Union[ExpectedGoalsModel, Any]] = None
+
+    @classmethod
+    def set_model(cls, model: Any) -> None:
+        """Sets a custom or heuristic model override (useful for testing or fallback)."""
+        cls._override_model = model
+
+    @classmethod
+    def reset_model(cls) -> None:
+        """Resets model override back to active ModelRegistry model."""
+        cls._override_model = None
+
+    @classmethod
+    def get_active_model_name(cls) -> str:
+        """Returns the identifier/name of the current active xG model."""
+        if cls._override_model is not None:
+            return getattr(cls._override_model, 'name', 'custom-model')
+        return ModelRegistry.get_active_name()
+
+    @classmethod
+    def get_active_model_version(cls) -> str:
+        """Returns the version string of the current active xG model."""
+        if cls._override_model is not None:
+            return getattr(cls._override_model, 'version', getattr(cls._override_model, 'name', 'custom-model'))
+        return ModelRegistry.get_active_version()
+
+    @classmethod
+    def predict_shot_xg(cls, distance: Optional[float] = None, angle: Optional[float] = None,
+                        shot_type: Optional[str] = None, strength_state: Optional[str] = None,
+                        empty_net: bool = False, features: Optional[Dict[str, Any]] = None, **kwargs) -> XGPrediction:
         """
-        Calculates the expected goals (xG) probability for a shot attempt.
-        Returns a float between 0.0 and 1.0 (rounded to 4 decimal places).
-
-        This is a prototype heuristic xG model using hand-selected coefficients,
-        rather than a statistically trained ML model.
-
-        Formula:
-            log_odds = beta_0 + (beta_dist * distance) + (beta_angle * abs(angle))
-                       + shot_type_adjustment + strength_state_adjustment
-
-            probability = 1 / (1 + exp(-log_odds))
-
-        Coefficients:
-            beta_0 (Baseline log-odds): -1.9 (representing ~13% average conversion)
-            beta_dist (Distance decay): -0.035 per foot
-            beta_angle (Angle decay): -0.015 per degree (from net center)
-
-        Adjustments:
-            Shot Types:
-                - Tip-In, Deflection, Tip: +0.4 log-odds (higher danger)
-                - Backhand: +0.1 log-odds
-                - Slap Shot: -0.2 log-odds (lower danger from distance)
-            Strength States:
-                - Power Play (e.g. PP, 5v4, 5v3): +0.15 log-odds
-                - Shorthanded (e.g. SH, 4v5, 3v5): -0.15 log-odds
-
-        Empty Net Override:
-            If empty_net is True:
-                probability = max(0.1, 1.0 - (distance * 0.005))
-                (Linear decay from 99% near net to 10% from own side)
+        Calculates expected goals (xG) prediction and returns complete provenance (model name, version, method).
+        Supports either a pre-extracted complete features dictionary or individual keyword arguments.
         """
-        # Baseline constant (approximate log-odds of a typical shot scoring)
-        # Average NHL shooting percentage is about 9-10% (log-odds = -2.2)
-        beta_0 = -1.9
-        
-        # Distance coefficient: farther shots have lower probability
-        d = distance if distance is not None else 30.0
-        beta_dist = -0.035
-        
-        # Angle coefficient: wider angles have lower probability (angle in degrees relative to net center)
-        a = abs(angle) if angle is not None else 0.0
-        beta_angle = -0.015
-        
-        # Empty Net override
-        if empty_net:
-            # Linear decay: max 99% near net, min 10% from other side
-            prob = max(0.1, 1.0 - (d * 0.005))
-            return round(prob, 4)
-            
-        # Shot type adjustment
-        shot_adj = 0.0
-        if shot_type:
-            s_type = shot_type.lower()
-            if 'tip-in' in s_type or 'deflect' in s_type or 'tip' in s_type:
-                shot_adj = 0.4
-            elif 'slap' in s_type:
-                shot_adj = -0.2
-            elif 'backhand' in s_type:
-                shot_adj = 0.1
-                
-        # Strength state adjustment
-        strength_adj = 0.0
-        if strength_state:
-            st = strength_state.upper()
-            if 'PP' in st or '5V4' in st or '5V3' in st:
-                strength_adj = 0.15
-            elif 'SH' in st or '4V5' in st or '3V5' in st:
-                strength_adj = -0.15
-                
-        log_odds = beta_0 + (beta_dist * d) + (beta_angle * a) + shot_adj + strength_adj
-        
-        try:
-            prob = 1.0 / (1.0 + math.exp(-log_odds))
-        except OverflowError:
-            prob = 0.0 if log_odds < 0 else 1.0
-            
-        return round(prob, 4)
+        if features is not None:
+            shot_features = dict(features)
+            if distance is not None:
+                shot_features['distance'] = distance
+            if angle is not None:
+                shot_features['angle'] = angle
+            if shot_type is not None:
+                shot_features['shot_type'] = shot_type
+            if strength_state is not None:
+                shot_features['strength_state'] = strength_state
+            if empty_net:
+                shot_features['empty_net'] = empty_net
+            if kwargs:
+                shot_features.update(kwargs)
+        else:
+            shot_features = {
+                'distance': distance,
+                'angle': angle,
+                'shot_type': shot_type,
+                'strength_state': strength_state,
+                'empty_net': empty_net,
+                **kwargs
+            }
+
+        # If an explicit override model is set (e.g. HeuristicXGModel in legacy tests), delegate to it
+        if cls._override_model is not None:
+            if hasattr(cls._override_model, 'predict'):
+                prob = cls._override_model.predict(
+                    distance=shot_features.get('distance'),
+                    angle=shot_features.get('angle'),
+                    shot_type=shot_features.get('shot_type'),
+                    strength_state=shot_features.get('strength_state'),
+                    empty_net=bool(shot_features.get('empty_net', False))
+                )
+                model_name = getattr(cls._override_model, 'name', 'custom-model')
+                model_ver = getattr(cls._override_model, 'version', '1.0.0')
+                is_heuristic = isinstance(cls._override_model, HeuristicXGModel) or 'heuristic' in model_name.lower()
+                return XGPrediction(
+                    xg=round(float(prob), 4),
+                    model_name=model_name,
+                    model_version=model_ver,
+                    method="heuristic" if is_heuristic else "ml",
+                    fallback_used=is_heuristic
+                )
+
+        # Delegate to ModelRegistry
+        return ModelRegistry.predict_shot_xg_with_provenance(shot_features)
+
+    @classmethod
+    def calculate_shot_xg(cls, distance: Optional[float] = None, angle: Optional[float] = None,
+                          shot_type: Optional[str] = None, strength_state: Optional[str] = None,
+                          empty_net: bool = False, features: Optional[Dict[str, Any]] = None, **kwargs) -> float:
+        """
+        Calculates expected goals (xG) probability for a shot attempt.
+        Supports individual keyword arguments or additional contextual features.
+        Returns a float strictly bounded in [0.0, 1.0].
+        """
+        prediction = cls.predict_shot_xg(
+            distance=distance, angle=angle, shot_type=shot_type,
+            strength_state=strength_state, empty_net=empty_net,
+            features=features, **kwargs
+        )
+        return prediction.xg
+
