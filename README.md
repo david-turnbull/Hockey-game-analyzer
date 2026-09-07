@@ -350,7 +350,7 @@ The application preserves source values where practical. For example, the NHL ga
 ```powershell
 git clone https://github.com/david-turnbull/Hockey-game-analyzer.git
 cd Hockey-game-analyzer
-git checkout v1.2.1-hardening
+git checkout v1.2.1
 ```
 
 ### 2. Create a virtual environment
