@@ -93,7 +93,13 @@ def test_out_of_time_evaluator_invariance():
     assert pred1 > pred2
 
     # Verify decision is one of the valid states
-    valid_decisions = ["healthy", "minor calibration drift", "meaningful drift", "model redevelopment recommended"]
+    valid_decisions = [
+        "healthy",
+        "healthy_on_available_sample",
+        "minor calibration drift",
+        "meaningful drift",
+        "model redevelopment recommended"
+    ]
     assert report["model_decision"]["verdict"] in valid_decisions
 
     # Markdown generation check
