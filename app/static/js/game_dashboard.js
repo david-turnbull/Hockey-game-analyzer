@@ -224,6 +224,7 @@ async function initShotMap() {
             return {
                 x: list.map(s => normalize ? s.norm_x : s.raw_x),
                 y: list.map(s => normalize ? s.norm_y : s.raw_y),
+                customdata: list.map(s => s.shot_id),
                 size: list.map(s => {
                     const prob = (s.xg !== undefined && s.xg !== null) ? Number(s.xg) : 0.05;
                     return Math.max(7, Math.min(26, Math.round(7 + prob * 28)));
@@ -238,7 +239,8 @@ async function initShotMap() {
                            `<b>xG:</b> ${xgFormatted}<br>` +
                            `<b>Distance:</b> ${distText}<br>` +
                            `<b>Angle:</b> ${angleText}<br>` +
-                           `<b>Result:</b> ${s.outcome}`;
+                           `<b>Result:</b> ${s.outcome}<br>` +
+                           `<span style="font-size: 10px; color: #38bdf8;">Click marker for xG breakdown</span>`;
                 })
             };
         };
@@ -252,6 +254,7 @@ async function initShotMap() {
             {
                 x: gCoords.x,
                 y: gCoords.y,
+                customdata: gCoords.customdata,
                 text: gCoords.text,
                 mode: 'markers',
                 name: 'Goal',
@@ -266,6 +269,7 @@ async function initShotMap() {
             {
                 x: sCoords.x,
                 y: sCoords.y,
+                customdata: sCoords.customdata,
                 text: sCoords.text,
                 mode: 'markers',
                 name: 'Save',
@@ -280,6 +284,7 @@ async function initShotMap() {
             {
                 x: mCoords.x,
                 y: mCoords.y,
+                customdata: mCoords.customdata,
                 text: mCoords.text,
                 mode: 'markers',
                 name: 'Miss',
@@ -294,6 +299,7 @@ async function initShotMap() {
             {
                 x: bCoords.x,
                 y: bCoords.y,
+                customdata: bCoords.customdata,
                 text: bCoords.text,
                 mode: 'markers',
                 name: 'Blocked',
@@ -436,7 +442,16 @@ async function initShotMap() {
             displayModeBar: false
         };
 
-        Plotly.newPlot(plotContainer, traces, layout, config);
+        Plotly.newPlot(plotContainer, traces, layout, config).then(() => {
+            plotContainer.on('plotly_click', function(data) {
+                if (data && data.points && data.points.length > 0) {
+                    const shotId = data.points[0].customdata;
+                    if (shotId) {
+                        window.openXgModal(shotId);
+                    }
+                }
+            });
+        });
     }
 
     teamFilter.addEventListener("change", renderPlot);
@@ -448,6 +463,127 @@ async function initShotMap() {
 
     renderPlot();
 }
+
+// ==========================================
+// Milestone 8: xG Explainability Modal Logic
+// ==========================================
+window.closeXgModal = function() {
+    const modal = document.getElementById('xg-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.openXgModal = async function(shotId) {
+    const modal = document.getElementById('xg-modal');
+    const title = document.getElementById('xg-modal-title');
+    const subtitle = document.getElementById('xg-modal-subtitle');
+    const body = document.getElementById('xg-modal-body');
+
+    if (!modal || !body) return;
+
+    modal.style.display = 'flex';
+    body.innerHTML = '<div style="text-align: center; padding: 2.5rem; color: var(--text-muted);"><div style="margin-bottom: 0.5rem; font-size: 1.25rem;">⏳</div>Loading xG model feature breakdown for shot #' + shotId + '...</div>';
+
+    try {
+        const res = await fetch('/api/shots/' + shotId + '/xg-explanation');
+        if (!res.ok) {
+            const errJson = await res.json();
+            throw new Error(errJson.error || "Failed to load explanation");
+        }
+        const data = await res.json();
+
+        title.textContent = `Shot #${data.shot_id}: ${data.shooter_name || 'Shooter'} (${data.team_abbrev || ''})`;
+        subtitle.textContent = `Period ${data.period} @ ${data.period_time} • ${data.shot_type || 'Shot'} (${data.outcome})`;
+
+        let positiveHtml = '';
+        if (data.positive_factors && data.positive_factors.length > 0) {
+            positiveHtml = data.positive_factors.map(f => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981; border-radius: 4px; margin-bottom: 0.35rem; font-size: 0.82rem;">
+                    <div>
+                        <span style="font-weight: 600; color: var(--text-primary);">${f.feature_name}</span>
+                        <span style="color: var(--text-muted); font-size: 0.75rem; margin-left: 0.35rem;">(val: ${f.raw_value})</span>
+                    </div>
+                    <span style="font-family: var(--font-mono); font-weight: 700; color: #10b981;">+${f.contribution.toFixed(3)}</span>
+                </div>
+            `).join('');
+        } else {
+            positiveHtml = '<div style="color: var(--text-muted); font-size: 0.8rem; font-style: italic; padding: 0.25rem 0;">No danger-increasing factors for this shot.</div>';
+        }
+
+        let negativeHtml = '';
+        if (data.negative_factors && data.negative_factors.length > 0) {
+            negativeHtml = data.negative_factors.map(f => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: rgba(239, 68, 68, 0.08); border-left: 3px solid #ef4444; border-radius: 4px; margin-bottom: 0.35rem; font-size: 0.82rem;">
+                    <div>
+                        <span style="font-weight: 600; color: var(--text-primary);">${f.feature_name}</span>
+                        <span style="color: var(--text-muted); font-size: 0.75rem; margin-left: 0.35rem;">(val: ${f.raw_value})</span>
+                    </div>
+                    <span style="font-family: var(--font-mono); font-weight: 700; color: #ef4444;">${f.contribution.toFixed(3)}</span>
+                </div>
+            `).join('');
+        } else {
+            negativeHtml = '<div style="color: var(--text-muted); font-size: 0.8rem; font-style: italic; padding: 0.25rem 0;">No danger-reducing factors for this shot.</div>';
+        }
+
+        body.innerHTML = `
+            <!-- Top Summary KPI Banner -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.25rem;">
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem; text-align: center;">
+                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Expected Goal (xG)</div>
+                    <div style="font-size: 1.4rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-color);">${(data.xg * 100).toFixed(1)}%</div>
+                    <div style="font-size: 0.7rem; color: var(--text-secondary);">${data.xg.toFixed(4)}</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem; text-align: center;">
+                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Model Logit</div>
+                    <div style="font-size: 1.4rem; font-weight: 800; font-family: var(--font-mono); color: var(--text-primary);">${data.logit.toFixed(3)}</div>
+                    <div style="font-size: 0.7rem; color: var(--text-secondary);">Intercept: ${data.intercept.toFixed(3)}</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem; text-align: center;">
+                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">vs Baseline</div>
+                    <div style="font-size: 1.4rem; font-weight: 800; font-family: var(--font-mono); color: ${data.odds_multiplier >= 1 ? '#10b981' : '#ef4444'};">${data.odds_multiplier.toFixed(2)}x</div>
+                    <div style="font-size: 0.7rem; color: var(--text-secondary);">Avg Unblocked: ${(data.baseline_probability * 100).toFixed(1)}%</div>
+                </div>
+            </div>
+
+            <!-- Context Details -->
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem; padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.2); border-radius: 4px;">
+                <span>Distance: <strong style="color: var(--text-primary);">${data.distance !== null ? Math.round(data.distance) + ' ft' : 'N/A'}</strong></span>
+                <span>Angle: <strong style="color: var(--text-primary);">${data.angle !== null ? Math.round(data.angle) + '°' : 'N/A'}</strong></span>
+                <span>Strength: <strong style="color: var(--text-primary);">${data.strength_state || '5v5'}</strong></span>
+            </div>
+
+            <!-- Danger Increasing (+) Factors -->
+            <div style="margin-bottom: 1.25rem;">
+                <div style="font-size: 0.8rem; font-weight: 700; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;">
+                    ▲ Danger-Increasing Factors (+ Logit)
+                </div>
+                ${positiveHtml}
+            </div>
+
+            <!-- Danger Reducing (-) Factors -->
+            <div>
+                <div style="font-size: 0.8rem; font-weight: 700; color: #ef4444; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;">
+                    ▼ Danger-Reducing Factors (− Logit)
+                </div>
+                ${negativeHtml}
+            </div>
+        `;
+    } catch (err) {
+        body.innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: var(--danger);">
+                <p>Failed to generate xG explanation: ${err.message}</p>
+                <button onclick="closeXgModal()" style="padding: 0.4rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; cursor: pointer;">Close</button>
+            </div>
+        `;
+    }
+};
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') window.closeXgModal();
+});
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('xg-modal');
+    if (modal && e.target === modal) window.closeXgModal();
+});
 
 // ==========================================
 // Milestone 11: Expected Goals Timeline

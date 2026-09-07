@@ -17,9 +17,10 @@
         </div>
         <nav class="nav-links">
             <a href="/" class="{% if request.path == '/' %}active{% endif %}">Game Selector</a>
-                {% if config.get("ENABLE_DIAGNOSTICS", False) %}
-                    <a href="/diagnostics" class="{% if request.path == '/diagnostics' %}active{% endif %}">Diagnostics</a>
-                {% endif %}
+            <a href="/season" class="{% if request.path.startswith('/season') or request.path.startswith('/team') or request.path.startswith('/player') or request.path.startswith('/goalie') %}active{% endif %}">Season Analytics</a>
+            {% if config.get("ENABLE_DIAGNOSTICS", False) %}
+                <a href="/diagnostics" class="{% if request.path == '/diagnostics' %}active{% endif %}">Diagnostics</a>
+            {% endif %}
         </nav>
     </header>
 

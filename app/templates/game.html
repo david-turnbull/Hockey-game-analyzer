@@ -607,6 +607,27 @@
         <!-- Rink Plot Card -->
         <div class="card" style="padding: 1rem; min-height: 520px; display: flex; flex-direction: column; justify-content: center; position: relative;">
             <div id="shot-map-plot" style="width: 100%; height: 500px;"></div>
+            <div style="margin-top: 0.75rem; text-align: center; font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 0.5rem;">
+                💡 <strong style="color: var(--accent-color);">Interactive Feature:</strong> Click any shot marker on the rink to inspect its mathematical xG feature contribution breakdown.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Shot xG Explanation Modal -->
+<div id="xg-modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
+    <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; width: 92%; max-width: 580px; max-height: 88vh; overflow-y: auto; padding: 1.5rem; position: relative; box-shadow: 0 16px 36px rgba(0,0,0,0.6);">
+        <!-- Modal Header -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text-primary);" id="xg-modal-title">Expected Goals (xG) Explanation</h3>
+                <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; color: var(--text-muted);" id="xg-modal-subtitle">Model feature contribution decomposition</p>
+            </div>
+            <button onclick="closeXgModal()" style="background: none; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; line-height: 1; padding: 0 0.25rem;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+        </div>
+        <!-- Modal Content Container -->
+        <div id="xg-modal-body">
+            <div style="text-align: center; padding: 2rem; color: var(--text-muted);">Loading xG model explanation...</div>
         </div>
     </div>
 </div>

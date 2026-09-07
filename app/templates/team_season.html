@@ -1,0 +1,436 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ team.name }} ({{ season[:4] }}-{{ season[6:] }}) Season Dashboard - PuckLens{% endblock %}
+
+{% block content %}
+<style>
+    .kpi-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .kpi-title {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    .kpi-val {
+        font-size: 1.75rem;
+        font-weight: 800;
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+        line-height: 1.1;
+    }
+    .kpi-sub {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.35rem;
+    }
+    .metric-pill {
+        display: inline-block;
+        padding: 0.15rem 0.45rem;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .metric-pos {
+        background: rgba(16, 185, 129, 0.12);
+        color: #10b981;
+    }
+    .metric-neg {
+        background: rgba(239, 68, 68, 0.12);
+        color: #ef4444;
+    }
+    .metric-neutral {
+        background: rgba(148, 163, 184, 0.1);
+        color: #94a3b8;
+    }
+    .sortable-table th {
+        cursor: pointer;
+        user-select: none;
+    }
+    .sortable-table th:hover {
+        color: var(--accent-color);
+    }
+</style>
+
+<!-- Breadcrumb -->
+<div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+    <a href="/season/{{ season }}" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem;">
+        &larr; Back to Season Standings
+    </a>
+
+    <!-- Season Switcher -->
+    {% if team_seasons and team_seasons|length > 1 %}
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="font-size: 0.8rem; color: var(--text-secondary);">Season:</span>
+        <select onchange="window.location.href='/team/{{ team.team_id }}/season/' + this.value" style="padding: 0.25rem 0.6rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; font-size: 0.8rem;">
+            {% for s in team_seasons %}
+            <option value="{{ s }}" {% if s == season %}selected{% endif %}>{{ s[:4] }}-{{ s[4:] }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Team Header -->
+<div class="card" style="padding: 1.75rem 2rem; margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+        <div style="display: flex; align-items: center; gap: 1.25rem;">
+            <div class="logo-badge" style="font-size: 1.5rem; padding: 0.6rem 1.2rem; border-radius: 8px;">
+                {{ team.abbreviation }}
+            </div>
+            <div>
+                <h1 style="font-size: 1.85rem; font-weight: 800; margin: 0; color: var(--text-primary); letter-spacing: -0.02em;">
+                    {{ team.name }}
+                </h1>
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.35rem; color: var(--text-secondary); font-size: 0.9rem;">
+                    <span>{{ season[:4] }}-{{ season[4:] }} Season</span>
+                    <span>&bull;</span>
+                    <span class="font-mono" style="font-weight: 600; color: var(--text-primary);">{{ stats.gp }} GP</span>
+                    <span>&bull;</span>
+                    <span class="font-mono" style="color: var(--accent-color); font-weight: 700;">{{ stats.w }}-{{ stats.l }}-{{ stats.otl }} ({{ stats.pts }} PTS)</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <div style="text-align: right;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Goal Diff</div>
+                <div class="font-mono" style="font-size: 1.35rem; font-weight: 800; color: {% if stats.goal_diff > 0 %}#10b981{% elif stats.goal_diff < 0 %}#ef4444{% else %}var(--text-primary){% endif %};">
+                    {% if stats.goal_diff > 0 %}+{% endif %}{{ stats.goal_diff }}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ stats.gf }} GF / {{ stats.ga }} GA</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Analytical Cards Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    <!-- xG% All vs 5v5 -->
+    <div class="kpi-card">
+        <div class="kpi-title">Expected Goal Share</div>
+        <div class="kpi-val" style="color: {% if stats.xg_pct >= 50.0 %}#10b981{% else %}#ef4444{% endif %};">
+            {{ stats.xg_pct }}%
+        </div>
+        <div class="kpi-sub">5v5 xG%: <span style="font-weight: 600; color: var(--text-primary);">{{ stats_5v5.xg_pct }}%</span></div>
+    </div>
+
+    <!-- xG Rates per 60 -->
+    <div class="kpi-card">
+        <div class="kpi-title">xG Rates (Per 60)</div>
+        <div class="kpi-val" style="color: var(--accent-color);">
+            {{ stats.xgf_per_60 }}
+        </div>
+        <div class="kpi-sub">xGA/60: <span style="font-weight: 600; color: var(--text-primary);">{{ stats.xga_per_60 }}</span> (Diff: {{ stats.xg_diff }})</div>
+    </div>
+
+    <!-- Possession Shares -->
+    <div class="kpi-card">
+        <div class="kpi-title">Shot Attempt Shares</div>
+        <div class="kpi-val">
+            {{ stats.cf_pct }}%
+        </div>
+        <div class="kpi-sub">Fenwick (FF%): <span style="font-weight: 600; color: var(--text-primary);">{{ stats.ff_pct }}%</span></div>
+    </div>
+
+    <!-- Finishing Variance -->
+    <div class="kpi-card">
+        <div class="kpi-title">Finishing Luck (GF - xGF)</div>
+        <div class="kpi-val" style="color: {% if stats.gf_xgf_diff >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+            {% if stats.gf_xgf_diff > 0 %}+{% endif %}{{ stats.gf_xgf_diff }}
+        </div>
+        <div class="kpi-sub">{{ stats.gf }} Goals on {{ stats.xgf }} xG</div>
+    </div>
+
+    <!-- Goaltending Variance -->
+    <div class="kpi-card">
+        <div class="kpi-title">Goaltending Luck (xGA - GA)</div>
+        {% set goalie_diff = stats.ga_xga_diff * -1 %}
+        <div class="kpi-val" style="color: {% if goalie_diff >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+            {% if goalie_diff > 0 %}+{% endif %}{{ goalie_diff }}
+        </div>
+        <div class="kpi-sub">{{ stats.ga }} GA on {{ stats.xga }} xGA</div>
+    </div>
+</div>
+
+<!-- Rolling Trends Section -->
+<div class="card" style="padding: 1.5rem; margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h2 class="card-title" style="margin-bottom: 0.25rem;">Rolling Form & Trend Analysis</h2>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">
+                Chronological rolling windows (zero future leakage) measuring process quality over time.
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;" id="window-buttons">
+            <button onclick="switchRollingWindow(5)" id="btn-win-5" class="tab-button active" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--accent-color); color: #fff; cursor: pointer;">5-Game</button>
+            <button onclick="switchRollingWindow(10)" id="btn-win-10" class="tab-button" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer;">10-Game</button>
+            <button onclick="switchRollingWindow(20)" id="btn-win-20" class="tab-button" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer;">20-Game</button>
+        </div>
+    </div>
+
+    <!-- Plotly Rolling Trend Chart -->
+    <div id="rolling-plot" style="width: 100%; height: 360px;"></div>
+</div>
+
+<!-- Team Skaters Section -->
+<div class="card" style="padding: 1.5rem; margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+            <h2 class="card-title" style="margin-bottom: 0.25rem;">Skater Performance</h2>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Individual scoring, expected goal generation, and 5v5 on-ice impact.</p>
+        </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="sortable-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">
+                    <th style="padding: 0.65rem 0.5rem;">Player</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">Pos</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">GP</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">TOI</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">G</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">A</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">PTS</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">SOG</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center; color: var(--accent-color);">xG</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">G - xG</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">xG/60</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">SH%</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">5v5 xG%</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for skater in skaters %}
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 0.65rem 0.5rem;">
+                        <a href="/player/{{ skater.player_id }}/season/{{ season }}" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">
+                            {{ skater.name }}
+                        </a>
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; color: var(--text-secondary);">{{ skater.position }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono);">{{ skater.gp }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono); color: var(--text-muted);">{{ skater.toi_formatted }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono); font-weight: 600;">{{ skater.goals }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono);">{{ skater.assists }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">{{ skater.points }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono);">{{ skater.shots_on_goal }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono); font-weight: 600; color: var(--accent-color);">{{ skater.xg }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center;">
+                        <span class="metric-pill {% if skater.goals_minus_xg > 0 %}metric-pos{% elif skater.goals_minus_xg < 0 %}metric-neg{% else %}metric-neutral{% endif %}">
+                            {% if skater.goals_minus_xg > 0 %}+{% endif %}{{ skater.goals_minus_xg }}
+                        </span>
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono);">{{ skater.xg_per_60 }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono);">{{ skater.shooting_pct }}%</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center;">
+                        {% if skater.on_ice_5v5 and skater.on_ice_5v5.xg_pct is not none %}
+                        <span class="metric-pill {% if skater.on_ice_5v5.xg_pct >= 50.0 %}metric-pos{% else %}metric-neg{% endif %}">
+                            {{ skater.on_ice_5v5.xg_pct }}%
+                        </span>
+                        {% else %}
+                        <span class="metric-pill metric-neutral">N/A</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Team Goalies Section -->
+<div class="card" style="padding: 1.5rem; margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+            <h2 class="card-title" style="margin-bottom: 0.25rem;">Goaltending Performance</h2>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Expected goals against, actual saves, and goals saved above expected (GSAx).</p>
+        </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="sortable-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">
+                    <th style="padding: 0.65rem 0.5rem;">Goalie</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">GP</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">TOI</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">SA</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">GA</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">SV%</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center; color: var(--accent-color);">xGA</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center; color: var(--accent-color);">GSAx</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">GSAx/60</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">EXP SV%</th>
+                    <th style="padding: 0.65rem 0.5rem; text-align: center;">SV% DIFF</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for goalie in goalies %}
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 0.65rem 0.5rem;">
+                        <a href="/goalie/{{ goalie.player_id }}/season/{{ season }}" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">
+                            {{ goalie.name }}
+                        </a>
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono);">{{ goalie.gp }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono); color: var(--text-muted);">{{ goalie.toi_formatted }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono);">{{ goalie.shots_faced }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono);">{{ goalie.goals_against }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono); font-weight: 600;">{{ goalie.save_pct }}%</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono); color: var(--accent-color);">{{ goalie.expected_goals_against }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center;">
+                        <span class="metric-pill {% if goalie.goals_saved_above_expected >= 0 %}metric-pos{% else %}metric-neg{% endif %}">
+                            {% if goalie.goals_saved_above_expected > 0 %}+{% endif %}{{ goalie.goals_saved_above_expected }}
+                        </span>
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono);">{{ goalie.gsax_per_60 }}</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-family: var(--font-mono);">{{ goalie.expected_save_pct }}%</td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center;">
+                        <span class="metric-pill {% if goalie.save_pct_diff >= 0 %}metric-pos{% else %}metric-neg{% endif %}">
+                            {% if goalie.save_pct_diff > 0 %}+{% endif %}{{ goalie.save_pct_diff }}%
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Recent Games Section -->
+<div class="card" style="padding: 1.5rem;">
+    <h2 class="card-title" style="margin-bottom: 1rem;">Recent Games ({{ recent_games|length }})</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
+        {% for g in recent_games %}
+        {% set is_home = (g.home_team_id == team.team_id) %}
+        {% set opp = g.away_team if is_home else g.home_team %}
+        {% set tm_score = g.home_score if is_home else g.away_score %}
+        {% set opp_score = g.away_score if is_home else g.home_score %}
+        {% set is_win = (tm_score > opp_score) %}
+        <a href="/game/{{ g.game_id }}?team_id={{ team.team_id }}" style="text-decoration: none; display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-color)'" onmouseout="this.style.borderColor='var(--border-color)'">
+            <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">{{ g.game_date.strftime("%b %d, %Y") }}</div>
+                <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.15rem;">
+                    {% if is_home %}vs {{ opp.abbreviation }}{% else %}@ {{ opp.abbreviation }}{% endif %}
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <span class="metric-pill {% if is_win %}metric-pos{% else %}metric-neg{% endif %}">
+                    {% if is_win %}W{% else %}L{% endif %} {{ tm_score }}-{{ opp_score }}
+                </span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Plotly CDN & Trend Script -->
+<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+<script>
+    const rollingData = {{ rolling_trends | tojson }};
+    let activeWindow = 5;
+
+    function renderTrendChart(windowSize) {
+        const plotEl = document.getElementById('rolling-plot');
+        const winKey = String(windowSize);
+        const winEntries = rollingData.windows[winKey] || [];
+
+        if (winEntries.length === 0) {
+            plotEl.innerHTML = `<div style="text-align: center; padding: 5rem 0; color: var(--text-muted);">Not enough games played for a ${windowSize}-game rolling window.</div>`;
+            return;
+        }
+
+        const gameLabels = winEntries.map(e => `Game ${e.game_number} vs ${e.opponent}`);
+        const xgPctVals = winEntries.map(e => e.rolling_xg_pct);
+        const cfPctVals = winEntries.map(e => e.rolling_cf_pct);
+        const xgDiffVals = winEntries.map(e => e.rolling_xg_diff);
+
+        const traceXgPct = {
+            x: gameLabels,
+            y: xgPctVals,
+            name: `${windowSize}-Game xGF%`,
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: '#38bdf8', width: 3 },
+            marker: { size: 6 }
+        };
+
+        const traceCfPct = {
+            x: gameLabels,
+            y: cfPctVals,
+            name: `${windowSize}-Game CF%`,
+            type: 'scatter',
+            mode: 'lines',
+            line: { color: '#94a3b8', width: 2, dash: 'dot' }
+        };
+
+        const layout = {
+            margin: { l: 40, r: 20, t: 20, b: 60 },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            showlegend: true,
+            legend: { orientation: 'h', y: -0.2, font: { color: '#94a3b8' } },
+            xaxis: {
+                tickfont: { color: '#94a3b8', size: 10 },
+                gridcolor: 'rgba(255, 255, 255, 0.05)',
+                tickangle: -30
+            },
+            yaxis: {
+                title: 'Share (%)',
+                titlefont: { color: '#94a3b8', size: 11 },
+                tickfont: { color: '#94a3b8' },
+                gridcolor: 'rgba(255, 255, 255, 0.05)',
+                zeroline: true,
+                zerolinecolor: 'rgba(255, 255, 255, 0.2)'
+            },
+            shapes: [
+                {
+                    type: 'line',
+                    x0: 0,
+                    x1: 1,
+                    xref: 'paper',
+                    y0: 50,
+                    y1: 50,
+                    line: { color: 'rgba(239, 68, 68, 0.5)', width: 1.5, dash: 'dash' }
+                }
+            ]
+        };
+
+        const config = { responsive: true, displayModeBar: false };
+        Plotly.newPlot(plotEl, [traceXgPct, traceCfPct], layout, config);
+    }
+
+    function switchRollingWindow(winSize) {
+        activeWindow = winSize;
+        [5, 10, 20].forEach(w => {
+            const btn = document.getElementById(`btn-win-${w}`);
+            if (btn) {
+                if (w === winSize) {
+                    btn.style.background = 'var(--accent-color)';
+                    btn.style.color = '#ffffff';
+                } else {
+                    btn.style.background = 'var(--bg-secondary)';
+                    btn.style.color = 'var(--text-secondary)';
+                }
+            }
+        });
+        renderTrendChart(winSize);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderTrendChart(activeWindow);
+    });
+</script>
+{% endblock %}

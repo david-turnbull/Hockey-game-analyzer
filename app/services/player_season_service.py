@@ -249,6 +249,8 @@ class PlayerSeasonService:
                 "unblocked_attempts": unblocked,
                 "xg": xg,
                 "goals_above_expected": g_minus_xg,
+                "goals_minus_xg": g_minus_xg,
+                "g_minus_xg": g_minus_xg,
                 # Individual Rates
                 "goals_per_60": goals_per_60,
                 "xg_per_60": xg_per_60,
@@ -267,7 +269,12 @@ class PlayerSeasonService:
                     "ff_pct": oi["ff_pct"],
                     "on_ice_xgf": oi["on_ice_xgf"],
                     "on_ice_xga": oi["on_ice_xga"],
-                    "on_ice_xg_pct": oi["on_ice_xg_pct"]
+                    "on_ice_xg_pct": oi["on_ice_xg_pct"],
+                    "xgf": oi["on_ice_xgf"],
+                    "xga": oi["on_ice_xga"],
+                    "xg_pct": oi["on_ice_xg_pct"],
+                    "toi_seconds": oi.get("toi_seconds", 0),
+                    "toi_formatted": format_toi(oi.get("toi_seconds", 0))
                 }
             })
 
@@ -370,8 +377,11 @@ class PlayerSeasonService:
             "points": 0,
             "shots_on_goal": 0,
             "unblocked_attempts": 0,
+            "unblocked_shot_attempts": 0,
             "xg": 0.0,
             "goals_above_expected": 0.0,
+            "goals_minus_xg": 0.0,
+            "g_minus_xg": 0.0,
             "goals_per_60": 0.0,
             "xg_per_60": 0.0,
             "shooting_pct": 0.0,
@@ -382,6 +392,8 @@ class PlayerSeasonService:
             "on_ice_5v5": {
                 "cf": 0, "ca": 0, "cf_pct": 50.0,
                 "ff": 0, "fa": 0, "ff_pct": 50.0,
-                "on_ice_xgf": 0.0, "on_ice_xga": 0.0, "on_ice_xg_pct": 50.0
+                "on_ice_xgf": 0.0, "on_ice_xga": 0.0, "on_ice_xg_pct": 50.0,
+                "xgf": 0.0, "xga": 0.0, "xg_pct": 50.0,
+                "toi_seconds": 0, "toi_formatted": "00:00"
             }
         }

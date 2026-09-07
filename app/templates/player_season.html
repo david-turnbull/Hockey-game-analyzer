@@ -1,0 +1,286 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ player.full_name }} ({{ season[:4] }}-{{ season[6:] }}) Season Profile - PuckLens{% endblock %}
+
+{% block content %}
+<style>
+    .kpi-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .kpi-title {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    .kpi-val {
+        font-size: 1.75rem;
+        font-weight: 800;
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+        line-height: 1.1;
+    }
+    .kpi-sub {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.35rem;
+    }
+    .metric-pill {
+        display: inline-block;
+        padding: 0.15rem 0.45rem;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .metric-pos {
+        background: rgba(16, 185, 129, 0.12);
+        color: #10b981;
+    }
+    .metric-neg {
+        background: rgba(239, 68, 68, 0.12);
+        color: #ef4444;
+    }
+    .metric-neutral {
+        background: rgba(148, 163, 184, 0.1);
+        color: #94a3b8;
+    }
+</style>
+
+<!-- Breadcrumb -->
+<div style="margin-bottom: 1.5rem;">
+    {% if stats.team_id %}
+    <a href="/team/{{ stats.team_id }}/season/{{ season }}" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem;">
+        &larr; Back to {{ stats.team_name }} Season
+    </a>
+    {% else %}
+    <a href="/season/{{ season }}" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem;">
+        &larr; Back to Season Standings
+    </a>
+    {% endif %}
+</div>
+
+<!-- Player Header -->
+<div class="card" style="padding: 1.75rem 2rem; margin-bottom: 2rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem;">
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            {% if player.headshot_url %}
+            <img src="{{ player.headshot_url }}" alt="{{ player.full_name }}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-color); background: var(--bg-secondary);">
+            {% else %}
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--bg-card); border: 2px solid var(--accent-color); display: flex; align-items: center; justify-content: center; font-size: 1.75rem; font-weight: 800; color: var(--accent-color);">
+                {{ player.position }}
+            </div>
+            {% endif %}
+            <div>
+                <h1 style="font-size: 1.85rem; font-weight: 800; margin: 0; color: var(--text-primary); letter-spacing: -0.02em;">
+                    {{ player.full_name }}
+                </h1>
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.35rem; color: var(--text-secondary); font-size: 0.9rem; flex-wrap: wrap;">
+                    {% if player.sweater_number %}<span>#{{ player.sweater_number }}</span><span>&bull;</span>{% endif %}
+                    <span>{{ player.position }}</span>
+                    <span>&bull;</span>
+                    {% if stats.team_id %}
+                    <a href="/team/{{ stats.team_id }}/season/{{ season }}" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">
+                        {{ stats.team_name }} ({{ stats.team_abbrev }})
+                    </a>
+                    {% else %}
+                    <span>Free Agent / Multiple</span>
+                    {% endif %}
+                    <span>&bull;</span>
+                    <span>{{ season[:4] }}-{{ season[4:] }} Season</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 1.5rem; align-items: center;">
+            <div style="text-align: right;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Points</div>
+                <div class="font-mono" style="font-size: 1.75rem; font-weight: 800; color: var(--accent-color);">
+                    {{ stats.points }}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ stats.goals }} G &bull; {{ stats.assists }} A</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Primary Stats Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    <!-- GP & TOI -->
+    <div class="kpi-card">
+        <div class="kpi-title">Games & Ice Time</div>
+        <div class="kpi-val">{{ stats.gp }} <span style="font-size: 1rem; color: var(--text-muted);">GP</span></div>
+        <div class="kpi-sub">Total TOI: <span class="font-mono" style="font-weight: 600; color: var(--text-primary);">{{ stats.toi_formatted }}</span></div>
+    </div>
+
+    <!-- Expected Goals -->
+    <div class="kpi-card">
+        <div class="kpi-title">Expected Goals (xG)</div>
+        <div class="kpi-val" style="color: var(--accent-color);">{{ stats.xg }}</div>
+        <div class="kpi-sub">Unblocked: <span class="font-mono" style="font-weight: 600; color: var(--text-primary);">{{ stats.unblocked_shot_attempts }}</span> (SOG: {{ stats.shots_on_goal }})</div>
+    </div>
+
+    <!-- Finishing Variance -->
+    <div class="kpi-card">
+        <div class="kpi-title">Finishing Variance (G - xG)</div>
+        <div class="kpi-val" style="color: {% if stats.goals_minus_xg >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+            {% if stats.goals_minus_xg > 0 %}+{% endif %}{{ stats.goals_minus_xg }}
+        </div>
+        <div class="kpi-sub">Actual: {{ stats.goals }} G vs {{ stats.xg }} Exp</div>
+    </div>
+
+    <!-- Rate Generation -->
+    <div class="kpi-card">
+        <div class="kpi-title">xG Rate (Per 60)</div>
+        <div class="kpi-val" style="color: var(--accent-color);">{{ stats.xg_per_60 }}</div>
+        <div class="kpi-sub">Goals/60: <span class="font-mono" style="font-weight: 600; color: var(--text-primary);">{{ stats.goals_per_60 }}</span></div>
+    </div>
+
+    <!-- Shooting vs Exp Conversion -->
+    <div class="kpi-card">
+        <div class="kpi-title">Conversion Rates</div>
+        <div class="kpi-val">{{ stats.shooting_pct }}%</div>
+        <div class="kpi-sub">Expected Conversion: <span class="font-mono" style="font-weight: 600; color: var(--text-primary);">{{ stats.expected_conversion_pct }}%</span></div>
+    </div>
+</div>
+
+<!-- 5v5 On-Ice Possession Profile -->
+<div class="card" style="padding: 1.5rem; margin-bottom: 2rem;">
+    <h2 class="card-title" style="margin-bottom: 0.25rem;">5v5 Even-Strength On-Ice Possession Profile</h2>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.5rem;">
+        Team shot attempts and expected goal shares while this skater is active on the ice.
+    </p>
+
+    {% if stats.on_ice_5v5 %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">5v5 On-Ice xG Share</div>
+            <div class="font-mono" style="font-size: 1.5rem; font-weight: 800; color: {% if stats.on_ice_5v5.xg_pct >= 50.0 %}#10b981{% else %}#ef4444{% endif %}; margin: 0.25rem 0;">
+                {{ stats.on_ice_5v5.xg_pct }}%
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                {{ stats.on_ice_5v5.xgf }} xGF / {{ stats.on_ice_5v5.xga }} xGA
+            </div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">5v5 Corsi Share (CF%)</div>
+            <div class="font-mono" style="font-size: 1.5rem; font-weight: 800; color: {% if stats.on_ice_5v5.cf_pct >= 50.0 %}#10b981{% else %}#ef4444{% endif %}; margin: 0.25rem 0;">
+                {{ stats.on_ice_5v5.cf_pct }}%
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                {{ stats.on_ice_5v5.cf }} CF / {{ stats.on_ice_5v5.ca }} CA
+            </div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">5v5 Fenwick Share (FF%)</div>
+            <div class="font-mono" style="font-size: 1.5rem; font-weight: 800; color: {% if stats.on_ice_5v5.ff_pct >= 50.0 %}#10b981{% else %}#ef4444{% endif %}; margin: 0.25rem 0;">
+                {{ stats.on_ice_5v5.ff_pct }}%
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                {{ stats.on_ice_5v5.ff }} FF / {{ stats.on_ice_5v5.fa }} FA
+            </div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">5v5 Total TOI</div>
+            <div class="font-mono" style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary); margin: 0.25rem 0;">
+                {{ stats.on_ice_5v5.toi_formatted }}
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                {{ stats.on_ice_5v5.toi_seconds // 60 }} mins total
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <p style="color: var(--text-muted);">No 5v5 on-ice events recorded for this skater.</p>
+    {% endif %}
+</div>
+
+<!-- Rolling Form Trend (5-Game Window) -->
+<div class="card" style="padding: 1.5rem;">
+    <h2 class="card-title" style="margin-bottom: 0.25rem;">Rolling Form & Trend Analysis</h2>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.25rem;">
+        5-game rolling window measuring individual expected goal quality and shot generation progression.
+    </p>
+
+    {% if rolling and rolling.trend and rolling.trend|length > 0 %}
+    <div id="skater-rolling-plot" style="width: 100%; height: 340px;"></div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
+        Not enough games played in this season for a 5-game rolling trend.
+    </div>
+    {% endif %}
+</div>
+
+<!-- Plotly CDN & Skater Trend Script -->
+<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+<script>
+    const rollingTrend = {{ rolling | tojson }};
+    if (rollingTrend && rollingTrend.trend && rollingTrend.trend.length > 0) {
+        const entries = rollingTrend.trend;
+        const labels = entries.map(e => `Game ${e.game_number} vs ${e.opponent}`);
+        const xgVals = entries.map(e => e.rolling_xg);
+        const shotVals = entries.map(e => e.rolling_unblocked_shots);
+
+        const traceXg = {
+            x: labels,
+            y: xgVals,
+            name: '5-Game Rolling xG',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: '#38bdf8', width: 3 },
+            marker: { size: 6 }
+        };
+
+        const traceShots = {
+            x: labels,
+            y: shotVals,
+            name: '5-Game Rolling Shots',
+            type: 'scatter',
+            mode: 'lines+markers',
+            yaxis: 'y2',
+            line: { color: '#f59e0b', width: 2, dash: 'dot' },
+            marker: { size: 5 }
+        };
+
+        const layout = {
+            margin: { l: 40, r: 40, t: 20, b: 60 },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            showlegend: true,
+            legend: { orientation: 'h', y: -0.25, font: { color: '#94a3b8' } },
+            xaxis: {
+                tickfont: { color: '#94a3b8', size: 10 },
+                gridcolor: 'rgba(255, 255, 255, 0.05)',
+                tickangle: -30
+            },
+            yaxis: {
+                title: 'Rolling xG',
+                titlefont: { color: '#38bdf8', size: 11 },
+                tickfont: { color: '#38bdf8' },
+                gridcolor: 'rgba(255, 255, 255, 0.05)'
+            },
+            yaxis2: {
+                title: 'Shot Attempts',
+                titlefont: { color: '#f59e0b', size: 11 },
+                tickfont: { color: '#f59e0b' },
+                overlaying: 'y',
+                side: 'right',
+                gridcolor: 'transparent'
+            }
+        };
+
+        Plotly.newPlot('skater-rolling-plot', [traceXg, traceShots], layout, { responsive: true, displayModeBar: false });
+    }
+</script>
+{% endblock %}

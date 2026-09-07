@@ -236,10 +236,13 @@ class GoalieSeasonService:
                 "save_pct": save_pct,
                 # Predictive / Quality-Adjusted Metrics
                 "xga": xga,
+                "expected_goals_against": xga,
                 "gsax": gsax,
+                "goals_saved_above_expected": gsax,
                 "gsax_per_60": gsax_per_60,
                 "xga_per_60": xga_per_60,
                 "expected_save_pct": expected_save_pct,
+                "save_pct_diff": save_pct_diff,
                 "save_pct_above_expected": save_pct_diff,
                 # Population metadata
                 "empty_net_excluded": True,
@@ -301,10 +304,13 @@ class GoalieSeasonService:
             "saves": 0,
             "save_pct": 0.0,
             "xga": 0.0,
+            "expected_goals_against": 0.0,
             "gsax": 0.0,
+            "goals_saved_above_expected": 0.0,
             "gsax_per_60": 0.0,
             "xga_per_60": 0.0,
             "expected_save_pct": 0.0,
+            "save_pct_diff": 0.0,
             "save_pct_above_expected": 0.0,
             "empty_net_excluded": True,
             "shootout_excluded": True

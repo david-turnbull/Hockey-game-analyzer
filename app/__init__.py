@@ -74,10 +74,12 @@ def create_app(config_name=None):
     from app.routes.main import main_bp
     from app.routes.api import api_bp
     from app.routes.games import games_bp
+    from app.routes.seasons import seasons_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(games_bp)
+    app.register_blueprint(seasons_bp)
     
     # Global error handlers
     @app.errorhandler(404)
