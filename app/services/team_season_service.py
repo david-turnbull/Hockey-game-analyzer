@@ -1,8 +1,10 @@
 import logging
+from collections import defaultdict
 from typing import Dict, List, Any, Optional
 from sqlalchemy import or_, and_, func, case
-from app.models import db, Game, Team, Event, Shot, Shift
+from app.models import db, Game, Team, Event, Shot, Shift, Player
 from app.services.possession_service import PossessionService
+from app.services.on_ice_service import OnIceService
 
 logger = logging.getLogger(__name__)
 
@@ -178,23 +180,106 @@ class TeamSeasonService:
             if opp_tid in xga_map:
                 xga_map[opp_tid] += float(sum_xg)
 
-        # 3. Calculate TOI per team in this situation
-        # In 'all': standard regulation is 3600s per game plus any OT seconds
-        # In '5v5': average ~48-50 mins (2880s) or shift-based
-        team_toi: Dict[int, int] = {}
+        # 3. Calculate actual situation TOI per team using shift timelines
+        # If reliable shift duration cannot be established, precision must not be fabricated (return None)
+        shifts = (
+            Shift.query.filter(
+                Shift.game_id.in_(game_ids),
+                Shift.is_anomaly == False,
+                Shift.duration > 0,
+                Shift.start_elapsed_seconds.isnot(None),
+                Shift.end_elapsed_seconds.isnot(None)
+            ).all()
+        )
+        shifts_by_game = defaultdict(list)
+        for s in shifts:
+            shifts_by_game[s.game_id].append(s)
+
+        shift_pids = list(set(s.player_id for s in shifts))
+        players_pos = dict(
+            db.session.query(Player.player_id, Player.position)
+            .filter(Player.player_id.in_(shift_pids))
+            .all()
+        )
+
+        game_toi: Dict[int, Optional[Dict[int, Dict[str, int]]]] = {}
+        for g in games:
+            gid = g.game_id
+            g_shifts = shifts_by_game.get(gid, [])
+            if not g_shifts:
+                # No shifts recorded for this game -> unreliable situation denominator
+                game_toi[gid] = None
+                continue
+
+            max_time = 3600
+            for s in g_shifts:
+                if s.end_elapsed_seconds is not None and s.end_elapsed_seconds > max_time:
+                    max_time = s.end_elapsed_seconds
+
+            home_players, away_players = OnIceService.build_active_players_timeline(
+                g_shifts, max_time, g.home_team_id
+            )
+
+            h_5v5 = a_5v5 = h_pp = a_pp = h_pk = a_pk = 0
+            for t in range(max_time):
+                hp = home_players[t]
+                ap = away_players[t]
+                h_skaters = sum(1 for p in hp if players_pos.get(p) != 'G')
+                a_skaters = sum(1 for p in ap if players_pos.get(p) != 'G')
+                h_g = sum(1 for p in hp if players_pos.get(p) == 'G')
+                a_g = sum(1 for p in ap if players_pos.get(p) == 'G')
+
+                # True 5v5: Exactly 5 skaters and 1 goalie on both sides
+                if h_skaters == 5 and a_skaters == 5 and h_g == 1 and a_g == 1:
+                    h_5v5 += 1
+                    a_5v5 += 1
+                elif h_skaters > a_skaters:
+                    h_pp += 1
+                    a_pk += 1
+                elif a_skaters > h_skaters:
+                    a_pp += 1
+                    h_pk += 1
+
+            game_toi[gid] = {
+                g.home_team_id: {
+                    "5v5": h_5v5,
+                    "pp": h_pp,
+                    "pk": h_pk,
+                    "all": max_time
+                },
+                g.away_team_id: {
+                    "5v5": a_5v5,
+                    "pp": a_pp,
+                    "pk": a_pk,
+                    "all": max_time
+                }
+            }
+
+        sit_key = (
+            "5v5" if situation == "5v5"
+            else ("pp" if situation in ["pp", "powerplay", "power_play"]
+            else ("pk" if situation in ["sh", "shorthanded", "pk"] else "all"))
+        )
+
+        team_toi: Dict[int, Optional[int]] = {}
         for tid, t_g_list in team_games.items():
-            if situation == "5v5":
-                # 5v5 duration approximation: 48 minutes (2880s) per game
-                team_toi[tid] = len(t_g_list) * 2880
-            elif situation in ["pp", "powerplay", "power_play"]:
-                # PP duration estimate: ~5 mins (300s) per game
-                team_toi[tid] = len(t_g_list) * 300
-            elif situation in ["sh", "shorthanded", "pk"]:
-                # PK duration estimate: ~5 mins (300s) per game
-                team_toi[tid] = len(t_g_list) * 300
+            # Check if any game for this team has missing/unreliable shifts
+            has_missing = False
+            tot_sec = 0
+            for g in t_g_list:
+                g_dict = game_toi.get(g.game_id)
+                if g_dict is None or tid not in g_dict:
+                    has_missing = True
+                    break
+                tot_sec += g_dict[tid][sit_key]
+
+            if has_missing or (len(shifts) == 0):
+                if sit_key == "all":
+                    team_toi[tid] = len(t_g_list) * 3600
+                else:
+                    team_toi[tid] = None
             else:
-                # 'all': 60 mins (3600s) per game
-                team_toi[tid] = len(t_g_list) * 3600
+                team_toi[tid] = tot_sec
 
         # 4. Assemble final stats for each team
         teams_by_id = {t.team_id: t for t in Team.query.filter(Team.team_id.in_(team_record.keys())).all()}
@@ -227,11 +312,17 @@ class TeamSeasonService:
             xga = round(xga_map.get(tid, 0.0), 2)
             xg_pct = round((xgf / (xgf + xga) * 100), 2) if (xgf + xga) > 0 else 50.0
 
-            toi_sec = team_toi.get(tid, gp * 3600)
-            toi_hours = toi_sec / 3600.0 if toi_sec > 0 else 1.0
-
-            xgf_per_60 = round(xgf / toi_hours, 2)
-            xga_per_60 = round(xga / toi_hours, 2)
+            toi_sec = team_toi.get(tid)
+            if toi_sec is not None and toi_sec > 0:
+                toi_hours = toi_sec / 3600.0
+                xgf_per_60 = round(xgf / toi_hours, 2)
+                xga_per_60 = round(xga / toi_hours, 2)
+                toi_formatted = f"{toi_sec // 60:d}:{toi_sec % 60:02d}"
+            else:
+                toi_sec = None
+                xgf_per_60 = None
+                xga_per_60 = None
+                toi_formatted = None
 
             gf_xgf = round(gf - xgf, 2)
             ga_xga = round(ga - xga, 2)
@@ -266,7 +357,7 @@ class TeamSeasonService:
                 "ga_xga_diff": ga_xga,
                 "xg_diff": xg_diff,
                 "toi_seconds": toi_sec,
-                "toi_formatted": f"{toi_sec // 60:d}:{toi_sec % 60:02d}"
+                "toi_formatted": toi_formatted
             })
 
         # Default sort by xg_pct descending
@@ -291,7 +382,13 @@ class TeamSeasonService:
         # xga_per_60: lower is better (ascending sort)
         reverse = (sort_by != "xga_per_60")
 
-        teams.sort(key=lambda x: x.get(sort_by, 0.0), reverse=reverse)
+        def sort_val(x):
+            v = x.get(sort_by)
+            if v is None:
+                return float('inf') if sort_by == "xga_per_60" else float('-inf')
+            return float(v)
+
+        teams.sort(key=sort_val, reverse=reverse)
 
         for rank_idx, team_data in enumerate(teams, 1):
             team_data["rank"] = rank_idx
@@ -323,11 +420,11 @@ class TeamSeasonService:
             "xgf": 0.0,
             "xga": 0.0,
             "xg_pct": 50.0,
-            "xgf_per_60": 0.0,
-            "xga_per_60": 0.0,
+            "xgf_per_60": None,
+            "xga_per_60": None,
             "gf_xgf_diff": 0.0,
             "ga_xga_diff": 0.0,
             "xg_diff": 0.0,
-            "toi_seconds": 0,
-            "toi_formatted": "00:00"
+            "toi_seconds": None,
+            "toi_formatted": None
         }
