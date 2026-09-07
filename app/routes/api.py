@@ -308,3 +308,13 @@ def get_player_shots(game_id, player_id):
         })
         
     return jsonify(formatted_shots)
+
+
+@api_bp.route('/shots/<shot_id>/xg-explanation')
+def get_shot_xg_explanation(shot_id: str):
+    """Returns interpretable feature contribution analysis and factors for a shot attempt."""
+    from app.analytics.explainability import XGExplainer
+    explanation = XGExplainer.explain_shot_by_id(shot_id)
+    if not explanation:
+        return jsonify({"error": f"Shot {shot_id} not found"}), 404
+    return jsonify(explanation)
