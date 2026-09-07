@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from typing import Dict, List, Any, Optional
 from sqlalchemy import or_, and_, func, distinct
 from app.models import db, Game, Player, Event, Shot, Shift, GamePlayer, Team
@@ -40,70 +41,121 @@ class GoalieSeasonService:
     ) -> List[Dict[str, Any]]:
         """
         Aggregates season statistics for all goalies in a given season using grouped SQL queries.
-        Population / Denominator rules:
-        - Conventional shots faced and saves include all shots on goal (Goal, Saved), excluding shootouts.
-        - xGA and GSAx strictly exclude empty-net attempts and shootout attempts.
+        When team_id is specified, stats are scoped strictly to games where the goalie represented that team.
+        When team_id is None, full-season statistics are aggregated across all team stints, with chronological
+        multi-team representation (e.g. CGY/VAN or CGY/VAN/CGY).
         """
-        # 1. Fetch all games for this season
-        game_query = db.session.query(Game.game_id).filter(Game.season == season)
-        season_game_ids = [r[0] for r in game_query.all()]
-        if not season_game_ids:
+        # 1. Fetch all games for this season ordered by date
+        game_query = (
+            db.session.query(Game.game_id, Game.game_date)
+            .filter(Game.season == season)
+            .order_by(Game.game_date.asc(), Game.game_id.asc())
+        )
+        season_game_rows = game_query.all()
+        if not season_game_rows:
             return []
+        season_game_ids = [r[0] for r in season_game_rows]
 
         # 2. Get GP, player info, and team association from GamePlayer / Player
         gp_query = (
             db.session.query(
                 GamePlayer.player_id,
+                GamePlayer.game_id,
                 GamePlayer.team_id,
-                func.count(distinct(GamePlayer.game_id)).label('gp'),
                 Player.first_name,
                 Player.last_name,
                 Player.position,
                 Team.abbreviation.label('team_abbrev'),
-                Team.name.label('team_name')
+                Team.name.label('team_name'),
+                Game.game_date
             )
             .join(Player, GamePlayer.player_id == Player.player_id)
             .join(Team, GamePlayer.team_id == Team.team_id)
+            .join(Game, GamePlayer.game_id == Game.game_id)
             .filter(
                 GamePlayer.game_id.in_(season_game_ids),
                 Player.position == 'G'
             )
+            .order_by(Game.game_date.asc(), Game.game_id.asc())
         )
-        if team_id:
+        if team_id is not None:
             gp_query = gp_query.filter(GamePlayer.team_id == team_id)
 
-        gp_rows = gp_query.group_by(GamePlayer.player_id, GamePlayer.team_id).all()
+        gp_rows = gp_query.all()
         if not gp_rows:
             return []
 
-        goalie_meta = {}
+        # Group appearances by goalie preserving chronological game order
+        player_appearances = defaultdict(list)
+        player_basic_info = {}
         for r in gp_rows:
             pid = r.player_id
-            if pid not in goalie_meta:
-                goalie_meta[pid] = {
+            player_appearances[pid].append(r)
+            if pid not in player_basic_info:
+                player_basic_info[pid] = {
                     "player_id": pid,
                     "first_name": r.first_name,
                     "last_name": r.last_name,
                     "full_name": f"{r.first_name} {r.last_name}",
-                    "position": "G",
-                    "team_id": r.team_id,
-                    "team_abbrev": r.team_abbrev,
-                    "team_name": r.team_name,
-                    "gp": r.gp
+                    "position": "G"
                 }
+
+        goalie_meta = {}
+        for pid, appearances in player_appearances.items():
+            info = player_basic_info[pid]
+            distinct_game_ids = set(r.game_id for r in appearances)
+            gp_count = len(distinct_game_ids)
+
+            if team_id is not None:
+                rep_team_id = team_id
+                rep_team_abbrev = appearances[0].team_abbrev
+                rep_team_name = appearances[0].team_name
+                stints_list = [rep_team_abbrev]
             else:
-                goalie_meta[pid]["gp"] += r.gp
+                stints = []
+                for r in appearances:
+                    if not stints or stints[-1]["team_id"] != r.team_id:
+                        stints.append({
+                            "team_id": r.team_id,
+                            "team_abbrev": r.team_abbrev,
+                            "team_name": r.team_name
+                        })
+                rep_team_abbrev = "/".join(s["team_abbrev"] for s in stints)
+                rep_team_name = " / ".join(s["team_name"] for s in stints) if len(stints) > 1 else stints[0]["team_name"]
+                rep_team_id = stints[-1]["team_id"]
+                stints_list = [s["team_abbrev"] for s in stints]
+
+            goalie_meta[pid] = {
+                **info,
+                "team_id": rep_team_id,
+                "team_abbrev": rep_team_abbrev,
+                "team_name": rep_team_name,
+                "teams": rep_team_abbrev,
+                "stints": stints_list,
+                "gp": gp_count
+            }
 
         relevant_pids = list(goalie_meta.keys())
 
         # 3. Shots on Goal Faced (outcome in ['Goal', 'Saved'], excluding shootouts)
-        sog_rows = (
+        sog_query = (
             db.session.query(
                 Shot.goalie_id,
                 func.count(Shot.shot_id)
             )
             .join(Event, Shot.shot_id == Event.event_id)
-            .filter(
+        )
+        if team_id is not None:
+            sog_query = sog_query.join(
+                GamePlayer,
+                and_(
+                    GamePlayer.game_id == Event.game_id,
+                    GamePlayer.player_id == Shot.goalie_id,
+                    GamePlayer.team_id == team_id
+                )
+            )
+        sog_rows = (
+            sog_query.filter(
                 Event.game_id.in_(season_game_ids),
                 Shot.goalie_id.in_(relevant_pids),
                 Shot.outcome.in_(['Goal', 'Saved']),
@@ -114,13 +166,24 @@ class GoalieSeasonService:
         shots_faced_map = {pid: count for pid, count in sog_rows}
 
         # 4. Goals Against (goal == True, outcome in ['Goal'], excluding shootouts)
-        ga_rows = (
+        ga_query = (
             db.session.query(
                 Shot.goalie_id,
                 func.count(Shot.shot_id)
             )
             .join(Event, Shot.shot_id == Event.event_id)
-            .filter(
+        )
+        if team_id is not None:
+            ga_query = ga_query.join(
+                GamePlayer,
+                and_(
+                    GamePlayer.game_id == Event.game_id,
+                    GamePlayer.player_id == Shot.goalie_id,
+                    GamePlayer.team_id == team_id
+                )
+            )
+        ga_rows = (
+            ga_query.filter(
                 Event.game_id.in_(season_game_ids),
                 Shot.goalie_id.in_(relevant_pids),
                 Shot.goal == True,
@@ -131,15 +194,25 @@ class GoalieSeasonService:
         ga_map = {pid: count for pid, count in ga_rows}
 
         # 5. Non-Empty-Net Shots Faced, Goals Against Faced, and xGA
-        # Excludes empty-net attempts and shootouts
-        xga_rows = (
+        xga_query = (
             db.session.query(
                 Shot.goalie_id,
                 func.sum(Shot.xg),
                 func.count(Shot.shot_id)
             )
             .join(Event, Shot.shot_id == Event.event_id)
-            .filter(
+        )
+        if team_id is not None:
+            xga_query = xga_query.join(
+                GamePlayer,
+                and_(
+                    GamePlayer.game_id == Event.game_id,
+                    GamePlayer.player_id == Shot.goalie_id,
+                    GamePlayer.team_id == team_id
+                )
+            )
+        xga_rows = (
+            xga_query.filter(
                 Event.game_id.in_(season_game_ids),
                 Shot.goalie_id.in_(relevant_pids),
                 Shot.outcome.in_(['Goal', 'Saved']),
@@ -151,13 +224,24 @@ class GoalieSeasonService:
         xga_map = {pid: (round(float(sum_xg), 2) if sum_xg is not None else 0.0) for pid, sum_xg, _ in xga_rows}
         shots_faced_nen_map = {pid: count for pid, _, count in xga_rows}
 
-        ga_faced_rows = (
+        ga_faced_query = (
             db.session.query(
                 Shot.goalie_id,
                 func.count(Shot.shot_id)
             )
             .join(Event, Shot.shot_id == Event.event_id)
-            .filter(
+        )
+        if team_id is not None:
+            ga_faced_query = ga_faced_query.join(
+                GamePlayer,
+                and_(
+                    GamePlayer.game_id == Event.game_id,
+                    GamePlayer.player_id == Shot.goalie_id,
+                    GamePlayer.team_id == team_id
+                )
+            )
+        ga_faced_rows = (
+            ga_faced_query.filter(
                 Event.game_id.in_(season_game_ids),
                 Shot.goalie_id.in_(relevant_pids),
                 Shot.goal == True,
@@ -169,7 +253,7 @@ class GoalieSeasonService:
         ga_faced_map = {pid: count for pid, count in ga_faced_rows}
 
         # 6. Time on Ice (TOI) from Shift
-        toi_rows = (
+        toi_query = (
             db.session.query(
                 Shift.player_id,
                 func.sum(Shift.duration)
@@ -180,8 +264,10 @@ class GoalieSeasonService:
                 Shift.duration > 0,
                 Shift.is_anomaly == False
             )
-            .group_by(Shift.player_id).all()
         )
+        if team_id is not None:
+            toi_query = toi_query.filter(Shift.team_id == team_id)
+        toi_rows = toi_query.group_by(Shift.player_id).all()
         toi_map = {pid: (int(tot_sec) if tot_sec else 0) for pid, tot_sec in toi_rows}
 
         # 7. Assemble goalie season records
@@ -209,7 +295,6 @@ class GoalieSeasonService:
             xga_per_60 = round(xga / toi_hours, 2) if toi_hours > 0 else 0.0
 
             # Expected save percentage based on shots faced
-            # (shots_faced - xga) / shots_faced * 100
             nen_shots = shots_faced_nen_map.get(pid, shots_faced)
             if nen_shots > 0:
                 expected_save_pct = round(((nen_shots - xga) / nen_shots * 100), 2)
@@ -224,7 +309,10 @@ class GoalieSeasonService:
                 "position": "G",
                 "team_id": meta["team_id"],
                 "team_abbrev": meta["team_abbrev"],
+                "team": meta["team_abbrev"],
                 "team_name": meta["team_name"],
+                "teams": meta["teams"],
+                "stints": meta.get("stints", [meta["team_abbrev"]]),
                 "season": season,
                 # Traditional Metrics
                 "gp": gp,
@@ -260,19 +348,32 @@ class GoalieSeasonService:
         min_gp: int = 1,
         min_shots_faced: int = 0,
         min_toi_seconds: int = 0,
-        limit: int = 50
+        limit: int = 50,
+        team_id: Optional[int] = None,
+        precomputed_goalies: Optional[List[Dict[str, Any]]] = None
     ) -> List[Dict[str, Any]]:
         """
         Generates goalie analytical leaderboards with sample thresholds.
+        Supports in-memory sorting over precomputed goalie summaries to eliminate duplicate DB queries.
         Valid sort_by keys: 'gsax', 'gsax_per_60', 'save_pct', 'expected_save_pct',
         'save_pct_above_expected', 'shots_faced', 'xga', 'xga_per_60'.
         """
-        goalies = cls.get_season_goalies_summary(
-            season=season,
-            min_gp=min_gp,
-            min_shots_faced=min_shots_faced,
-            min_toi_seconds=min_toi_seconds
-        )
+        if precomputed_goalies is not None:
+            goalies = [
+                g.copy() for g in precomputed_goalies
+                if g.get("gp", 0) >= min_gp
+                and g.get("shots_faced", 0) >= min_shots_faced
+                and g.get("toi_seconds", 0) >= min_toi_seconds
+                and (team_id is None or g.get("team_id") == team_id)
+            ]
+        else:
+            goalies = cls.get_season_goalies_summary(
+                season=season,
+                team_id=team_id,
+                min_gp=min_gp,
+                min_shots_faced=min_shots_faced,
+                min_toi_seconds=min_toi_seconds
+            )
         if not goalies:
             return []
 
@@ -288,13 +389,17 @@ class GoalieSeasonService:
 
     @staticmethod
     def _empty_goalie_stats(player: Player, season: str) -> Dict[str, Any]:
+        abbr = player.current_team.abbreviation if player.current_team else "UNK"
+        name = player.current_team.name if player.current_team else "Unknown"
         return {
             "player_id": player.player_id,
             "name": player.full_name,
             "position": "G",
             "team_id": player.current_team_id,
-            "team_abbrev": player.current_team.abbreviation if player.current_team else "UNK",
-            "team_name": player.current_team.name if player.current_team else "Unknown",
+            "team_abbrev": abbr,
+            "team_name": name,
+            "teams": abbr,
+            "stints": [abbr],
             "season": season,
             "gp": 0,
             "toi_seconds": 0,
