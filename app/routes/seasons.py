@@ -33,11 +33,20 @@ def season_overview(season: str):
     League Overview Dashboard:
     - Standings table with team stats (Record, Goals, Expected Goals, Shot Attempt Shares, Finishing Diff)
     - Situation toggle (All Situations vs 5v5)
+    - Team filter selector (dynamic, season-aware, preserving multi-filter state)
     - Analytical leaders preview (Top Skaters by xG, G-xG, Points; Top Goalies by GSAx, Sv%)
     """
     situation = request.args.get('situation', 'all').lower()
     if situation not in ['all', '5v5', 'pp', 'sh']:
         situation = 'all'
+
+    team_id_raw = request.args.get('team_id')
+    selected_team_id = None
+    if team_id_raw:
+        try:
+            selected_team_id = int(team_id_raw)
+        except (ValueError, TypeError):
+            selected_team_id = None
 
     # Get available seasons for selector
     raw_seasons = GameService.get_available_seasons()
@@ -49,13 +58,36 @@ def season_overview(season: str):
     # Team analytical standings
     teams = TeamSeasonService.get_season_teams_summary(season=season, situation=situation)
 
-    # Analytical Leaders
+    # Derive available teams for selector from teams present in season
+    available_teams = sorted(
+        [{"team_id": t["team_id"], "team_abbrev": t["team_abbrev"], "team_name": t["team_name"]} for t in teams],
+        key=lambda x: x["team_name"]
+    )
+
+    selected_team = next((t for t in teams if t["team_id"] == selected_team_id), None)
+    if selected_team_id is not None and selected_team is None:
+        selected_team_id = None
+
+    # Analytical Leaders: calculate season summaries ONCE, then derive leaderboards in memory
+    all_skaters = PlayerSeasonService.get_season_skaters_summary(season=season, team_id=selected_team_id, min_gp=1)
+    all_goalies = GoalieSeasonService.get_season_goalies_summary(season=season, team_id=selected_team_id, min_gp=1)
+
     leaders = {
-        "xg": PlayerSeasonService.get_skater_leaderboards(season=season, sort_by='xg', limit=5),
-        "finishing": PlayerSeasonService.get_skater_leaderboards(season=season, sort_by='goals_above_expected', limit=5),
-        "points": PlayerSeasonService.get_skater_leaderboards(season=season, sort_by='points', limit=5),
-        "gsax": GoalieSeasonService.get_goalie_leaderboards(season=season, sort_by='gsax', limit=5),
-        "save_pct": GoalieSeasonService.get_goalie_leaderboards(season=season, sort_by='save_pct', limit=5)
+        "xg": PlayerSeasonService.get_skater_leaderboards(
+            season=season, sort_by='xg', limit=5, team_id=selected_team_id, precomputed_skaters=all_skaters
+        ),
+        "finishing": PlayerSeasonService.get_skater_leaderboards(
+            season=season, sort_by='goals_above_expected', limit=5, team_id=selected_team_id, precomputed_skaters=all_skaters
+        ),
+        "points": PlayerSeasonService.get_skater_leaderboards(
+            season=season, sort_by='points', limit=5, team_id=selected_team_id, precomputed_skaters=all_skaters
+        ),
+        "gsax": GoalieSeasonService.get_goalie_leaderboards(
+            season=season, sort_by='gsax', limit=5, team_id=selected_team_id, precomputed_goalies=all_goalies
+        ),
+        "save_pct": GoalieSeasonService.get_goalie_leaderboards(
+            season=season, sort_by='save_pct', limit=5, team_id=selected_team_id, precomputed_goalies=all_goalies
+        )
     }
 
     return render_template(
@@ -64,7 +96,10 @@ def season_overview(season: str):
         situation=situation,
         teams=teams,
         leaders=leaders,
-        available_seasons=available_seasons
+        available_seasons=available_seasons,
+        available_teams=available_teams,
+        selected_team_id=selected_team_id,
+        selected_team=selected_team
     )
 
 

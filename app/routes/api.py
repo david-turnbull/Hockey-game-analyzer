@@ -452,6 +452,8 @@ def get_season_leaders(season: str):
     min_gp = int(request.args.get('min_gp', 1))
     min_toi = int(request.args.get('min_toi', 0))
     limit = int(request.args.get('limit', 50))
+    team_id_raw = request.args.get('team_id')
+    team_id = int(team_id_raw) if (team_id_raw and team_id_raw.isdigit()) else None
 
     if category == 'goalies':
         min_shots = int(request.args.get('min_shots', 0))
@@ -461,7 +463,8 @@ def get_season_leaders(season: str):
             min_gp=min_gp,
             min_shots_faced=min_shots,
             min_toi_seconds=min_toi,
-            limit=limit
+            limit=limit,
+            team_id=team_id
         )
     else:
         min_unblocked = int(request.args.get('min_unblocked', 0))
@@ -471,13 +474,15 @@ def get_season_leaders(season: str):
             min_gp=min_gp,
             min_toi_seconds=min_toi,
             min_unblocked_attempts=min_unblocked,
-            limit=limit
+            limit=limit,
+            team_id=team_id
         )
 
     return jsonify({
         "season": season,
         "category": category,
         "metric": metric,
+        "team_id": team_id,
         "sample_size": len(leaders),
         "minimum_threshold": {
             "min_gp": min_gp,

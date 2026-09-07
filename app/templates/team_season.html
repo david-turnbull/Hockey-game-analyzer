@@ -129,9 +129,9 @@
     <div class="kpi-card">
         <div class="kpi-title">xG Rates (Per 60)</div>
         <div class="kpi-val" style="color: var(--accent-color);">
-            {{ stats.xgf_per_60 }}
+            {% if stats.xgf_per_60 is not none %}{{ stats.xgf_per_60 }}{% else %}&mdash;{% endif %}
         </div>
-        <div class="kpi-sub">xGA/60: <span style="font-weight: 600; color: var(--text-primary);">{{ stats.xga_per_60 }}</span> (Diff: {{ stats.xg_diff }})</div>
+        <div class="kpi-sub">xGA/60: <span style="font-weight: 600; color: var(--text-primary);">{% if stats.xga_per_60 is not none %}{{ stats.xga_per_60 }}{% else %}&mdash;{% endif %}</span> (Diff: {% if stats.xg_diff is not none %}{{ stats.xg_diff }}{% else %}&mdash;{% endif %})</div>
     </div>
 
     <!-- Possession Shares -->
