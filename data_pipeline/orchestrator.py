@@ -25,6 +25,7 @@ class PipelineOrchestrator:
         """
         logger.info(f"--- Starting Pipeline for Game ID: {game_id} ---")
         
+        was_cached = self.api_client.is_game_cached(game_id)
         # 1. Ingest Phase
         pbp_raw = self.api_client.get_play_by_play(game_id, force_refresh=force_refresh)
         shifts_raw = self.api_client.get_shifts(game_id, force_refresh=force_refresh)
@@ -263,6 +264,11 @@ class PipelineOrchestrator:
         valid_shifts = checker.validate_shifts(shifts_list, {p.player_id: p.position for p in players_list})
         
         summary = checker.get_summary()
+        summary["events_count"] = len(valid_events)
+        summary["shots_count"] = len(valid_shots)
+        summary["shifts_count"] = len(valid_shifts)
+        summary["player_ids"] = list(known_player_ids)
+        summary["was_cached"] = was_cached
         
         # 4. Loading Phase
         if checker.rejected_records_count > (len(events_list) * 0.5) and len(events_list) > 0:
@@ -290,50 +296,136 @@ class PipelineOrchestrator:
                 
         return success, summary
 
-    def ingest_season(self, team_abbr: str, season: str, limit: int = None, force_refresh: bool = False) -> dict:
+    def ingest_season(
+        self,
+        team_abbr: str = None,
+        season: str = None,
+        limit: int = None,
+        force_refresh: bool = False,
+        all_teams: bool = False
+    ) -> dict:
         """
-        Orchestrates ingestion of a whole season schedule for a team.
+        Orchestrates ingestion of a season schedule for a single team or league-wide.
+        
+        Returns validation summary containing:
+            season, games_requested, games_downloaded, games_cached,
+            games_successfully_ingested, games_skipped, games_failed,
+            events, shots, shifts, players.
         """
-        logger.info(f"Ingesting season schedule for {team_abbr} {season}")
-        schedule_data = self.api_client.get_season_schedule(team_abbr, season, force_refresh=force_refresh)
-        
-        if not schedule_data or "games" not in schedule_data:
-            return {"error": "Failed to retrieve schedule"}
-            
-        # Filter regular season games
-        reg_games = [g for g in schedule_data["games"] if g.get("gameType") == 2]
-        total_games = len(reg_games)
-        
-        if limit:
-            reg_games = reg_games[:limit]
-            
-        logger.info(f"Found {total_games} regular season games. Ingesting {len(reg_games)} games.")
-        
-        results = {
-            "total_games": total_games,
-            "processed_games": 0,
-            "successful_games": 0,
-            "failed_games": 0,
-            "game_summaries": {}
-        }
-        
-        for game in reg_games:
-            game_id = game["id"]
-            results["processed_games"] += 1
-            
-            # Skip games that are not final/played
-            # gameState can be 'OFF', 'FINAL', 'LIVE', 'PRV'
-            if game.get("gameState") not in ['OFF', 'FINAL']:
-                logger.info(f"Skipping game {game_id} because state is {game.get('gameState')} (not final).")
-                results["failed_games"] += 1
-                results["game_summaries"][game_id] = {"error": f"Game state is {game.get('gameState')}"}
-                continue
-                
-            success, summary = self.ingest_game(game_id, force_refresh=force_refresh)
-            if success:
-                results["successful_games"] += 1
+        # Support flexible positional/keyword arguments
+        if season is None and team_abbr and len(team_abbr) == 8 and team_abbr.isdigit():
+            # team_abbr passed as season
+            season = team_abbr
+            team_abbr = None
+
+        if not season:
+            return {"error": "Missing season argument"}
+
+        logger.info(f"Ingesting season {season} (team: {team_abbr or 'ALL'}, all_teams: {all_teams})")
+
+        # Collect list of teams
+        if all_teams or not team_abbr or team_abbr.upper() == 'ALL':
+            # Standard 32 NHL teams (Coyotes relocated to Utah for 2024-25+)
+            if int(season[:4]) >= 2024:
+                teams_to_query = [
+                    'ANA', 'BOS', 'BUF', 'CAR', 'CBJ', 'CGY', 'CHI', 'COL',
+                    'DAL', 'DET', 'EDM', 'FLA', 'LAK', 'MIN', 'MTL', 'NJD',
+                    'NSH', 'NYI', 'NYR', 'OTT', 'PHI', 'PIT', 'SEA', 'SJS',
+                    'STL', 'TBL', 'TOR', 'UTA', 'VAN', 'VGK', 'WPG', 'WSH'
+                ]
             else:
-                results["failed_games"] += 1
-            results["game_summaries"][game_id] = summary
-            
+                teams_to_query = [
+                    'ANA', 'ARI', 'BOS', 'BUF', 'CAR', 'CBJ', 'CGY', 'CHI',
+                    'COL', 'DAL', 'DET', 'EDM', 'FLA', 'LAK', 'MIN', 'MTL',
+                    'NJD', 'NSH', 'NYI', 'NYR', 'OTT', 'PHI', 'PIT', 'SEA',
+                    'SJS', 'STL', 'TBL', 'TOR', 'VAN', 'VGK', 'WPG', 'WSH'
+                ]
+        else:
+            teams_to_query = [team_abbr.upper()]
+
+        # Collect unique regular-season games across requested teams
+        games_by_id = {}
+        for abbr in teams_to_query:
+            try:
+                sched = self.api_client.get_season_schedule(abbr, season, force_refresh=force_refresh)
+                if sched and "games" in sched:
+                    for g in sched["games"]:
+                        if g.get("gameType") == 2:  # Regular season only
+                            games_by_id[g["id"]] = g
+            except Exception as e:
+                logger.warning(f"Failed to fetch schedule for team {abbr} season {season}: {e}")
+
+        if not games_by_id:
+            return {"error": f"Failed to retrieve any schedule games for season {season}"}
+
+        # Sort games chronologically
+        sorted_games = sorted(games_by_id.values(), key=lambda x: (x.get("gameDate", ""), x.get("id", 0)))
+        total_requested = len(sorted_games)
+
+        if limit:
+            sorted_games = sorted_games[:limit]
+
+        logger.info(f"Found {total_requested} regular season games. Processing {len(sorted_games)} games.")
+
+        games_downloaded = 0
+        games_cached = 0
+        successful_games = 0
+        skipped_games = 0
+        failed_games = 0
+
+        total_events = 0
+        total_shots = 0
+        total_shifts = 0
+        all_player_ids = set()
+        game_summaries = {}
+
+        for game in sorted_games:
+            game_id = game["id"]
+            game_state = game.get("gameState")
+
+            # Safeguard for partial/incomplete seasons: skip non-final games
+            if game_state not in ['OFF', 'FINAL']:
+                logger.info(f"Skipping game {game_id} because state is {game_state} (not final).")
+                skipped_games += 1
+                game_summaries[game_id] = {"error": f"Game state is {game_state} (not final)", "skipped": True}
+                continue
+
+            was_cached = self.api_client.is_game_cached(game_id)
+            success, summary = self.ingest_game(game_id, force_refresh=force_refresh)
+
+            if was_cached:
+                games_cached += 1
+            else:
+                games_downloaded += 1
+
+            if success:
+                successful_games += 1
+                total_events += summary.get("events_count", 0)
+                total_shots += summary.get("shots_count", 0)
+                total_shifts += summary.get("shifts_count", 0)
+                all_player_ids.update(summary.get("player_ids", []))
+            else:
+                failed_games += 1
+
+            game_summaries[game_id] = summary
+
+        results = {
+            "season": season,
+            "games_requested": len(sorted_games),
+            "games_downloaded": games_downloaded,
+            "games_cached": games_cached,
+            "games_successfully_ingested": successful_games,
+            "games_skipped": skipped_games,
+            "games_failed": failed_games,
+            "events": total_events,
+            "shots": total_shots,
+            "shifts": total_shifts,
+            "players": len(all_player_ids),
+            # Legacy backwards compatibility keys
+            "total_games": total_requested,
+            "processed_games": len(sorted_games),
+            "successful_games": successful_games,
+            "failed_games": failed_games + skipped_games,
+            "game_summaries": game_summaries
+        }
         return results
