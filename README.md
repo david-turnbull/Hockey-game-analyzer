@@ -265,19 +265,27 @@ All coordinates are symmetrically mapped to the attacking net at $(89, 0)$ such 
 
 ### 3. Candidate Selection & Held-Out Test Evaluation
 
-Candidate models were evaluated and compared strictly on the chronological validation set (2,176 shots, 24 games) using Validation Log Loss as the primary decision metric, keeping the held-out test set completely untouched during selection:
+Candidate models were evaluated and compared strictly on the chronological validation set (2,176 shots, 24 games) using Validation Log Loss as the primary decision metric, keeping the held-out test set completely untouched during candidate selection:
 
-- **Validation Selection**: Logistic Regression achieved lower validation log loss (0.2325 vs 0.2328) and superior calibration compared to gradient boosting.
+- **Validation Selection**: Logistic Regression was selected because it achieved the lower validation Log Loss (0.2326 vs 0.2341). Gradient Boosting performed slightly better on validation Brier Score (0.0629 vs 0.0635) and validation ROC AUC (0.7515 vs 0.7485), but validation Log Loss served as the primary model selection criterion:
+
+| Candidate Model | Validation Log Loss | Validation Brier Score | Validation ROC AUC | Expected Goals | Actual Goals |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Logistic Regression** (Selected) | **0.2326** | 0.0635 | 0.7485 | 151.50 | 157.0 (7.22%) |
+| **Gradient Boosting** | 0.2341 | **0.0629** | **0.7515** | 138.97 | 157.0 (7.22%) |
+
 - **Production Retraining (Option B)**: The selected Logistic Regression configuration was refitted on the combined training and validation set (12,036 shots across 137 games).
-- **Final Benchmark**: The retrained model was evaluated once on the untouched held-out test set (2,226 shots across 25 games):
+- **Held-Out Test Evaluation**: The current training pipeline does not use the held-out test set for candidate selection, hyperparameter selection, or production refitting. Final test metrics are computed only after the selected model configuration has been frozen. The retrained model was evaluated once on the untouched held-out test set (2,226 shots across 25 games):
 
 | Evaluation Metric | Production Model (`pucklens-xg-logistic` v1.0.0) | Target Direction |
 | :--- | :--- | :--- |
 | **Test Log Loss** | **0.2127** | Lower is better |
-| **Test Brier Score** | **0.0563** | Lower is better |
-| **Test ROC AUC** | **0.7493** | Higher is better |
-| **Total Expected Goals** | **150.44** | Target: 147.0 Actual Goals (+2.3% delta) |
-| **Expected Goal Rate** | **6.76%** | Target: 6.60% Actual |
+| **Test Brier Score** | **0.0562** | Lower is better |
+| **Test ROC AUC** | **0.7494** | Higher is better |
+| **Actual Goals** | 147 | — |
+| **Total Expected Goals** | **150.27** | Target: 147.0 Actual Goals (+2.2% delta) |
+| **Actual Goal Rate** | 6.60% | — |
+| **Expected Goal Rate** | **6.75%** | Well-calibrated baseline |
 
 For comprehensive diagnostic breakdowns across distance brackets, calibration curves, and feature importances, see the [PuckLens xG Model Card](docs/models/xg_v1.md).
 

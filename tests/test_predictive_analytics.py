@@ -916,4 +916,133 @@ def test_training_serving_feature_parity():
         assert col in training_shot_features, f"Missing feature column: {col}"
 
 
+def test_shot_feature_extractor_missing_event_id():
+    """Issue 2: Verifies that an unblocked shot with missing eventId is skipped from canonical extraction."""
+    pbp_mock = {
+        "id": 10004,
+        "season": "20232024",
+        "gameDate": "2023-11-01",
+        "homeTeam": {"id": 1, "abbrev": "HOM"},
+        "awayTeam": {"id": 2, "abbrev": "AWY"},
+        "plays": [
+            {
+                "eventId": None,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "03:00",
+                "typeDescKey": "shot-on-goal",
+                "details": {"xCoord": 65.0, "yCoord": 5.0, "eventOwnerTeamId": 1, "shootingPlayerId": 101, "goalieInNetId": 201, "shotType": "wrist"}
+            },
+            {
+                "eventId": 10,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "04:00",
+                "typeDescKey": "shot-on-goal",
+                "details": {"xCoord": 70.0, "yCoord": 0.0, "eventOwnerTeamId": 1, "shootingPlayerId": 102, "goalieInNetId": 201, "shotType": "slap"}
+            }
+        ]
+    }
+    extracted = ShotFeatureExtractor.extract_shots_from_pbp_json(pbp_mock, unblocked_only=True)
+    assert len(extracted) == 1
+    assert extracted[0]["event_id"] == "10004_10"
+    for s in extracted:
+        assert "None" not in str(s["event_id"])
+
+
+def test_shot_feature_extractor_duplicate_event_id():
+    """Issue 2: Verifies that duplicate eventId does not silently overwrite and first valid occurrence is preserved."""
+    pbp_mock = {
+        "id": 10005,
+        "season": "20232024",
+        "gameDate": "2023-11-01",
+        "homeTeam": {"id": 1, "abbrev": "HOM"},
+        "awayTeam": {"id": 2, "abbrev": "AWY"},
+        "plays": [
+            {
+                "eventId": 42,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "03:00",
+                "typeDescKey": "shot-on-goal",
+                "details": {"xCoord": 65.0, "yCoord": 5.0, "eventOwnerTeamId": 1, "shootingPlayerId": 101, "goalieInNetId": 201, "shotType": "wrist"}
+            },
+            {
+                "eventId": 42,
+                "periodDescriptor": {"number": 1, "periodType": "REG"},
+                "timeInPeriod": "03:05",
+                "typeDescKey": "shot-on-goal",
+                "details": {"xCoord": 80.0, "yCoord": 0.0, "eventOwnerTeamId": 1, "shootingPlayerId": 102, "goalieInNetId": 201, "shotType": "slap"}
+            }
+        ]
+    }
+    extracted = ShotFeatureExtractor.extract_shots_from_pbp_json(pbp_mock, unblocked_only=True)
+    assert len(extracted) == 1
+    assert extracted[0]["event_id"] == "10005_42"
+    assert extracted[0]["shot_type"] == "wrist"
+
+
+def test_orchestrator_missing_feature_leaves_null_xg():
+    """Issue 2: Verifies that an unblocked shot with missing canonical feature in orchestrated ingestion leaves xG/provenance NULL."""
+    normalizer = DataNormalizer()
+    play = {
+        "eventId": 777,
+        "periodDescriptor": {"number": 1, "periodType": "REG"},
+        "timeInPeriod": "05:00",
+        "typeDescKey": "shot-on-goal",
+        "situationCode": "1551",
+        "details": {
+            "xCoord": 70.0,
+            "yCoord": 5.0,
+            "eventOwnerTeamId": 1,
+            "shootingPlayerId": 101,
+            "goalieInNetId": 201,
+            "shotType": "wrist"
+        }
+    }
+    event_model, shot_model = normalizer.transform_event(
+        play, 99999, 1, xg_features=None, require_full_xg_context=True
+    )
+    assert shot_model is not None
+    assert shot_model.outcome == "Saved"
+    assert shot_model.xg is None
+    assert shot_model.model_name is None
+    assert shot_model.model_version is None
+    assert shot_model.prediction_method is None
+
+
+def test_backfill_skipping_policy(app, db, tmp_path):
+    """Issue 1: Verifies backfill skips shots without PBP or without feature match instead of generating reduced-context predictions."""
+    game = Game(game_id=77701, season="20232024", game_date=date(2023, 10, 15), game_type=2, nhl_game_state="OFF", home_team_id=1, away_team_id=2, home_score=0, away_score=0)
+    t1 = Team(team_id=1, name="Home", abbreviation="HOM")
+    t2 = Team(team_id=2, name="Away", abbreviation="AWY")
+    p1 = Player(player_id=101, first_name="A", last_name="B", position="C")
+    db.session.add_all([game, t1, t2, p1])
+    
+    # Event 1: Unblocked shot with existing canonical xG that must NOT be overwritten
+    ev1 = Event(event_id="77701_1", game_id=77701, period=1, period_time="01:00", event_type="shot-on-goal", team_id=1, primary_player_id=101)
+    s1 = Shot(shot_id="77701_1", game_id=77701, team_id=1, shooter_id=101, outcome="Saved", xg=0.1234, model_name="canonical", model_version="1.0", prediction_method="ml")
+    
+    # Event 2: Blocked shot with old value that MUST be cleared
+    ev2 = Event(event_id="77701_2", game_id=77701, period=1, period_time="02:00", event_type="blocked-shot", team_id=1, primary_player_id=101)
+    s2 = Shot(shot_id="77701_2", game_id=77701, team_id=1, shooter_id=101, outcome="Blocked", xg=0.05, model_name="legacy", model_version="0.9", prediction_method="ml")
+    
+    db.session.add_all([ev1, s1, ev2, s2])
+    db.session.commit()
+    
+    from scripts.backfill_xg import run_backfill
+    summary = run_backfill(app, raw_dir=str(tmp_path))
+    
+    # Blocked shot cleared
+    s2_refreshed = db.session.get(Shot, "77701_2")
+    assert s2_refreshed.xg is None
+    assert s2_refreshed.model_name is None
+    
+    # Unblocked shot skipped: existing value was NOT overwritten
+    s1_refreshed = db.session.get(Shot, "77701_1")
+    assert s1_refreshed.xg == 0.1234
+    assert s1_refreshed.model_name == "canonical"
+    
+    assert summary["shots_skipped_missing_pbp"] >= 1
+    assert summary["blocked_shots_cleared"] >= 1
+
+
+
 

@@ -48,12 +48,13 @@ All features are normalized relative to the attacking net located at $(x = 89, y
 
 ### Missing Coordinate & Categorical Robustness:
 - **Missing Coordinates (`coordinates_missing = 1`)**: When raw play coordinates are absent, neutral values ($45.0$ ft distance, $0.0^\circ$ angle) are assigned and `coordinates_missing` is set to 1. In the database, coordinate fields remain `NULL`, but the shot is scored by the model.
-- **`'UNKNOWN'` Categories**: Unrecognized or missing categorical values (`shot_type`, `strength_state`, `prev_event_type`) map cleanly to standardized `'UNKNOWN'` categories rather than failing.
+- **Categorical Handling (`shot_type`, `strength_state`)**: Unrecognized or missing shot release types or manpower states map to standardized `'UNKNOWN'` categories.
+- **Preceding Event Handling (`prev_event_type`)**: When there is no preceding event (e.g., at period start), `prev_event_type` is assigned `"none"`. Preceding event types present in source data are preserved as normalized lower-case event type keys (e.g., `'shot-on-goal'`, `'hit'`, `'faceoff'`, `'giveaway'`, `'takeaway'`).
 
 ### Sequential & Contextual Derived Features:
 | Feature | Type | Description |
 | :--- | :--- | :--- |
-| `prev_event_type` | Categorical | Type of play-by-play event immediately preceding the shot attempt. |
+| `prev_event_type` | Categorical | Type of play-by-play event immediately preceding the shot attempt (`"none"` if no preceding event in period). |
 | `time_since_prev_event` | Numeric | Elapsed seconds ($\Delta t$) between preceding event and current shot attempt. |
 | `distance_from_prev_event` | Numeric | Distance in feet ($\Delta d$) traveled from the location of the previous event. |
 | `angle_change` | Numeric | Change in angle relative to the net between preceding event and shot attempt. |
@@ -96,7 +97,7 @@ Once candidate architecture selection was frozen, the selected Logistic Regressi
 ### Final Single Evaluation on Untouched Held-Out Test Set
 The finalized refit model was evaluated **once** on the untouched chronological test set (25 games; 2,226 shot attempts; 147 actual goals).
 
-> **Methodological Disclaimer**: The held-out test set was never accessed, evaluated, or peeked at during candidate selection, hyperparameter choices, or feature engineering iterations.
+> **Methodological Disclaimer**: The current training pipeline does not use the held-out test set for candidate selection, hyperparameter selection, or production refitting. Final test metrics are computed only after the selected model configuration has been frozen.
 
 | Final Test Metric | Production Model (`pucklens-xg-logistic` v1.0.0) | Target / Reference |
 | :--- | :--- | :--- |

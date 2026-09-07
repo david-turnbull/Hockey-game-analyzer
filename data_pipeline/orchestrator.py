@@ -192,16 +192,26 @@ class PipelineOrchestrator:
             # Pre-extract full 21-feature contextual representations for unblocked shots
             from app.analytics.shot_features import ShotFeatureExtractor
             pbp_shots = ShotFeatureExtractor.extract_shots_from_pbp_json(pbp_raw, unblocked_only=True)
-            xg_features_by_event_id = {s['event_id']: s for s in pbp_shots}
+            xg_features_by_event_id = {}
+            for feature in pbp_shots:
+                eid = feature.get("event_id")
+                if not eid:
+                    logger.warning("Extracted shot missing event_id in game %s", game_id)
+                    continue
+                if eid in xg_features_by_event_id:
+                    logger.error("Duplicate event_id %s in extracted shots for game %s; preserving first occurrence", eid, game_id)
+                    continue
+                xg_features_by_event_id[eid] = feature
 
             # Events & Shots
             events_list = []
             shots_list = []
             for play in pbp_raw.get("plays", []):
-                play_event_id = f"{game_id}_{play.get('eventId')}"
-                feat = xg_features_by_event_id.get(play_event_id)
+                raw_eid = play.get("eventId")
+                play_event_id = f"{game_id}_{raw_eid}" if raw_eid is not None else None
+                feat = xg_features_by_event_id.get(play_event_id) if play_event_id else None
                 event_model, shot_model = self.normalizer.transform_event(
-                    play, game_id, home_team_raw["id"], xg_features=feat
+                    play, game_id, home_team_raw["id"], xg_features=feat, require_full_xg_context=True
                 )
                 events_list.append(event_model)
                 if shot_model:

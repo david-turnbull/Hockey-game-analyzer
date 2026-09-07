@@ -1,5 +1,8 @@
 import math
+import logging
 from typing import Dict, List, Optional, Tuple, Any
+
+logger = logging.getLogger(__name__)
 
 NET_X = 89.0
 NET_Y = 0.0
@@ -290,6 +293,7 @@ class ShotFeatureExtractor:
 
         raw_plays = pbp_data.get('plays', [])
         shots = []
+        seen_event_ids = set()
 
         # Track previous event details within each period
         current_period = 0
@@ -325,116 +329,130 @@ class ShotFeatureExtractor:
 
             # Check if this play is a shot attempt
             if type_desc in target_event_types:
-                # Determine shooter and goalie
-                shooter_id = play.get('details', {}).get('scoringPlayerId') or play.get('details', {}).get('shootingPlayerId')
-                goalie_id = play.get('details', {}).get('goalieInNetId')
-                is_goal = (type_desc == 'goal')
-                shot_type = play.get('details', {}).get('shotType')
-
-                # Calculate score differential at the instant of the shot
-                shooter_score = home_score if is_home_event else away_score
-                defending_score = away_score if is_home_event else home_score
-                score_diff = shooter_score - defending_score
-
-                # Determine situation / strength state
-                situation_code = play.get('situationCode')
-                empty_net = False
-                strength_state = 'UNKNOWN'
-                if situation_code and len(str(situation_code)) == 4 and str(situation_code).isdigit():
-                    away_g, away_s, home_s, home_g = [int(c) for c in str(situation_code)]
-                    if is_home_event:
-                        empty_net = (away_g == 0)
-                        if home_s > away_s:
-                            strength_state = 'PP'
-                        elif home_s < away_s:
-                            strength_state = 'SH'
-                        else:
-                            strength_state = 'EV'
-                    else:
-                        empty_net = (home_g == 0)
-                        if away_s > home_s:
-                            strength_state = 'PP'
-                        elif away_s < home_s:
-                            strength_state = 'SH'
-                        else:
-                            strength_state = 'EV'
-
-                # Coordinates and normalization
-                coords_missing = (raw_x is None or raw_y is None)
-                if not coords_missing:
-                    should_flip = get_attacking_coordinate_transform(raw_x, raw_y, is_home_team=is_home_event)
-                    norm_x, norm_y = apply_coordinate_transform(raw_x, raw_y, should_flip)
-                    dist, ang = calculate_distance_and_angle(norm_x, norm_y)
+                raw_event_id = play.get("eventId")
+                if raw_event_id is None:
+                    logger.warning(
+                        "Skipping xG feature extraction for game %s: eligible shot missing eventId",
+                        game_id,
+                    )
+                elif raw_event_id in seen_event_ids:
+                    logger.warning(
+                        "Duplicate eventId %s detected in game %s; excluding duplicate feature record",
+                        raw_event_id,
+                        game_id,
+                    )
                 else:
-                    should_flip = False
-                    norm_x, norm_y = None, None
-                    dist, ang = 45.0, 0.0
+                    seen_event_ids.add(raw_event_id)
+                    # Determine shooter and goalie
+                    shooter_id = play.get('details', {}).get('scoringPlayerId') or play.get('details', {}).get('shootingPlayerId')
+                    goalie_id = play.get('details', {}).get('goalieInNetId')
+                    is_goal = (type_desc == 'goal')
+                    shot_type = play.get('details', {}).get('shotType')
 
-                # Previous event context
-                prev_type = 'none'
-                delta_t = 15.0
-                delta_d = 0.0
-                angle_change = 0.0
+                    # Calculate score differential at the instant of the shot
+                    shooter_score = home_score if is_home_event else away_score
+                    defending_score = away_score if is_home_event else home_score
+                    score_diff = shooter_score - defending_score
 
-                if prev_event is not None:
-                    prev_type = prev_event.get('type', 'none')
-                    prev_sec = prev_event.get('seconds', period_seconds)
-                    delta_t = max(0.0, float(period_seconds - prev_sec))
-                    prev_raw_x = prev_event.get('raw_x')
-                    prev_raw_y = prev_event.get('raw_y')
-                    
-                    if not coords_missing and prev_raw_x is not None and prev_raw_y is not None:
-                        # 1. Physical Euclidean distance remains raw Euclidean distance (unflipped)
-                        delta_d = math.sqrt((raw_x - prev_raw_x)**2 + (raw_y - prev_raw_y)**2)
+                    # Determine situation / strength state
+                    situation_code = play.get('situationCode')
+                    empty_net = False
+                    strength_state = 'UNKNOWN'
+                    if situation_code and len(str(situation_code)) == 4 and str(situation_code).isdigit():
+                        away_g, away_s, home_s, home_g = [int(c) for c in str(situation_code)]
+                        if is_home_event:
+                            empty_net = (away_g == 0)
+                            if home_s > away_s:
+                                strength_state = 'PP'
+                            elif home_s < away_s:
+                                strength_state = 'SH'
+                            else:
+                                strength_state = 'EV'
+                        else:
+                            empty_net = (home_g == 0)
+                            if away_s > home_s:
+                                strength_state = 'PP'
+                            elif away_s < home_s:
+                                strength_state = 'SH'
+                            else:
+                                strength_state = 'EV'
+
+                    # Coordinates and normalization
+                    coords_missing = (raw_x is None or raw_y is None)
+                    if not coords_missing:
+                        should_flip = get_attacking_coordinate_transform(raw_x, raw_y, is_home_team=is_home_event)
+                        norm_x, norm_y = apply_coordinate_transform(raw_x, raw_y, should_flip)
+                        dist, ang = calculate_distance_and_angle(norm_x, norm_y)
+                    else:
+                        should_flip = False
+                        norm_x, norm_y = None, None
+                        dist, ang = 45.0, 0.0
+
+                    # Previous event context
+                    prev_type = 'none'
+                    delta_t = 15.0
+                    delta_d = 0.0
+                    angle_change = 0.0
+
+                    if prev_event is not None:
+                        prev_type = prev_event.get('type', 'none')
+                        prev_sec = prev_event.get('seconds', period_seconds)
+                        delta_t = max(0.0, float(period_seconds - prev_sec))
+                        prev_raw_x = prev_event.get('raw_x')
+                        prev_raw_y = prev_event.get('raw_y')
                         
-                        # 2. Sequential angle change applies one unified attacking frame transform
-                        prev_nx_shooter, prev_ny_shooter = apply_coordinate_transform(
-                            prev_raw_x, prev_raw_y, should_flip
-                        )
-                        prev_dist, prev_ang = calculate_distance_and_angle(prev_nx_shooter, prev_ny_shooter)
-                        angle_change = abs(ang - prev_ang)
+                        if not coords_missing and prev_raw_x is not None and prev_raw_y is not None:
+                            # 1. Physical Euclidean distance remains raw Euclidean distance (unflipped)
+                            delta_d = math.sqrt((raw_x - prev_raw_x)**2 + (raw_y - prev_raw_y)**2)
+                            
+                            # 2. Sequential angle change applies one unified attacking frame transform
+                            prev_nx_shooter, prev_ny_shooter = apply_coordinate_transform(
+                                prev_raw_x, prev_raw_y, should_flip
+                            )
+                            prev_dist, prev_ang = calculate_distance_and_angle(prev_nx_shooter, prev_ny_shooter)
+                            angle_change = abs(ang - prev_ang)
 
-                feature_input = {
-                    'distance': dist,
-                    'angle': ang,
-                    'coordinates_missing': 1 if coords_missing else 0,
-                    'shot_type': shot_type,
-                    'period': period,
-                    'period_seconds': period_seconds,
-                    'strength_state': strength_state,
-                    'score_differential': score_diff,
-                    'is_home': is_home_event,
-                    'empty_net': empty_net,
-                    'prev_event_type': prev_type,
-                    'time_since_prev_event': delta_t,
-                    'distance_from_prev_event': delta_d,
-                    'angle_change': angle_change
-                }
+                    feature_input = {
+                        'distance': dist,
+                        'angle': ang,
+                        'coordinates_missing': 1 if coords_missing else 0,
+                        'shot_type': shot_type,
+                        'period': period,
+                        'period_seconds': period_seconds,
+                        'strength_state': strength_state,
+                        'score_differential': score_diff,
+                        'is_home': is_home_event,
+                        'empty_net': empty_net,
+                        'prev_event_type': prev_type,
+                        'time_since_prev_event': delta_t,
+                        'distance_from_prev_event': delta_d,
+                        'angle_change': angle_change
+                    }
 
-                features = cls.extract_features_from_dict(feature_input)
-                
-                # Attach metadata identifiers
-                record = {
-                    'game_id': game_id,
-                    'event_id': f"{game_id}_{play.get('eventId', len(shots))}",
-                    'season': season,
-                    'game_date': game_date,
-                    'period': period,
-                    'period_time': time_str,
-                    'period_seconds': period_seconds,
-                    'shooter_id': shooter_id,
-                    'shooter_team_id': event_owner_team_id,
-                    'defending_team_id': away_team_id if is_home_event else home_team_id,
-                    'goalie_id': goalie_id,
-                    'event_type': type_desc,
-                    'goal': 1 if is_goal else 0,
-                    'raw_x': raw_x,
-                    'raw_y': raw_y,
-                    'norm_x': norm_x,
-                    'norm_y': norm_y,
-                    **features
-                }
-                shots.append(record)
+                    features = cls.extract_features_from_dict(feature_input)
+                    
+                    # Attach metadata identifiers
+                    record = {
+                        'game_id': game_id,
+                        'event_id': f"{game_id}_{raw_event_id}",
+                        'season': season,
+                        'game_date': game_date,
+                        'period': period,
+                        'period_time': time_str,
+                        'period_seconds': period_seconds,
+                        'shooter_id': shooter_id,
+                        'shooter_team_id': event_owner_team_id,
+                        'defending_team_id': away_team_id if is_home_event else home_team_id,
+                        'goalie_id': goalie_id,
+                        'event_type': type_desc,
+                        'goal': 1 if is_goal else 0,
+                        'raw_x': raw_x,
+                        'raw_y': raw_y,
+                        'norm_x': norm_x,
+                        'norm_y': norm_y,
+                        **features
+                    }
+                    shots.append(record)
 
             # Update score if goal scored
             if type_desc == 'goal':

@@ -274,7 +274,9 @@ class DataNormalizer:
             nhl_game_state=nhl_game_state
         )
 
-    def transform_event(self, play: dict, game_id: int, home_team_id: int, xg_features: Optional[Dict[str, Any]] = None) -> tuple:
+    def transform_event(self, play: dict, game_id: int, home_team_id: int, 
+                        xg_features: Optional[Dict[str, Any]] = None,
+                        require_full_xg_context: bool = False) -> tuple:
         """
         Transforms a play dict into an Event model, and if it's a shot attempt,
         also constructs a Shot model.
@@ -423,6 +425,20 @@ class DataNormalizer:
                 from app.services.xg_service import XGService
                 if xg_features is not None:
                     xg_prediction = XGService.predict_shot_xg(features=xg_features)
+                    shot_xg = xg_prediction.xg
+                    m_name = xg_prediction.model_name
+                    m_version = xg_prediction.model_version
+                    p_method = xg_prediction.method
+                elif require_full_xg_context:
+                    logger.warning(
+                        "Canonical contextual xG features missing for shot event %s in game %s; leaving xG and provenance NULL.",
+                        event_id,
+                        game_id
+                    )
+                    shot_xg = None
+                    m_name = None
+                    m_version = None
+                    p_method = None
                 else:
                     xg_prediction = XGService.predict_shot_xg(
                         distance=dist,
@@ -431,10 +447,10 @@ class DataNormalizer:
                         strength_state=team_strength_state,
                         empty_net=empty_net
                     )
-                shot_xg = xg_prediction.xg
-                m_name = xg_prediction.model_name
-                m_version = xg_prediction.model_version
-                p_method = xg_prediction.method
+                    shot_xg = xg_prediction.xg
+                    m_name = xg_prediction.model_name
+                    m_version = xg_prediction.model_version
+                    p_method = xg_prediction.method
             else:
                 shot_xg = None
                 m_name = None
