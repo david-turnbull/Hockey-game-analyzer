@@ -179,10 +179,14 @@
     const goalieTrend = {{ rolling | tojson }};
     if (goalieTrend && goalieTrend.trend && goalieTrend.trend.length > 0) {
         const entries = goalieTrend.trend;
-        const labels = entries.map(e => `Game ${e.game_number} vs ${e.opponent}`);
-        const gsaxVals = entries.map(e => e.rolling_gsax);
-        const svPctVals = entries.map(e => e.rolling_save_pct);
-        const expSvPctVals = entries.map(e => e.rolling_expected_save_pct);
+        const labels = entries.map((e, idx) => {
+            const num = e.game_number || e.game_index || (idx + 1);
+            const opp = e.opponent_display || (e.opponent ? `vs ${e.opponent}` : '');
+            return `Gm ${num} ${opp}`.trim();
+        });
+        const gsaxVals = entries.map(e => e.rolling_gsax !== undefined ? e.rolling_gsax : 0);
+        const svPctVals = entries.map(e => e.rolling_save_pct !== undefined ? e.rolling_save_pct : 0);
+        const expSvPctVals = entries.map(e => e.rolling_expected_save_pct !== undefined ? e.rolling_expected_save_pct : 0);
 
         const traceGsax = {
             x: labels,
@@ -191,7 +195,8 @@
             type: 'scatter',
             mode: 'lines+markers',
             line: { color: '#10b981', width: 3 },
-            marker: { size: 6 }
+            marker: { size: 6 },
+            hovertemplate: '%{x}<br>Rolling GSAx: <b>%{y:.2f}</b><extra></extra>'
         };
 
         const traceSv = {
@@ -201,7 +206,8 @@
             type: 'scatter',
             mode: 'lines',
             yaxis: 'y2',
-            line: { color: '#38bdf8', width: 2 }
+            line: { color: '#38bdf8', width: 2 },
+            hovertemplate: '%{x}<br>Rolling SV%: <b>%{y:.1f}%</b><extra></extra>'
         };
 
         const traceExpSv = {
@@ -211,11 +217,12 @@
             type: 'scatter',
             mode: 'lines',
             yaxis: 'y2',
-            line: { color: '#94a3b8', width: 1.5, dash: 'dot' }
+            line: { color: '#94a3b8', width: 1.5, dash: 'dot' },
+            hovertemplate: '%{x}<br>Exp SV%: <b>%{y:.1f}%</b><extra></extra>'
         };
 
         const layout = {
-            margin: { l: 40, r: 40, t: 20, b: 60 },
+            margin: { l: 45, r: 45, t: 20, b: 60 },
             paper_bgcolor: 'transparent',
             plot_bgcolor: 'transparent',
             showlegend: true,

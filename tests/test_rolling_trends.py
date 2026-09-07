@@ -111,3 +111,13 @@ def test_team_rolling_trends_chronology_and_isolation(app, db):
 
     # Verify game 4 had NO leakage from games 5, 6, 7
     assert pt_g4["xgf_pct"] > pt_g7["xgf_pct"]
+
+    # Verify template field bindings and aliases
+    assert pt_g4["game_number"] == 4
+    assert pt_g4["opponent"] == "EDM"
+    assert pt_g4["opponent_display"] == "vs EDM"
+    assert pt_g4["is_home"] is True
+    assert pt_g4["rolling_xg_pct"] == pt_g4["xgf_pct"]
+    assert pt_g4["rolling_cf_pct"] == pt_g4["cf_pct"]
+    assert pt_g4["rolling_xg_diff"] == pt_g4["xg_diff"]
+

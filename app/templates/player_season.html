@@ -228,9 +228,13 @@
     const rollingTrend = {{ rolling | tojson }};
     if (rollingTrend && rollingTrend.trend && rollingTrend.trend.length > 0) {
         const entries = rollingTrend.trend;
-        const labels = entries.map(e => `Game ${e.game_number} vs ${e.opponent}`);
-        const xgVals = entries.map(e => e.rolling_xg);
-        const shotVals = entries.map(e => e.rolling_unblocked_shots);
+        const labels = entries.map((e, idx) => {
+            const num = e.game_number || e.game_index || (idx + 1);
+            const opp = e.opponent_display || (e.opponent ? `vs ${e.opponent}` : '');
+            return `Gm ${num} ${opp}`.trim();
+        });
+        const xgVals = entries.map(e => e.rolling_xg !== undefined ? e.rolling_xg : 0);
+        const shotVals = entries.map(e => e.rolling_unblocked_shots !== undefined ? e.rolling_unblocked_shots : (e.rolling_shot_volume !== undefined ? e.rolling_shot_volume : 0));
 
         const traceXg = {
             x: labels,
@@ -239,7 +243,8 @@
             type: 'scatter',
             mode: 'lines+markers',
             line: { color: '#38bdf8', width: 3 },
-            marker: { size: 6 }
+            marker: { size: 6 },
+            hovertemplate: '%{x}<br>Rolling xG: <b>%{y:.2f}</b><extra></extra>'
         };
 
         const traceShots = {
@@ -250,7 +255,8 @@
             mode: 'lines+markers',
             yaxis: 'y2',
             line: { color: '#f59e0b', width: 2, dash: 'dot' },
-            marker: { size: 5 }
+            marker: { size: 5 },
+            hovertemplate: '%{x}<br>Rolling Shots: <b>%{y}</b><extra></extra>'
         };
 
         const layout = {

@@ -352,10 +352,14 @@
             return;
         }
 
-        const gameLabels = winEntries.map(e => `Game ${e.game_number} vs ${e.opponent}`);
-        const xgPctVals = winEntries.map(e => e.rolling_xg_pct);
-        const cfPctVals = winEntries.map(e => e.rolling_cf_pct);
-        const xgDiffVals = winEntries.map(e => e.rolling_xg_diff);
+        const gameLabels = winEntries.map((e, idx) => {
+            const num = e.game_number || e.game_index || (idx + 1);
+            const opp = e.opponent_display || (e.opponent ? `vs ${e.opponent}` : '');
+            return `Gm ${num} ${opp}`.trim();
+        });
+        const xgPctVals = winEntries.map(e => e.rolling_xg_pct !== undefined ? e.rolling_xg_pct : (e.xgf_pct !== undefined ? e.xgf_pct : 50.0));
+        const cfPctVals = winEntries.map(e => e.rolling_cf_pct !== undefined ? e.rolling_cf_pct : (e.cf_pct !== undefined ? e.cf_pct : 50.0));
+        const xgDiffVals = winEntries.map(e => e.rolling_xg_diff !== undefined ? e.rolling_xg_diff : (e.xg_diff !== undefined ? e.xg_diff : 0.0));
 
         const traceXgPct = {
             x: gameLabels,
@@ -364,7 +368,8 @@
             type: 'scatter',
             mode: 'lines+markers',
             line: { color: '#38bdf8', width: 3 },
-            marker: { size: 6 }
+            marker: { size: 6 },
+            hovertemplate: '%{x}<br>xGF%: <b>%{y:.1f}%</b><extra></extra>'
         };
 
         const traceCfPct = {
@@ -373,27 +378,28 @@
             name: `${windowSize}-Game CF%`,
             type: 'scatter',
             mode: 'lines',
-            line: { color: '#94a3b8', width: 2, dash: 'dot' }
+            line: { color: '#94a3b8', width: 2, dash: 'dot' },
+            hovertemplate: '%{x}<br>CF%: <b>%{y:.1f}%</b><extra></extra>'
         };
 
         const layout = {
-            margin: { l: 40, r: 20, t: 20, b: 60 },
+            margin: { l: 45, r: 25, t: 20, b: 70 },
             paper_bgcolor: 'transparent',
             plot_bgcolor: 'transparent',
             showlegend: true,
-            legend: { orientation: 'h', y: -0.2, font: { color: '#94a3b8' } },
+            hovermode: 'x unified',
+            legend: { orientation: 'h', y: -0.25, font: { color: '#94a3b8' } },
             xaxis: {
                 tickfont: { color: '#94a3b8', size: 10 },
                 gridcolor: 'rgba(255, 255, 255, 0.05)',
-                tickangle: -30
+                tickangle: -35
             },
             yaxis: {
                 title: 'Share (%)',
                 titlefont: { color: '#94a3b8', size: 11 },
                 tickfont: { color: '#94a3b8' },
                 gridcolor: 'rgba(255, 255, 255, 0.05)',
-                zeroline: true,
-                zerolinecolor: 'rgba(255, 255, 255, 0.2)'
+                zeroline: false
             },
             shapes: [
                 {
@@ -403,7 +409,7 @@
                     xref: 'paper',
                     y0: 50,
                     y1: 50,
-                    line: { color: 'rgba(239, 68, 68, 0.5)', width: 1.5, dash: 'dash' }
+                    line: { color: 'rgba(239, 68, 68, 0.6)', width: 1.5, dash: 'dash' }
                 }
             ]
         };

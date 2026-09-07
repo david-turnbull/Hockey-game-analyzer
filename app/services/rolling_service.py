@@ -150,19 +150,33 @@ class RollingService:
                 ga_minus_xga = round(w_ga - w_xga, 2)
 
                 curr_g = games[i]
+                is_home = (curr_g.home_team_id == team_id)
+                opp = curr_g.away_team if is_home else curr_g.home_team
+                opp_abbrev = opp.abbreviation if opp else "UNK"
+                opp_display = f"{'vs' if is_home else '@'} {opp_abbrev}"
+
                 w_points.append({
                     "game_index": i + 1,
+                    "game_number": i + 1,
                     "game_id": curr_g.game_id,
                     "date": curr_g.game_date.strftime("%Y-%m-%d"),
                     "window_size": w_size,
                     "games_in_window": actual_w,
+                    "opponent": opp_abbrev,
+                    "opponent_display": opp_display,
+                    "is_home": is_home,
                     "xgf_pct": xgf_pct,
+                    "rolling_xg_pct": xgf_pct,
                     "xg_diff": xg_diff,
+                    "rolling_xg_diff": xg_diff,
                     "xgf_per_60": xgf_per_60,
                     "xga_per_60": xga_per_60,
                     "cf_pct": cf_pct,
+                    "rolling_cf_pct": cf_pct,
                     "ff_pct": ff_pct,
+                    "rolling_ff_pct": ff_pct,
                     "gf_minus_xgf": gf_minus_xgf,
+                    "rolling_finishing_diff": gf_minus_xgf,
                     "ga_minus_xga": ga_minus_xga
                 })
 
@@ -206,6 +220,18 @@ class RollingService:
         # 2. Extract per-game goalie metrics
         per_game_stats = []
         for g in games:
+            # Determine goalie team & opponent
+            gp = GamePlayer.query.filter_by(game_id=g.game_id, player_id=goalie_id).first()
+            goalie_team_id = gp.team_id if gp else None
+            if not goalie_team_id:
+                s_sample = Shot.query.filter_by(game_id=g.game_id, goalie_id=goalie_id).first()
+                if s_sample:
+                    goalie_team_id = g.home_team_id if g.away_team_id == s_sample.team_id else g.away_team_id
+            is_home = (g.home_team_id == goalie_team_id) if goalie_team_id else True
+            opp = (g.away_team if is_home else g.home_team) if goalie_team_id else None
+            opp_abbrev = opp.abbreviation if opp else "UNK"
+            opp_display = f"{'vs' if is_home else '@'} {opp_abbrev}"
+
             # Shots faced & GA on net
             shots = Shot.query.filter(
                 Shot.game_id == g.game_id,
@@ -226,6 +252,9 @@ class RollingService:
             per_game_stats.append({
                 "game_id": g.game_id,
                 "date": g.game_date.strftime("%Y-%m-%d"),
+                "opponent": opp_abbrev,
+                "opponent_display": opp_display,
+                "is_home": is_home,
                 "shots_faced": shots_faced,
                 "goals_against": goals_against,
                 "saves": saves,
@@ -253,11 +282,16 @@ class RollingService:
             rolling_gsax = round(w_gsax, 2)
             rolling_gsax_per_game = round(w_gsax / actual_w, 2) if actual_w > 0 else 0.0
 
+            stat = per_game_stats[i]
             trend.append({
                 "game_index": i + 1,
-                "game_id": per_game_stats[i]["game_id"],
-                "date": per_game_stats[i]["date"],
+                "game_number": i + 1,
+                "game_id": stat["game_id"],
+                "date": stat["date"],
                 "games_in_window": actual_w,
+                "opponent": stat["opponent"],
+                "opponent_display": stat["opponent_display"],
+                "is_home": stat["is_home"],
                 "rolling_gsax": rolling_gsax,
                 "rolling_gsax_per_game": rolling_gsax_per_game,
                 "rolling_save_pct": rolling_save_pct,
@@ -301,6 +335,18 @@ class RollingService:
         # 2. Extract per-game stats
         per_game_stats = []
         for g in games:
+            # Determine skater team & opponent
+            gp = GamePlayer.query.filter_by(game_id=g.game_id, player_id=player_id).first()
+            player_team_id = gp.team_id if gp else None
+            if not player_team_id:
+                sh_sample = Shift.query.filter_by(game_id=g.game_id, player_id=player_id).first()
+                if sh_sample:
+                    player_team_id = sh_sample.team_id
+            is_home = (g.home_team_id == player_team_id) if player_team_id else True
+            opp = (g.away_team if is_home else g.home_team) if player_team_id else None
+            opp_abbrev = opp.abbreviation if opp else "UNK"
+            opp_display = f"{'vs' if is_home else '@'} {opp_abbrev}"
+
             # Goals
             goals = Event.query.filter(
                 Event.game_id == g.game_id,
@@ -332,6 +378,9 @@ class RollingService:
             per_game_stats.append({
                 "game_id": g.game_id,
                 "date": g.game_date.strftime("%Y-%m-%d"),
+                "opponent": opp_abbrev,
+                "opponent_display": opp_display,
+                "is_home": is_home,
                 "goals": goals,
                 "shot_volume": shots_count,
                 "xg": xg_val,
@@ -354,15 +403,21 @@ class RollingService:
             rolling_xg_per_60 = round(w_xg / toi_hours, 2) if toi_hours > 0 else 0.0
             rolling_g_minus_xg = round(w_goals - w_xg, 2)
 
+            stat = per_game_stats[i]
             trend.append({
                 "game_index": i + 1,
-                "game_id": per_game_stats[i]["game_id"],
-                "date": per_game_stats[i]["date"],
+                "game_number": i + 1,
+                "game_id": stat["game_id"],
+                "date": stat["date"],
                 "games_in_window": actual_w,
+                "opponent": stat["opponent"],
+                "opponent_display": stat["opponent_display"],
+                "is_home": stat["is_home"],
                 "rolling_xg": round(w_xg, 2),
                 "rolling_goals_above_expected": rolling_g_minus_xg,
                 "rolling_xg_per_60": rolling_xg_per_60,
-                "rolling_shot_volume": w_shots
+                "rolling_shot_volume": w_shots,
+                "rolling_unblocked_shots": w_shots
             })
 
         return {
