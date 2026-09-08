@@ -46,6 +46,8 @@ def test_out_of_time_evaluator_invariance():
             "strength_state": "EV",
             "prev_event_type": "shot-on-goal",
             "goal": 1,
+            "game_id": 2024020001,
+            "game_date": "2024-10-10",
             "team_abbrev": "CGY"
         },
         {
@@ -72,6 +74,8 @@ def test_out_of_time_evaluator_invariance():
             "strength_state": "EV",
             "prev_event_type": "blocked-shot",
             "goal": 0,
+            "game_id": 2024020002,
+            "game_date": "2024-10-12",
             "team_abbrev": "EDM"
         }
     ]
@@ -106,3 +110,65 @@ def test_out_of_time_evaluator_invariance():
     md = validator.generate_markdown(report)
     assert "# Out-of-Time xG Validation Report" in md
     assert "Core Probabilistic Evaluation Metrics" in md
+
+
+def test_evaluator_rejects_missing_game_provenance():
+    """Verify that OutOfTimeValidator rejects shots data without authentic game_id provenance (no fabricated fallbacks)."""
+    validator = OutOfTimeValidator(season="20242025")
+    shots_without_game_id = [
+        {
+            "shot_id": "shot_no_game",
+            "distance": 15.0,
+            "angle": 10.0,
+            "goal": 0,
+            "game_date": "2024-10-10"
+        }
+    ]
+    with pytest.raises(ValueError, match="Cannot determine game provenance"):
+        validator.evaluate(shots_without_game_id)
+
+
+def test_evaluator_rejects_missing_game_dates():
+    """Verify that OutOfTimeValidator rejects shots data without authentic game_date provenance."""
+    validator = OutOfTimeValidator(season="20242025")
+    shots_without_date = [
+        {
+            "shot_id": "shot_no_date",
+            "distance": 15.0,
+            "angle": 10.0,
+            "goal": 0,
+            "game_id": 2024020001
+        }
+    ]
+    with pytest.raises(ValueError, match="Cannot determine game dates provenance"):
+        validator.evaluate(shots_without_date)
+
+
+def test_model_hashes_recorded_and_persisted():
+    """Verify that OutOfTimeValidator records expected, pre-validation, and post-validation model SHA-256 hashes."""
+    validator = OutOfTimeValidator(season="20242025")
+    shots = [
+        {
+            "shot_id": "s1",
+            "game_id": 2024020001,
+            "game_date": "2024-10-10",
+            "distance": 20.0,
+            "angle": 15.0,
+            "goal": 0
+        }
+    ]
+    report = validator.evaluate(shots)
+    m = report["model"]
+    expected_hash = "c7f4f55bb0136f5d1774267446f5bd07a9a0bad2285238a25f551a61b0927635"
+    assert m["expected_sha256"] == expected_hash
+    assert m["pre_validation_sha256"] == expected_hash
+    assert m["post_validation_sha256"] == expected_hash
+    assert m["sha256"] == expected_hash
+    assert m["invariance_verified"] is True
+
+    # Check markdown attestation
+    md = OutOfTimeValidator.generate_markdown(report)
+    assert f"- **Expected SHA-256**: `{expected_hash}`" in md
+    assert f"- **Pre-Validation SHA-256**: `{expected_hash}`" in md
+    assert f"- **Post-Validation SHA-256**: `{expected_hash}`" in md
+    assert "- **Invariance Status**: **PASS**" in md

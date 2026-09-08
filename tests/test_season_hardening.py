@@ -365,3 +365,230 @@ def test_season_route_team_filtering_and_leaders_api(client, app, db):
     assert 'leaders' in data
     assert len(data['leaders']) > 0
     assert any('Connor' in lead['name'] for lead in data['leaders'])
+
+
+def test_manpower_situation_toi_empty_net_exclusion(app, db):
+    """
+    Verify that team situation TOI correctly distinguishes genuine PP/PK manpower advantages
+    from empty-net / goalie-pull states (e.g. 6v5, 5v6).
+    - 5v5: 5 skaters + 1 goalie both sides
+    - 5v4: 5 skaters + 1 goalie vs 4 skaters + 1 goalie -> home PP, away PK
+    - 4v5: 4 skaters + 1 goalie vs 5 skaters + 1 goalie -> away PP, home PK
+    - 5v3: 5 skaters + 1 goalie vs 3 skaters + 1 goalie -> home PP, away PK
+    - 6v5: 6 skaters + 0 goalies vs 5 skaters + 1 goalie -> goalie pulled / empty net, NOT PP or PK!
+    """
+    t1 = Team(team_id=10, abbreviation='HMT', name='Home Team')
+    t2 = Team(team_id=20, abbreviation='AWT', name='Away Team')
+    db.session.add_all([t1, t2])
+    db.session.commit()
+
+    # Home players: 6 skaters (h1..h6) + 1 goalie (hg)
+    h_skaters = [Player(player_id=100 + i, first_name=f'Home{i}', last_name='S', position='F') for i in range(1, 7)]
+    hg = Player(player_id=199, first_name='Home', last_name='Goalie', position='G')
+    # Away players: 5 skaters (a1..a5) + 1 goalie (ag)
+    a_skaters = [Player(player_id=200 + i, first_name=f'Away{i}', last_name='S', position='F') for i in range(1, 6)]
+    ag = Player(player_id=299, first_name='Away', last_name='Goalie', position='G')
+    db.session.add_all(h_skaters + [hg] + a_skaters + [ag])
+    db.session.commit()
+
+    g = Game(
+        game_id=2024020901, season='20242025', game_date=date(2024, 11, 1),
+        game_type='R', home_team_id=10, away_team_id=20, home_score=3, away_score=2, nhl_game_state='FINAL'
+    )
+    db.session.add(g)
+    db.session.commit()
+
+    shifts = []
+    # Segment 1: 0 - 600s: True 5v5 (5 skaters + 1 goalie each side)
+    for p in h_skaters[:5] + [hg]:
+        shifts.append(Shift(shift_id=f's1_h_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=10,
+                            period=1, start_time='00:00', end_time='10:00', start_elapsed_seconds=0, end_elapsed_seconds=600, duration=600))
+    for p in a_skaters[:5] + [ag]:
+        shifts.append(Shift(shift_id=f's1_a_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=20,
+                            period=1, start_time='00:00', end_time='10:00', start_elapsed_seconds=0, end_elapsed_seconds=600, duration=600))
+
+    # Segment 2: 600 - 900s (300s): Home PP (5v4: Home has 5 skaters + 1 goalie; Away has 4 skaters + 1 goalie)
+    for p in h_skaters[:5] + [hg]:
+        shifts.append(Shift(shift_id=f's2_h_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=10,
+                            period=1, start_time='10:00', end_time='15:00', start_elapsed_seconds=600, end_elapsed_seconds=900, duration=300))
+    for p in a_skaters[:4] + [ag]:
+        shifts.append(Shift(shift_id=f's2_a_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=20,
+                            period=1, start_time='10:00', end_time='15:00', start_elapsed_seconds=600, end_elapsed_seconds=900, duration=300))
+
+    # Segment 3: 900 - 1100s (200s): Away PP (4v5: Home has 4 skaters + 1 goalie; Away has 5 skaters + 1 goalie)
+    for p in h_skaters[:4] + [hg]:
+        shifts.append(Shift(shift_id=f's3_h_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=10,
+                            period=1, start_time='15:00', end_time='18:20', start_elapsed_seconds=900, end_elapsed_seconds=1100, duration=200))
+    for p in a_skaters[:5] + [ag]:
+        shifts.append(Shift(shift_id=f's3_a_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=20,
+                            period=1, start_time='15:00', end_time='18:20', start_elapsed_seconds=900, end_elapsed_seconds=1100, duration=200))
+
+    # Segment 4: 1100 - 1200s (100s): Home 5v3 PP (Home has 5 skaters + 1 goalie; Away has 3 skaters + 1 goalie)
+    for p in h_skaters[:5] + [hg]:
+        shifts.append(Shift(shift_id=f's4_h_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=10,
+                            period=1, start_time='18:20', end_time='20:00', start_elapsed_seconds=1100, end_elapsed_seconds=1200, duration=100))
+    for p in a_skaters[:3] + [ag]:
+        shifts.append(Shift(shift_id=f's4_a_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=20,
+                            period=1, start_time='18:20', end_time='20:00', start_elapsed_seconds=1100, end_elapsed_seconds=1200, duration=100))
+
+    # Segment 5: 1200 - 1500s (300s): 6v5 Empty Net (Home pulls goalie hg! Home has 6 skaters h1..h6; Away has 5 skaters + 1 goalie)
+    # This is an extra attacker / goalie-pull situation, NOT a PP or PK!
+    for p in h_skaters[:6]:  # all 6 skaters, no hg
+        shifts.append(Shift(shift_id=f's5_h_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=10,
+                            period=2, start_time='00:00', end_time='05:00', start_elapsed_seconds=1200, end_elapsed_seconds=1500, duration=300))
+    for p in a_skaters[:5] + [ag]:
+        shifts.append(Shift(shift_id=f's5_a_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=20,
+                            period=2, start_time='00:00', end_time='05:00', start_elapsed_seconds=1200, end_elapsed_seconds=1500, duration=300))
+
+    db.session.add_all(shifts)
+    db.session.commit()
+
+    # Verify Home Team situation TOI:
+    # 5v5: exactly 600s
+    summary_5v5 = TeamSeasonService.get_season_teams_summary(season='20242025', situation='5v5')
+    home_5v5 = next(t for t in summary_5v5 if t['team_id'] == 10)
+    away_5v5 = next(t for t in summary_5v5 if t['team_id'] == 20)
+    assert home_5v5['toi_seconds'] == 600
+    assert away_5v5['toi_seconds'] == 600
+
+    # PP: Home had 300s (5v4) + 100s (5v3) = 400s PP TOI.
+    # The 300s of 6v5 empty-net MUST NOT be counted as PP!
+    summary_pp = TeamSeasonService.get_season_teams_summary(season='20242025', situation='pp')
+    home_pp = next(t for t in summary_pp if t['team_id'] == 10)
+    away_pp = next(t for t in summary_pp if t['team_id'] == 20)
+    assert home_pp['toi_seconds'] == 400
+    assert away_pp['toi_seconds'] == 200  # Away had 200s (4v5)
+
+    # PK: Home had 200s (4v5). Away had 300s (5v4) + 100s (5v3) = 400s PK TOI.
+    # The 300s of 6v5 empty net MUST NOT be counted as PK for Away!
+    summary_pk = TeamSeasonService.get_season_teams_summary(season='20242025', situation='pk')
+    home_pk = next(t for t in summary_pk if t['team_id'] == 10)
+    away_pk = next(t for t in summary_pk if t['team_id'] == 20)
+    assert home_pk['toi_seconds'] == 200
+    assert away_pk['toi_seconds'] == 400
+
+
+def test_skater_5v5_on_ice_toi_accuracy(app, db):
+    """
+    Verify that skater on_ice_5v5.toi_seconds and toi_formatted are populated with
+    actual 5v5 duration from shift timelines (not defaulted to 0).
+    Also verifies that empty net (6v5) and 4v4 periods are excluded.
+    """
+    t1 = Team(team_id=11, abbreviation='T1', name='Team One')
+    t2 = Team(team_id=22, abbreviation='T2', name='Team Two')
+    skater = Player(player_id=301, first_name='Star', last_name='Skater', position='F')
+    # Other skaters to make 5 on ice
+    h_others = [Player(player_id=310 + i, first_name=f'HO{i}', last_name='S', position='F') for i in range(4)]
+    hg = Player(player_id=319, first_name='HG', last_name='G', position='G')
+    a_skaters = [Player(player_id=320 + i, first_name=f'AO{i}', last_name='S', position='F') for i in range(5)]
+    ag = Player(player_id=329, first_name='AG', last_name='G', position='G')
+    db.session.add_all([t1, t2, skater, hg, ag] + h_others + a_skaters)
+    db.session.commit()
+
+    g = Game(
+        game_id=2024020950, season='20242025', game_date=date(2024, 11, 2),
+        game_type='R', home_team_id=11, away_team_id=22, home_score=2, away_score=1, nhl_game_state='FINAL'
+    )
+    db.session.add(g)
+    db.session.commit()
+
+    gp = GamePlayer(game_id=g.game_id, player_id=301, team_id=11, position='F')
+    db.session.add(gp)
+
+    shifts = []
+    # 0 - 600s: True 5v5 (skater is on ice)
+    shifts.append(Shift(shift_id='s_star_5v5', game_id=g.game_id, player_id=301, team_id=11,
+                        period=1, start_time='00:00', end_time='10:00', start_elapsed_seconds=0, end_elapsed_seconds=600, duration=600))
+    for p in h_others + [hg]:
+        shifts.append(Shift(shift_id=f's_h_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=11,
+                            period=1, start_time='00:00', end_time='10:00', start_elapsed_seconds=0, end_elapsed_seconds=600, duration=600))
+    for p in a_skaters + [ag]:
+        shifts.append(Shift(shift_id=f's_a_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=22,
+                            period=1, start_time='00:00', end_time='10:00', start_elapsed_seconds=0, end_elapsed_seconds=600, duration=600))
+
+    # 600 - 900s (300s): 6v5 empty-net (skater is on ice with extra attacker, no home goalie) -> should NOT count towards 5v5 TOI
+    extra_skater = Player(player_id=330, first_name='Extra', last_name='Skater', position='F')
+    db.session.add(extra_skater)
+    shifts.append(Shift(shift_id='s_star_en', game_id=g.game_id, player_id=301, team_id=11,
+                        period=1, start_time='10:00', end_time='15:00', start_elapsed_seconds=600, end_elapsed_seconds=900, duration=300))
+    for p in h_others + [extra_skater]:
+        shifts.append(Shift(shift_id=f's_en_h_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=11,
+                            period=1, start_time='10:00', end_time='15:00', start_elapsed_seconds=600, end_elapsed_seconds=900, duration=300))
+    for p in a_skaters + [ag]:
+        shifts.append(Shift(shift_id=f's_en_a_{p.player_id}', game_id=g.game_id, player_id=p.player_id, team_id=22,
+                            period=1, start_time='10:00', end_time='15:00', start_elapsed_seconds=600, end_elapsed_seconds=900, duration=300))
+
+    db.session.add_all(shifts)
+    db.session.commit()
+
+    skaters = PlayerSeasonService.get_season_skaters_summary(season='20242025', team_id=11, min_gp=1)
+    s_stat = next(p for p in skaters if p['player_id'] == 301)
+
+    # 5v5 on-ice TOI must be exactly 600s, formatted as "10:00"
+    assert s_stat['on_ice_5v5']['toi_seconds'] == 600
+    assert s_stat['on_ice_5v5']['toi_formatted'] == "10:00"
+    # Total TOI was 900s ("15:00")
+    assert s_stat['toi_seconds'] == 900
+    assert s_stat['toi_formatted'] == "15:00"
+
+
+def test_api_season_leaders_team_id_validation(client, app, db):
+    """
+    Verify /api/seasons/<season>/leaders team_id validation:
+    - Malformed team_id (non-integer string or float) returns HTTP 400.
+    - Non-existent team_id or team not in season returns HTTP 404.
+    - Omitted team_id returns HTTP 200 with league-wide results.
+    """
+    cgy = Team(team_id=51, abbreviation='CGY', name='Calgary Flames')
+    skater = Player(player_id=501, first_name='Lead', last_name='Skater', position='F')
+    db.session.add_all([cgy, skater])
+    db.session.commit()
+
+    g = Game(
+        game_id=2024020999, season='20242025', game_date=date(2024, 10, 8),
+        game_type='R', home_team_id=51, away_team_id=51, home_score=2, away_score=1, nhl_game_state='FINAL'
+    )
+    db.session.add(g)
+    db.session.flush()
+    gp = GamePlayer(game_id=g.game_id, player_id=501, team_id=51, position='F')
+    s = Shift(shift_id='s_lead_val', game_id=g.game_id, player_id=501, period=1, start_time='00:00',
+              end_time='10:00', start_elapsed_seconds=0, end_elapsed_seconds=600, duration=600, team_id=51)
+    ev = Event(event_id='e_lead_val', game_id=g.game_id, period=1, period_time='05:00', event_type='goal', team_id=51, primary_player_id=501)
+    sh = Shot(shot_id='e_lead_val', game_id=g.game_id, team_id=51, shooter_id=501, outcome='Goal', goal=True, xg=0.50)
+    db.session.add_all([gp, s, ev, sh])
+    db.session.commit()
+
+    # 1. Malformed non-integer string -> 400
+    res_bad_str = client.get('/api/seasons/20242025/leaders?team_id=calgary')
+    assert res_bad_str.status_code == 400
+    data_bad_str = res_bad_str.get_json()
+    assert data_bad_str['error'] == 'Invalid team_id'
+    assert data_bad_str['detail'] == 'team_id must be an integer'
+
+    # 2. Malformed float -> 400
+    res_float = client.get('/api/seasons/20242025/leaders?team_id=51.5')
+    assert res_float.status_code == 400
+    data_float = res_float.get_json()
+    assert data_float['error'] == 'Invalid team_id'
+    assert data_float['detail'] == 'team_id must be an integer'
+
+    # 3. Non-existent team -> 404
+    res_not_found = client.get('/api/seasons/20242025/leaders?team_id=99999')
+    assert res_not_found.status_code == 404
+    data_not_found = res_not_found.get_json()
+    assert 'Team 99999 not found' in data_not_found['error']
+
+    # 4. Omitted team_id -> 200 (league-wide)
+    res_omitted = client.get('/api/seasons/20242025/leaders?category=skaters')
+    assert res_omitted.status_code == 200
+    data_omitted = res_omitted.get_json()
+    assert data_omitted['team_id'] is None
+    assert len(data_omitted['leaders']) > 0
+
+    # 5. Valid team_id in season -> 200
+    res_valid = client.get('/api/seasons/20242025/leaders?category=skaters&team_id=51')
+    assert res_valid.status_code == 200
+    data_valid = res_valid.get_json()
+    assert data_valid['team_id'] == 51
+    assert len(data_valid['leaders']) > 0
+
