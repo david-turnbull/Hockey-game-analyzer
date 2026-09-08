@@ -1,14 +1,25 @@
 # Team Season Analytics Architecture & Methodology
 
 ## Overview
-The PuckLens Team Season Analytics engine aggregates full regular-season schedules into actionable possession, expected goal, and finishing variance metrics. To handle large volumes of games and events efficiently, all calculations use grouped SQL aggregations, eliminating N+1 database queries.
+The PuckLens Team Season Analytics engine aggregates full regular-season schedules into actionable possession, expected goal, and finishing variance metrics. 
 
-## Situational Filtering
+To achieve optimal performance and scalability across multi-season datasets, PuckLens implements a **hybrid architecture**:
+1. **Bulk Grouped SQL Aggregations:** Used for high-volume counting, shot metrics, and event aggregations, eliminating N+1 database round-trips.
+2. **Bounded In-Memory Temporal Processing (`OnIceService`):** Used for micro-level second-by-second shift timeline reconstructions to compute precise manpower situations and individual skater 5v5 on-ice time on ice.
+
+## Situational Filtering & Manpower Rules
 Hockey operates in distinct game states that dramatically affect shot rates and expected quality. PuckLens supports four canonical situation filters:
-- **`all` (All Situations):** Encompasses even-strength, power play, short-handed, empty net, and 3v3 overtime play.
-- **`5v5` (Even Strength):** Restricted strictly to 5v5 skater strength state, representing true baseline team quality.
-- **`pp` (Power Play):** Offensive man-advantage strength states (5v4, 5v3, 4v3).
-- **`sh` (Shorthanded):** Defensive penalty-killing strength states (4v5, 3v5, 3v4).
+- **`all` (All Situations):** Encompasses even-strength, power play, shorthanded, empty net, and 3v3 overtime play.
+- **`5v5` (Even Strength):** Restricted strictly to true 5-on-5 play, requiring exactly 5 skaters and 1 goalie on the ice for both teams.
+- **`pp` (Power Play):** Offensive man-advantage strength states (e.g. 5v4, 5v3, 4v3). **Rule:** Requires both goalies on the ice (`h_g >= 1 and a_g >= 1`) with skater numerical advantage. Goalie-pull / extra-attacker situations (e.g. 6v5, 5v6) are strictly excluded.
+- **`sh` (Shorthanded / PK):** Defensive penalty-killing strength states (e.g. 4v5, 3v5, 3v4). **Rule:** Requires both goalies on the ice (`h_g >= 1 and a_g >= 1`) with skater numerical disadvantage. Goalie-pull / empty net situations are strictly excluded.
+
+> **Missing Shift Data Invariant:** If a game lacks shift records, situation-specific denominators cannot be determined with statistical confidence; `toi_seconds` defaults to `None` for affected filters.
+
+## Traded Player Representation
+PuckLens implements a unified stint-based representation for players active on multiple teams during a season:
+- **League-Wide Scope (`team_id=None`):** Statistics and TOI are aggregated across all stints, with chronological team abbreviations (e.g. `CGY/VAN/CGY`).
+- **Team-Filtered Scope (`team_id=<team>`):** Only production, shots, TOI, and 5v5 on-ice possession metrics recorded while actively representing that team are returned.
 
 ## Core Metric Definitions & Formulas
 
