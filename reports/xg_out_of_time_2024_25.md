@@ -13,7 +13,7 @@
 - **Unknown Team Attribution**: `0` (0.00%)
 - **Model Name & Version**: `pucklens-xg-logistic` (1.0.0)
 - **Model Invariance SHA-256**: `c7f4f55bb0136f5d1774267446f5bd07a9a0bad2285238a25f551a61b0927635` (Verified Unchanged)
-- **Evaluated At**: `2026-09-07T20:03:13.146838+00:00`
+- **Evaluated At**: `2026-09-08T13:31:22.014911+00:00`
 
 ## 1. Executive Summary & Model Decision
 

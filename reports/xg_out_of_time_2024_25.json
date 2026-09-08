@@ -1,11 +1,15 @@
 {
   "evaluation_season": "20242025",
-  "evaluation_date": "2026-09-07T20:03:13.146838+00:00",
+  "evaluation_date": "2026-09-08T13:31:22.014911+00:00",
   "model": {
     "name": "pucklens-xg-logistic",
     "version": "1.0.0",
     "model_type": "LogisticRegressionXGModel",
-    "sha256": "c7f4f55bb0136f5d1774267446f5bd07a9a0bad2285238a25f551a61b0927635"
+    "expected_sha256": "c7f4f55bb0136f5d1774267446f5bd07a9a0bad2285238a25f551a61b0927635",
+    "pre_validation_sha256": "c7f4f55bb0136f5d1774267446f5bd07a9a0bad2285238a25f551a61b0927635",
+    "post_validation_sha256": "c7f4f55bb0136f5d1774267446f5bd07a9a0bad2285238a25f551a61b0927635",
+    "sha256": "c7f4f55bb0136f5d1774267446f5bd07a9a0bad2285238a25f551a61b0927635",
+    "invariance_verified": true
   },
   "dataset_coverage": {
     "target_season": "20242025",
