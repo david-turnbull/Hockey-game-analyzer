@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, current_app
 from app.services.game_service import GameService
 from app.models import db, Shot, Event, Player, Team, Game, Shift
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -453,7 +454,27 @@ def get_season_leaders(season: str):
     min_toi = int(request.args.get('min_toi', 0))
     limit = int(request.args.get('limit', 50))
     team_id_raw = request.args.get('team_id')
-    team_id = int(team_id_raw) if (team_id_raw and team_id_raw.isdigit()) else None
+    team_id = None
+    if team_id_raw is not None and team_id_raw != '':
+        try:
+            team_id = int(team_id_raw)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid team_id", "detail": "team_id must be an integer"}), 400
+
+        team = db.session.get(Team, team_id)
+        if not team:
+            return jsonify({"error": f"Team {team_id} not found"}), 404
+
+        team_in_season = (
+            db.session.query(Game.game_id)
+            .filter(
+                Game.season == season,
+                or_(Game.home_team_id == team_id, Game.away_team_id == team_id)
+            )
+            .first()
+        )
+        if not team_in_season:
+            return jsonify({"error": f"Team {team_id} not found in season {season}"}), 404
 
     if category == 'goalies':
         min_shots = int(request.args.get('min_shots', 0))
