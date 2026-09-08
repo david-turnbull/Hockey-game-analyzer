@@ -233,12 +233,14 @@ class TeamSeasonService:
                 if h_skaters == 5 and a_skaters == 5 and h_g == 1 and a_g == 1:
                     h_5v5 += 1
                     a_5v5 += 1
-                elif h_skaters > a_skaters:
-                    h_pp += 1
-                    a_pk += 1
-                elif a_skaters > h_skaters:
-                    a_pp += 1
-                    h_pk += 1
+                elif h_g >= 1 and a_g >= 1:
+                    # Valid PP/PK requires both goalies on ice; goalie-pull/empty-net states (e.g. 6v5, 5v6) are excluded
+                    if h_skaters > a_skaters:
+                        h_pp += 1
+                        a_pk += 1
+                    elif a_skaters > h_skaters:
+                        a_pp += 1
+                        h_pk += 1
 
             game_toi[gid] = {
                 g.home_team_id: {

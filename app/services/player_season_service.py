@@ -5,6 +5,7 @@ from sqlalchemy import or_, and_, func, distinct
 from app.models import db, Game, Player, Event, Shot, Shift, GamePlayer, Team
 from app.utils.time_helpers import format_toi
 from app.services.possession_service import PossessionService
+from app.services.on_ice_service import OnIceService
 
 logger = logging.getLogger(__name__)
 
@@ -414,9 +415,9 @@ class PlayerSeasonService:
             for pid in skater_ids
         }
 
-        # 1. Bulk query game home team mapping
-        game_rows = db.session.query(Game.game_id, Game.home_team_id).filter(Game.game_id.in_(season_game_ids)).all()
-        game_home_map = {gid: h_id for gid, h_id in game_rows}
+        # 1. Bulk query game home & away team mapping
+        game_rows = db.session.query(Game.game_id, Game.home_team_id, Game.away_team_id).filter(Game.game_id.in_(season_game_ids)).all()
+        game_teams_map = {gid: (h_id, a_id) for gid, h_id, a_id in game_rows}
 
         # 2. Bulk query shifts with player position pre-fetched
         shifts = (
@@ -461,12 +462,47 @@ class PlayerSeasonService:
 
         # 4. In-memory processing by game
         for gid in season_game_ids:
-            home_team_id = game_home_map.get(gid)
-            if not home_team_id:
+            teams = game_teams_map.get(gid)
+            if not teams:
                 continue
+            home_team_id, away_team_id = teams
             game_shifts = shifts_by_game.get(gid, [])
             if not game_shifts:
                 continue
+
+            # Calculate 5v5 on-ice TOI from shift timelines
+            max_time = 3600
+            for s in game_shifts:
+                if s.end_elapsed_seconds is not None and s.end_elapsed_seconds > max_time:
+                    max_time = s.end_elapsed_seconds
+
+            home_players, away_players = OnIceService.build_active_players_timeline(
+                game_shifts, max_time, home_team_id
+            )
+
+            for t in range(max_time):
+                hp = home_players[t]
+                ap = away_players[t]
+                if len(hp) != 6 or len(ap) != 6:
+                    continue
+                # Both goalies must be on ice
+                h_g = sum(1 for p in hp if players_pos.get(p) == 'G')
+                if h_g != 1:
+                    continue
+                a_g = sum(1 for p in ap if players_pos.get(p) == 'G')
+                if a_g != 1:
+                    continue
+
+                # Exactly 5 skaters and 1 goalie on both sides (True 5v5)
+                if target_team_id is None or home_team_id == target_team_id:
+                    for p in hp:
+                        if p in skater_set and players_pos.get(p) != 'G':
+                            on_ice_res[p]["toi_seconds"] += 1
+                if target_team_id is None or away_team_id == target_team_id:
+                    for p in ap:
+                        if p in skater_set and players_pos.get(p) != 'G':
+                            on_ice_res[p]["toi_seconds"] += 1
+
             game_events = events_by_game.get(gid, [])
 
             for event, xg in game_events:
