@@ -3,12 +3,18 @@ from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
+_migrations_completed = False
+
 def run_migrations(db):
     """
-    Checks if columns added in v1.1 exist in the SQLite database,
-    and runs ALTER TABLE commands if they are missing.
+    Checks if columns and tables added in v1.4 exist in the SQLite database,
+    and creates missing tables or runs ALTER TABLE commands if missing.
     """
+    global _migrations_completed
+    if _migrations_completed:
+        return
     try:
+        db.create_all()
         connection = db.session.connection()
         
         # Check if tables exist first
@@ -82,6 +88,9 @@ def run_migrations(db):
             if "game_status" in existing_game_cols and "nhl_game_state" not in existing_game_cols:
                 logger.info("Migrating: Renaming column 'game_status' to 'nhl_game_state' in 'game' table")
                 connection.execute(text("ALTER TABLE game RENAME COLUMN game_status TO nhl_game_state"))
+            if "start_time_utc" not in existing_game_cols:
+                logger.info("Migrating: Adding column 'start_time_utc' to 'game' table")
+                connection.execute(text("ALTER TABLE game ADD COLUMN start_time_utc DATETIME"))
 
         # 5. Check shot table coordinate column rename
         shot_exists = connection.execute(text(
@@ -111,7 +120,21 @@ def run_migrations(db):
                 "UPDATE shot SET xg = NULL, model_name = NULL, model_version = NULL, prediction_method = NULL "
                 "WHERE outcome = 'Blocked' AND (xg IS NOT NULL OR model_name IS NOT NULL OR model_version IS NOT NULL OR prediction_method IS NOT NULL)"
             ))
+
+        # 6. Performance Indexes for Forecasting & Pregame Queries
+        index_queries = [
+            "CREATE INDEX IF NOT EXISTS idx_game_season_type ON game (season, game_type, nhl_game_state)",
+            "CREATE INDEX IF NOT EXISTS idx_game_home_start ON game (home_team_id, game_type, nhl_game_state, start_time_utc)",
+            "CREATE INDEX IF NOT EXISTS idx_game_away_start ON game (away_team_id, game_type, nhl_game_state, start_time_utc)",
+            "CREATE INDEX IF NOT EXISTS idx_game_start_utc ON game (start_time_utc)",
+            "CREATE INDEX IF NOT EXISTS idx_game_date ON game (game_date)",
+            "CREATE INDEX IF NOT EXISTS idx_game_prediction_game_official ON game_prediction (game_id, is_official)"
+        ]
+        for q in index_queries:
+            connection.execute(text(q))
+
         db.session.commit()
+        _migrations_completed = True
         logger.info("Database migration check completed successfully.")
     except Exception as e:
         db.session.rollback()

@@ -1,0 +1,86 @@
+{
+  "backtest_run_at": "2026-09-09T22:20:49.435802+00:00",
+  "protocol": {
+    "train_season": "20212022",
+    "select_season": "20222023",
+    "refit_seasons": "20212022 + 20222023",
+    "calibrate_season": "20232024",
+    "test_season": "20242025 (Holdout)"
+  },
+  "model_selection": {
+    "selected_model": "LogisticRegression",
+    "logistic_regression_log_loss": 0.6597,
+    "hgb_log_loss": 0.6937,
+    "refit_sample_count": 2624,
+    "calibration_status": "IsotonicRegression fitted on 2023-24"
+  },
+  "test_season_20242025_eval": {
+    "season": "20242025",
+    "game_count": 1312,
+    "calibrated_model": {
+      "log_loss": 0.6509,
+      "brier_score": 0.2294,
+      "accuracy": 61.43,
+      "ece": 0.0285
+    },
+    "elo_baseline": {
+      "log_loss": 0.6485,
+      "brier_score": 0.2284,
+      "accuracy": 62.27,
+      "ece": 0.0635
+    },
+    "naive_50_50_log_loss": 0.6931,
+    "score_projection": {
+      "total_goals_mae": 1.54,
+      "top5_scoreline_coverage_pct": 26.6
+    }
+  },
+  "calibrate_season_20232024_eval": {
+    "season": "20232024",
+    "game_count": 1312,
+    "calibrated_model": {
+      "log_loss": 0.637,
+      "brier_score": 0.223,
+      "accuracy": 63.8,
+      "ece": 0.0
+    },
+    "elo_baseline": {
+      "log_loss": 0.6414,
+      "brier_score": 0.2252,
+      "accuracy": 63.19,
+      "ece": 0.0636
+    },
+    "naive_50_50_log_loss": 0.6931,
+    "score_projection": {
+      "total_goals_mae": 1.53,
+      "top5_scoreline_coverage_pct": 26.6
+    }
+  },
+  "select_season_20222023_eval": {
+    "season": "20222023",
+    "game_count": 1312,
+    "calibrated_model": {
+      "log_loss": 0.6527,
+      "brier_score": 0.2304,
+      "accuracy": 61.2,
+      "ece": 0.0214
+    },
+    "elo_baseline": {
+      "log_loss": 0.6486,
+      "brier_score": 0.2288,
+      "accuracy": 60.52,
+      "ece": 0.0458
+    },
+    "naive_50_50_log_loss": 0.6931,
+    "score_projection": {
+      "total_goals_mae": 1.55,
+      "top5_scoreline_coverage_pct": 23.86
+    }
+  },
+  "elo_baseline_overall": {
+    "log_loss": 0.6434,
+    "brier_score": 0.2262,
+    "accuracy": 62.35,
+    "ece": 0.051
+  }
+}

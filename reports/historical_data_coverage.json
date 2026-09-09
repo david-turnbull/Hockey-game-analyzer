@@ -1,0 +1,46 @@
+{
+  "audited_at": "2026-09-09T22:14:39.626977+00:00",
+  "target_seasons": [
+    "20212022",
+    "20222023",
+    "20232024",
+    "20242025"
+  ],
+  "min_complete_seasons_required": 3,
+  "complete_seasons_found": 4,
+  "hard_gate_passed": true,
+  "seasons": {
+    "20212022": {
+      "total_games": 1312,
+      "completed_games": 1312,
+      "with_start_time_utc": 1312,
+      "events_count": 82315,
+      "shifts_count": 0,
+      "is_complete_season": true
+    },
+    "20222023": {
+      "total_games": 1312,
+      "completed_games": 1312,
+      "with_start_time_utc": 1312,
+      "events_count": 34805,
+      "shifts_count": 0,
+      "is_complete_season": true
+    },
+    "20232024": {
+      "total_games": 1312,
+      "completed_games": 1312,
+      "with_start_time_utc": 1306,
+      "events_count": 28045,
+      "shifts_count": 4813,
+      "is_complete_season": true
+    },
+    "20242025": {
+      "total_games": 1312,
+      "completed_games": 1312,
+      "with_start_time_utc": 1287,
+      "events_count": 34530,
+      "shifts_count": 19744,
+      "is_complete_season": true
+    }
+  }
+}
