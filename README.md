@@ -2,7 +2,7 @@
 
 [![Run Automated Tests](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml)
 
-**Current Release:** `v1.2.1` (Predictive Analytics Hardening)
+**Current Release:** `v1.3.0` (Season Analytics, Out-of-Time Predictive Validation & Rolling Trends)
 
 PuckLens is an independent hockey-operations analytics platform that transforms raw NHL play-by-play and shift data into reproducible game, player, lineup, possession, spatial, and predictive analysis.
 
@@ -13,22 +13,18 @@ The project is designed as both a hockey analytics tool and a portfolio demonstr
 ## What the platform does
 
 - **Statistically trained Expected Goals (xG)** — machine-learning shot-quality pipeline with feature engineering, versioned model registry, and persistent database scoring.
-- **Interactive cumulative game xG timeline** — step-function cumulative xG progression chart with period markers and situation filtering (All, 5v5, Power Play).
-- **Probability-scaled shot mapping** — spatial rink visualization where shot markers dynamically scale in radius and color intensity by expected goal probability.
-- **Goaltender predictive analytics** — Expected Goals Against ($xGA$), Goals Saved Above Expected ($GSAx$), and rate stats ($GSAx/60$), strictly excluding empty nets.
-- **Skater finishing analytics** — Goals Above Expected ($G - xG$), Expected Goals per 60 ($xG/60$), and Expected Conversion Rate / Shooting Percentage.
-- **5v5 unit xG profiling** — Expected Goals For ($xGF$), Expected Goals Against ($xGA$), and Expected Goal Share ($xG\%$) for forward trios and defensive pairings.
-- **Game analysis** — team boxscore comparisons, scoring/penalty timelines, and game-level dashboards with period-by-period xG breakdowns.
-- **Shift reconstruction** — aligns NHL shift-chart data with play-by-play timing using consistent half-open interval semantics.
-- **True 5v5 possession** — Corsi and Fenwick calculations restricted to complete 5v5 play.
-- **5v5 forward combinations** — observed forward trios with shared TOI and on-ice GF/GA/SF/SA and xGF/xGA/xG%.
-- **Defensive pairings** — defenseman duos with shared TOI and on-ice GF/GA/SF/SA and xGF/xGA/xG%.
-- **Shared 5v5 combination drill-down** — Clickable forward lines and defensive pairings details dashboard showing shared shifts, on-ice events, Corsi/Fenwick/xG statistics, and Plotly shot maps.
-- **Side-by-side player comparisons** — Side-by-side single-game performance comparison dashboard with situation filters and dual Plotly maps.
-- **Model & data quality diagnostics** — Shot model data quality audits (coordinate geometry, goalie attribution, missing values) and relational integrity checks.
-- **Standardized metric explanations** — Help tooltip hovers explaining advanced stats (Corsi, Fenwick, xG, GSAx) across the platform.
-- **Full-season ingestion** — Ingest a team's regular-season schedule using the same validated game pipeline.
-- **Automated regression testing and CI** — Analytical edge cases, ML reproducibility, and historical attribution covered by comprehensive tests in `pytest` and GitHub Actions.
+- **Out-of-time model validation (2024-25 season)** — evaluated frozen v1.2.1 model on 2,190 unblocked attempts from the 2024-25 season, confirming calibration stability (0.932 ratio, 0.2057 log loss, 0.7603 ROC-AUC).
+- **Multi-season data foundation** — robust multi-season ingestion supporting targeted team/season downloads with cache safeguards.
+- **Team season analytics & 5v5 splits** — SQL-grouped team possession, expected goals, rates per 60, and finishing/goaltending variance across situations (`all`, `5v5`, `pp`, `sh`).
+- **Skater season profiles & leaderboards** — individual scoring, $xG$, $G - xG$, $xG/60$, $Sh\%$ vs $Exp\ Conv\%$, and 5v5 on-ice possession impact with sample thresholds.
+- **Goaltender season analytics & GSAx** — workload, Expected Goals Against ($xGA$), Goals Saved Above Expected ($GSAx$), and $Exp\ Sv\%$, strictly barring empty nets and shootouts.
+- **Chronological rolling form & trends** — 5, 10, and 20-game rolling trends for teams, skaters, and goalies with zero lookahead leakage.
+- **Mathematical xG explainability** — logit factor contribution decomposition exposing danger-increasing and danger-reducing features and baseline odds multipliers.
+- **Interactive cumulative game xG timeline** — step-function cumulative xG progression chart with period markers and situation filtering.
+- **Probability-scaled shot mapping & model popover** — spatial rink visualization where shot markers scale by xG, clickable to view feature contributions.
+- **RESTful season API** — complete JSON API suite for season teams, rosters, players, goalies, rolling trends, leaderboards, and shot explanations.
+- **Responsive analytical dashboards** — dark-theme dashboards for league standings, team analytics, skater profiles, and goalie evaluations.
+- **Automated regression testing** — 129 comprehensive tests in `pytest` verifying statistical invariants, data integrity, and pipeline reproducibility.
 
 ---
 
@@ -546,7 +542,7 @@ Diagnostics are intended for development, verification, and audit purposes, acce
 - comprehensive model card documentation (`docs/models/xg_v1.md`)
 - automated regression and predictive unit tests passing
 
-### v1.2.1 — Predictive Analytics Hardening (Current)
+### v1.2.1 — Predictive Analytics Hardening (Completed)
 
 - **inviolable blocked shots invariant**: blocked attempts (`outcome == 'Blocked'`) are strictly ineligible for xG (`Shot.xg = NULL`), preserving Corsi while barring blocked shots from receiving or contributing to any xG or Fenwick/unblocked-attempt-derived metrics
 - **validation Log Loss candidate model selection**: strictly isolating held-out test data until single final evaluation
@@ -558,9 +554,20 @@ Diagnostics are intended for development, verification, and audit purposes, acce
 - **comprehensive 3-part prediction provenance**: storing `prediction_method`, `model_name`, and `model_version` independently
 - **separate shot denominator semantics**: actual shooting percentage (shots on goal) vs expected goal rate (unblocked attempts)
 
-### Future Modelling (v1.3+)
+### v1.3.0 — Season Analytics, Out-of-Time Validation & Rolling Trends (Current)
 
-- season-level multi-game rolling xG and GSAx trend analysis
+- **out-of-time predictive validation**: evaluated frozen v1.2.1 logistic regression model on 2,190 unblocked attempts from 2024-25 data, achieving 0.2057 log loss, 0.0544 Brier score, 0.7603 ROC-AUC, and 0.932 calibration ratio (**HEALTHY** verdict)
+- **multi-season ingestion foundation**: selective team/season ingestion (`--season 20242025 --team CGY`) with caching and telemetry metrics
+- **team season analytics service**: SQL-grouped aggregations across situations (`all`, `5v5`, `pp`, `sh`), possession shares ($CF\%$, $FF\%$), expected goal shares ($xG\%$), and process variances ($GF - xGF$, $xGA - GA$)
+- **skater & goalie season analytics**: individual scoring and predictive rates ($xG/60$, $GSAx/60$, $Exp\ Sv\%$), with strict domain exclusions (empty nets and shootouts barred from $xGA$/$GSAx$) and configurable sample thresholds
+- **chronological rolling form & trends**: 5, 10, and 20-game rolling windows with zero lookahead leakage
+- **xG model explainability**: mathematical logit factor decomposition exposing danger-increasing and danger-reducing contributions with odds multipliers
+- **season RESTful API**: 10 endpoints serving season standings, team profiles, player/goalie stats, rolling trends, leaderboards, and xG explanations
+- **responsive dark-mode dashboards**: league standings, team analytics, skater/goalie profiles, and interactive shot map model popovers
+- **129 automated tests**: comprehensive test suite across analytical math, domain invariants, APIs, and UI routes
+
+### Future Modelling (v1.4+)
+
 - Bayesian regression for individual finishing talent separation from variance
 - next-game win probability and score margin forecasting models
 - player impact regularization (e.g. RAPM / Ridge regression on shift data)
@@ -569,6 +576,6 @@ Diagnostics are intended for development, verification, and audit purposes, acce
 
 ## Project Status
 
-`v1.2.1`
+`v1.3.0`
 
-The emphasis of v1.2 and v1.2.1 is **delivering a rigorously validated predictive analytics engine**, elevating PuckLens from descriptive boxscores to methodologically sound, calibrated expected goals, goaltender evaluation, and lineup shot-quality analysis.
+The emphasis of v1.3.0 is **delivering robust season-level analytics and empirical model stability**, demonstrating that our frozen predictive xG engine generalizes cleanly to out-of-time NHL data while providing actionable, interpretable dashboards for hockey operations.

@@ -125,3 +125,9 @@ class NHLApiClient:
             logger.info(f"Cached boxscore to {filepath}")
         return data
 
+    def is_game_cached(self, game_id: int) -> bool:
+        """Returns True if play-by-play and shifts data are already cached on disk."""
+        pbp_path = os.path.join(self.raw_data_dir, f"pbp_{game_id}.json")
+        shifts_path = os.path.join(self.raw_data_dir, f"shifts_{game_id}.json")
+        return os.path.exists(pbp_path) and os.path.exists(shifts_path)
+

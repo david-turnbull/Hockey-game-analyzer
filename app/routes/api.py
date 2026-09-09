@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, current_app
 from app.services.game_service import GameService
 from app.models import db, Shot, Event, Player, Team, Game, Shift
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -308,3 +309,205 @@ def get_player_shots(game_id, player_id):
         })
         
     return jsonify(formatted_shots)
+
+
+@api_bp.route('/shots/<shot_id>/xg-explanation')
+def get_shot_xg_explanation(shot_id: str):
+    """Returns interpretable feature contribution analysis and factors for a shot attempt."""
+    from app.analytics.explainability import XGExplainer
+    shot = db.session.get(Shot, shot_id)
+    if not shot:
+        return jsonify({"error": f"Shot {shot_id} not found"}), 404
+    if shot.outcome == 'Blocked':
+        return jsonify({"error": "Blocked shot attempts are excluded from expected goals (xG = NULL) in accordance with PuckLens domain rules."}), 400
+
+    explanation = XGExplainer.explain_shot_by_id(shot_id)
+    if not explanation:
+        return jsonify({"error": f"Shot {shot_id} not found"}), 404
+    return jsonify(explanation)
+
+
+# ==========================================
+# Season Analytics API Resources
+# ==========================================
+
+@api_bp.route('/seasons')
+def get_available_seasons():
+    """Returns all distinct seasons available in the system."""
+    seasons = GameService.get_available_seasons()
+    return jsonify({
+        "seasons": seasons,
+        "count": len(seasons)
+    })
+
+
+@api_bp.route('/seasons/<season>/teams')
+def get_season_teams(season: str):
+    """Returns analytical metrics and rankings for all teams in a season."""
+    from app.services.team_season_service import TeamSeasonService
+    situation = request.args.get('situation', 'all')
+    teams_summary = TeamSeasonService.get_season_teams_summary(season=season, situation=situation)
+    return jsonify({
+        "season": season,
+        "situation": situation,
+        "team_count": len(teams_summary),
+        "teams": teams_summary
+    })
+
+
+@api_bp.route('/teams/<int:team_id>/season/<season>')
+def get_team_season(team_id: int, season: str):
+    """Returns full season metrics for a specific team."""
+    from app.services.team_season_service import TeamSeasonService
+    situation = request.args.get('situation', 'all')
+    stats = TeamSeasonService.get_team_season_stats(team_id=team_id, season=season, situation=situation)
+    if not stats:
+        return jsonify({"error": f"Team {team_id} not found in season {season}"}), 404
+    return jsonify(stats)
+
+
+@api_bp.route('/teams/<int:team_id>/season/<season>/trends')
+def get_team_season_trends(team_id: int, season: str):
+    """Returns rolling chronological metrics (5, 10, 20 game windows) for a team."""
+    from app.services.rolling_service import RollingService
+    raw_windows = request.args.get('windows', '5,10,20')
+    try:
+        window_sizes = [int(w.strip()) for w in raw_windows.split(',') if w.strip().isdigit()]
+    except Exception:
+        window_sizes = [5, 10, 20]
+
+    trends = RollingService.get_team_rolling_trends(team_id=team_id, season=season, window_sizes=window_sizes)
+    return jsonify(trends)
+
+
+@api_bp.route('/teams/<int:team_id>/season/<season>/players')
+def get_team_season_players(team_id: int, season: str):
+    """Returns skater season statistics for a team roster."""
+    from app.services.player_season_service import PlayerSeasonService
+    skaters = PlayerSeasonService.get_season_skaters_summary(season=season, team_id=team_id, min_gp=0)
+    return jsonify({
+        "team_id": team_id,
+        "season": season,
+        "skater_count": len(skaters),
+        "players": skaters
+    })
+
+
+@api_bp.route('/teams/<int:team_id>/season/<season>/goalies')
+def get_team_season_goalies(team_id: int, season: str):
+    """Returns goalie season statistics for a team roster."""
+    from app.services.goalie_season_service import GoalieSeasonService
+    goalies = GoalieSeasonService.get_season_goalies_summary(season=season, team_id=team_id, min_gp=0)
+    return jsonify({
+        "team_id": team_id,
+        "season": season,
+        "goalie_count": len(goalies),
+        "goalies": goalies
+    })
+
+
+@api_bp.route('/players/<int:player_id>/season/<season>')
+def get_player_season(player_id: int, season: str):
+    """Returns full season statistics, individual rates, and 5v5 on-ice metrics for a skater."""
+    from app.services.player_season_service import PlayerSeasonService
+    from app.services.rolling_service import RollingService
+
+    stats = PlayerSeasonService.get_skater_season_stats(player_id=player_id, season=season)
+    if not stats:
+        return jsonify({"error": f"Skater {player_id} not found in season {season}"}), 404
+
+    include_trends = request.args.get('include_trends', 'false').lower() == 'true'
+    if include_trends:
+        trends = RollingService.get_player_rolling_trends(player_id=player_id, season=season)
+        stats["rolling_trends"] = trends.get("trend", [])
+
+    return jsonify(stats)
+
+
+@api_bp.route('/goalies/<int:goalie_id>/season/<season>')
+def get_goalie_season(goalie_id: int, season: str):
+    """Returns season statistics, GSAx, and expected save % for a goalie."""
+    from app.services.goalie_season_service import GoalieSeasonService
+    from app.services.rolling_service import RollingService
+
+    stats = GoalieSeasonService.get_goalie_season_stats(goalie_id=goalie_id, season=season)
+    if not stats:
+        return jsonify({"error": f"Goalie {goalie_id} not found in season {season}"}), 404
+
+    include_trends = request.args.get('include_trends', 'false').lower() == 'true'
+    if include_trends:
+        trends = RollingService.get_goalie_rolling_trends(goalie_id=goalie_id, season=season)
+        stats["rolling_trends"] = trends.get("trend", [])
+
+    return jsonify(stats)
+
+
+@api_bp.route('/seasons/<season>/leaders')
+def get_season_leaders(season: str):
+    """Returns league leaderboards for skaters or goalies with configurable metrics and thresholds."""
+    from app.services.player_season_service import PlayerSeasonService
+    from app.services.goalie_season_service import GoalieSeasonService
+
+    category = request.args.get('category', 'skaters').lower()
+    metric = request.args.get('metric', 'points' if category == 'skaters' else 'gsax')
+    min_gp = int(request.args.get('min_gp', 1))
+    min_toi = int(request.args.get('min_toi', 0))
+    limit = int(request.args.get('limit', 50))
+    team_id_raw = request.args.get('team_id')
+    team_id = None
+    if team_id_raw is not None and team_id_raw != '':
+        try:
+            team_id = int(team_id_raw)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid team_id", "detail": "team_id must be an integer"}), 400
+
+        team = db.session.get(Team, team_id)
+        if not team:
+            return jsonify({"error": f"Team {team_id} not found"}), 404
+
+        team_in_season = (
+            db.session.query(Game.game_id)
+            .filter(
+                Game.season == season,
+                or_(Game.home_team_id == team_id, Game.away_team_id == team_id)
+            )
+            .first()
+        )
+        if not team_in_season:
+            return jsonify({"error": f"Team {team_id} not found in season {season}"}), 404
+
+    if category == 'goalies':
+        min_shots = int(request.args.get('min_shots', 0))
+        leaders = GoalieSeasonService.get_goalie_leaderboards(
+            season=season,
+            sort_by=metric,
+            min_gp=min_gp,
+            min_shots_faced=min_shots,
+            min_toi_seconds=min_toi,
+            limit=limit,
+            team_id=team_id
+        )
+    else:
+        min_unblocked = int(request.args.get('min_unblocked', 0))
+        leaders = PlayerSeasonService.get_skater_leaderboards(
+            season=season,
+            sort_by=metric,
+            min_gp=min_gp,
+            min_toi_seconds=min_toi,
+            min_unblocked_attempts=min_unblocked,
+            limit=limit,
+            team_id=team_id
+        )
+
+    return jsonify({
+        "season": season,
+        "category": category,
+        "metric": metric,
+        "team_id": team_id,
+        "sample_size": len(leaders),
+        "minimum_threshold": {
+            "min_gp": min_gp,
+            "min_toi": min_toi
+        },
+        "leaders": leaders
+    })

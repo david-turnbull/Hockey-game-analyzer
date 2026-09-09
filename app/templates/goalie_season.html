@@ -1,0 +1,256 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ player.full_name }} ({{ season[:4] }}-{{ season[6:] }}) Goalie Profile - PuckLens{% endblock %}
+
+{% block content %}
+<style>
+    .kpi-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .kpi-title {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    .kpi-val {
+        font-size: 1.75rem;
+        font-weight: 800;
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+        line-height: 1.1;
+    }
+    .kpi-sub {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.35rem;
+    }
+    .metric-pill {
+        display: inline-block;
+        padding: 0.15rem 0.45rem;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .metric-pos {
+        background: rgba(16, 185, 129, 0.12);
+        color: #10b981;
+    }
+    .metric-neg {
+        background: rgba(239, 68, 68, 0.12);
+        color: #ef4444;
+    }
+    .metric-neutral {
+        background: rgba(148, 163, 184, 0.1);
+        color: #94a3b8;
+    }
+</style>
+
+<!-- Breadcrumb -->
+<div style="margin-bottom: 1.5rem;">
+    {% if stats.team_id %}
+    <a href="/team/{{ stats.team_id }}/season/{{ season }}" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem;">
+        &larr; Back to {{ stats.team_name }} Season
+    </a>
+    {% else %}
+    <a href="/season/{{ season }}" style="color: var(--accent-color); text-decoration: none; font-size: 0.9rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem;">
+        &larr; Back to Season Standings
+    </a>
+    {% endif %}
+</div>
+
+<!-- Goalie Header -->
+<div class="card" style="padding: 1.75rem 2rem; margin-bottom: 2rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem;">
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            {% if player.headshot_url %}
+            <img src="{{ player.headshot_url }}" alt="{{ player.full_name }}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-color); background: var(--bg-secondary);">
+            {% else %}
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--bg-card); border: 2px solid var(--accent-color); display: flex; align-items: center; justify-content: center; font-size: 1.75rem; font-weight: 800; color: var(--accent-color);">
+                G
+            </div>
+            {% endif %}
+            <div>
+                <h1 style="font-size: 1.85rem; font-weight: 800; margin: 0; color: var(--text-primary); letter-spacing: -0.02em;">
+                    {{ player.full_name }}
+                </h1>
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.35rem; color: var(--text-secondary); font-size: 0.9rem; flex-wrap: wrap;">
+                    {% if player.sweater_number %}<span>#{{ player.sweater_number }}</span><span>&bull;</span>{% endif %}
+                    <span>Goaltender (G)</span>
+                    <span>&bull;</span>
+                    {% if stats.team_id %}
+                    <a href="/team/{{ stats.team_id }}/season/{{ season }}" style="color: var(--accent-color); text-decoration: none; font-weight: 600;">
+                        {{ stats.team_name }} ({{ stats.team_abbrev }})
+                    </a>
+                    {% else %}
+                    <span>Free Agent / Multiple</span>
+                    {% endif %}
+                    <span>&bull;</span>
+                    <span>{{ season[:4] }}-{{ season[4:] }} Season</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 1.5rem; align-items: center;">
+            <div style="text-align: right;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Goals Saved Above Exp</div>
+                <div class="font-mono" style="font-size: 1.75rem; font-weight: 800; color: {% if stats.goals_saved_above_expected >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+                    {% if stats.goals_saved_above_expected > 0 %}+{% endif %}{{ stats.goals_saved_above_expected }}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ stats.gsax_per_60 }} GSAx / 60</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Primary Stats Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    <!-- GP & TOI -->
+    <div class="kpi-card">
+        <div class="kpi-title">Workload</div>
+        <div class="kpi-val">{{ stats.gp }} <span style="font-size: 1rem; color: var(--text-muted);">GP</span></div>
+        <div class="kpi-sub">Total TOI: <span class="font-mono" style="font-weight: 600; color: var(--text-primary);">{{ stats.toi_formatted }}</span></div>
+    </div>
+
+    <!-- Save Percentage -->
+    <div class="kpi-card">
+        <div class="kpi-title">Actual Save %</div>
+        <div class="kpi-val" style="color: var(--accent-color);">{{ stats.save_pct }}%</div>
+        <div class="kpi-sub">{{ stats.saves }} Saves / {{ stats.shots_faced }} Shots</div>
+    </div>
+
+    <!-- Expected Goals Against -->
+    <div class="kpi-card">
+        <div class="kpi-title">Expected Goals Against (xGA)</div>
+        <div class="kpi-val">{{ stats.expected_goals_against }}</div>
+        <div class="kpi-sub">Actual GA: <span class="font-mono" style="font-weight: 600; color: var(--text-primary);">{{ stats.goals_against }}</span></div>
+    </div>
+
+    <!-- Expected Save % -->
+    <div class="kpi-card">
+        <div class="kpi-title">Expected Save %</div>
+        <div class="kpi-val">{{ stats.expected_save_pct }}%</div>
+        <div class="kpi-sub">Differential: <span class="font-mono" style="font-weight: 600; color: {% if stats.save_pct_diff >= 0 %}#10b981{% else %}#ef4444{% endif %};">{% if stats.save_pct_diff > 0 %}+{% endif %}{{ stats.save_pct_diff }}%</span></div>
+    </div>
+
+    <!-- GSAx Rate -->
+    <div class="kpi-card">
+        <div class="kpi-title">GSAx Rate (Per 60)</div>
+        <div class="kpi-val" style="color: {% if stats.gsax_per_60 >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+            {% if stats.gsax_per_60 > 0 %}+{% endif %}{{ stats.gsax_per_60 }}
+        </div>
+        <div class="kpi-sub">Per 60 minutes of ice time</div>
+    </div>
+</div>
+
+<!-- Goalie Invariant Note Alert -->
+<div style="background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 6px; padding: 0.85rem 1.25rem; margin-bottom: 2rem; font-size: 0.82rem; color: var(--text-secondary);">
+    <strong style="color: var(--accent-color);">Analytical Note:</strong> In accordance with PuckLens domain rules, empty-net shots and shootouts are strictly excluded from xGA and GSAx calculations to avoid penalizing or artificially inflating goaltender quality ratings.
+</div>
+
+<!-- Rolling Form Trend (5-Game Window) -->
+<div class="card" style="padding: 1.5rem;">
+    <h2 class="card-title" style="margin-bottom: 0.25rem;">Rolling Form & Trend Analysis</h2>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.25rem;">
+        5-game rolling window tracking Goals Saved Above Expected (GSAx) and Save % performance.
+    </p>
+
+    {% if rolling and rolling.trend and rolling.trend|length > 0 %}
+    <div id="goalie-rolling-plot" style="width: 100%; height: 340px;"></div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
+        Not enough appearances in this season for a 5-game rolling trend.
+    </div>
+    {% endif %}
+</div>
+
+<!-- Plotly CDN & Goalie Trend Script -->
+<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+<script>
+    const goalieTrend = {{ rolling | tojson }};
+    if (goalieTrend && goalieTrend.trend && goalieTrend.trend.length > 0) {
+        const entries = goalieTrend.trend;
+        const labels = entries.map((e, idx) => {
+            const num = e.game_number || e.game_index || (idx + 1);
+            const opp = e.opponent_display || (e.opponent ? `vs ${e.opponent}` : '');
+            return `Gm ${num} ${opp}`.trim();
+        });
+        const gsaxVals = entries.map(e => e.rolling_gsax !== undefined ? e.rolling_gsax : 0);
+        const svPctVals = entries.map(e => e.rolling_save_pct !== undefined ? e.rolling_save_pct : 0);
+        const expSvPctVals = entries.map(e => e.rolling_expected_save_pct !== undefined ? e.rolling_expected_save_pct : 0);
+
+        const traceGsax = {
+            x: labels,
+            y: gsaxVals,
+            name: '5-Game Rolling GSAx',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: '#10b981', width: 3 },
+            marker: { size: 6 },
+            hovertemplate: '%{x}<br>Rolling GSAx: <b>%{y:.2f}</b><extra></extra>'
+        };
+
+        const traceSv = {
+            x: labels,
+            y: svPctVals,
+            name: '5-Game Rolling SV%',
+            type: 'scatter',
+            mode: 'lines',
+            yaxis: 'y2',
+            line: { color: '#38bdf8', width: 2 },
+            hovertemplate: '%{x}<br>Rolling SV%: <b>%{y:.1f}%</b><extra></extra>'
+        };
+
+        const traceExpSv = {
+            x: labels,
+            y: expSvPctVals,
+            name: '5-Game Exp SV%',
+            type: 'scatter',
+            mode: 'lines',
+            yaxis: 'y2',
+            line: { color: '#94a3b8', width: 1.5, dash: 'dot' },
+            hovertemplate: '%{x}<br>Exp SV%: <b>%{y:.1f}%</b><extra></extra>'
+        };
+
+        const layout = {
+            margin: { l: 45, r: 45, t: 20, b: 60 },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            showlegend: true,
+            legend: { orientation: 'h', y: -0.25, font: { color: '#94a3b8' } },
+            xaxis: {
+                tickfont: { color: '#94a3b8', size: 10 },
+                gridcolor: 'rgba(255, 255, 255, 0.05)',
+                tickangle: -30
+            },
+            yaxis: {
+                title: 'Rolling GSAx',
+                titlefont: { color: '#10b981', size: 11 },
+                tickfont: { color: '#10b981' },
+                gridcolor: 'rgba(255, 255, 255, 0.05)',
+                zeroline: true,
+                zerolinecolor: 'rgba(255, 255, 255, 0.2)'
+            },
+            yaxis2: {
+                title: 'Save %',
+                titlefont: { color: '#38bdf8', size: 11 },
+                tickfont: { color: '#38bdf8' },
+                overlaying: 'y',
+                side: 'right',
+                gridcolor: 'transparent'
+            }
+        };
+
+        Plotly.newPlot('goalie-rolling-plot', [traceGsax, traceSv, traceExpSv], layout, { responsive: true, displayModeBar: false });
+    }
+</script>
+{% endblock %}
