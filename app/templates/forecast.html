@@ -192,49 +192,14 @@
         <p class="hero-subtitle">
             Calibrated pregame win probability models, Poisson score projections, and auditable historical out-of-time backtesting evaluation.
         </p>
-    </div>
-
-    <!-- Backtest Performance Summary -->
-    <div class="section-header">
-        <span>🏆</span> Historical Out-of-Time Backtest Performance (2024-25 Test Holdout)
-    </div>
-
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-label">Model Architecture</div>
-            <div class="stat-value" style="font-size: 1.4rem; color: #38bdf8;">
-                {{ backtest.model_selection.selected_model if backtest and backtest.model_selection else 'Logistic Regression' }}
-            </div>
-            <div class="stat-sub">Selected via 2022-23 Log Loss</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-label">Log Loss (Holdout)</div>
-            <div class="stat-value">
-                {{ backtest.test_season_20242025_eval.calibrated_model.log_loss if backtest and backtest.test_season_20242025_eval else '0.6412' }}
-            </div>
-            <div class="stat-sub">vs Elo Baseline: {{ backtest.test_season_20242025_eval.elo_baseline.log_loss if backtest and backtest.test_season_20242025_eval else '0.6720' }}</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-label">Win Accuracy %</div>
-            <div class="stat-value">
-                {{ backtest.test_season_20242025_eval.calibrated_model.accuracy if backtest and backtest.test_season_20242025_eval else '64.8' }}%
-            </div>
-            <div class="stat-sub">Baseline: 50.0%</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-label">Calibration Error (ECE)</div>
-            <div class="stat-value">
-                {{ backtest.test_season_20242025_eval.calibrated_model.ece if backtest and backtest.test_season_20242025_eval else '0.0240' }}
-            </div>
-            <div class="stat-sub">Calibrated via Isotonic 2023-24</div>
+        <div style="margin-top: 1.25rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+            <a href="#game-forecasts" style="background: linear-gradient(90deg, #38bdf8, #0284c7); color: white; text-decoration: none; padding: 0.6rem 1.25rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem;">🔮 Game Forecasts</a>
+            <a href="#backtest-performance" style="background: rgba(255,255,255,0.08); color: #cbd5e1; text-decoration: none; padding: 0.6rem 1.25rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; border: 1px solid rgba(255,255,255,0.1);">🏆 Backtest Performance Metrics</a>
         </div>
     </div>
 
-    <!-- Upcoming Game Predictions -->
-    <div class="section-header">
+    <!-- Upcoming Game Predictions (Primary Section) -->
+    <div id="game-forecasts" class="section-header">
         <span>🔮</span> Game Forecasts & Projections
     </div>
 
@@ -282,6 +247,45 @@
         {% else %}
         <div style="color: #94a3b8; padding: 2rem;">No game forecasts available yet.</div>
         {% endfor %}
+    </div>
+
+    <!-- Backtest Performance Summary -->
+    <div id="backtest-performance" class="section-header" style="margin-top: 2rem;">
+        <span>🏆</span> Historical Out-of-Time Backtest Performance (2024-25 Test Holdout)
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Model Architecture</div>
+            <div class="stat-value" style="font-size: 1.4rem; color: #38bdf8;">
+                {{ backtest.model_selection.selected_model if backtest and backtest.model_selection else 'Logistic Regression' }}
+            </div>
+            <div class="stat-sub">Selected via 2022-23 Log Loss</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Log Loss (Holdout)</div>
+            <div class="stat-value">
+                {{ backtest.test_season_20242025_eval.calibrated_model.log_loss if backtest and backtest.test_season_20242025_eval else '0.6412' }}
+            </div>
+            <div class="stat-sub">vs Elo Baseline: {{ backtest.test_season_20242025_eval.elo_baseline.log_loss if backtest and backtest.test_season_20242025_eval else '0.6720' }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Win Accuracy %</div>
+            <div class="stat-value">
+                {{ backtest.test_season_20242025_eval.calibrated_model.accuracy if backtest and backtest.test_season_20242025_eval else '64.8' }}%
+            </div>
+            <div class="stat-sub">Baseline: 50.0%</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Calibration Error (ECE)</div>
+            <div class="stat-value">
+                {{ backtest.test_season_20242025_eval.calibrated_model.ece if backtest and backtest.test_season_20242025_eval else '0.0240' }}
+            </div>
+            <div class="stat-sub">Calibrated via Isotonic 2023-24</div>
+        </div>
     </div>
 </div>
 {% endblock %}
