@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}PuckLens - Game Forecast {{ forecast.game.away_team_abbrev }} @ {{ forecast.game.home_team_abbrev }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .game-forecast-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+    }
+    .matchup-hero {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+        backdrop-filter: blur(12px);
+    }
+    .matchup-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    .team-card {
+        text-align: center;
+        flex: 1;
+    }
+    .team-code {
+        font-size: 3rem;
+        font-weight: 900;
+        color: #f8fafc;
+        letter-spacing: -0.05em;
+    }
+    .team-full {
+        font-size: 1.1rem;
+        color: #94a3b8;
+    }
+    .vs-badge {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #64748b;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.5rem 1rem;
+        border-radius: 9999px;
+    }
+    .win-gauge-section {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .gauge-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #94a3b8;
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+    }
+    .gauge-bar-lg {
+        height: 24px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+    }
+    .gauge-fill-home {
+        background: linear-gradient(90deg, #38bdf8, #0284c7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: white;
+    }
+    .gauge-fill-away {
+        background: linear-gradient(90deg, #a855f7, #7e22ce);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: white;
+    }
+    .grid-2col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+    .panel-box {
+        background: rgba(30, 41, 59, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 1.5rem;
+    }
+    .panel-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #f8fafc;
+        margin-bottom: 1rem;
+    }
+    .disclaimer-tag {
+        font-size: 0.75rem;
+        color: #f59e0b;
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.2);
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        margin-bottom: 1.25rem;
+    }
+    /* Heatmap Grid */
+    .matrix-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+        text-align: center;
+    }
+    .matrix-table th, .matrix-table td {
+        padding: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .matrix-table th {
+        background: rgba(15, 23, 42, 0.8);
+        color: #94a3b8;
+    }
+    .feat-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        font-size: 0.9rem;
+    }
+    .feat-name {
+        color: #cbd5e1;
+    }
+    .contrib-pos {
+        color: #38bdf8;
+        font-weight: 700;
+    }
+    .contrib-neg {
+        color: #c084fc;
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="game-forecast-container">
+    <!-- Hero Matchup -->
+    <div class="matchup-hero">
+        <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;">
+            Game ID: {{ forecast.game_id }} | Season: {{ forecast.game.season }} | {{ forecast.game.game_date }}
+        </div>
+        <div class="matchup-header">
+            <div class="team-card">
+                <div class="team-code" style="color: #38bdf8;">{{ forecast.game.home_team_abbrev }}</div>
+                <div class="team-full">{{ forecast.game.home_team_name }} (Home)</div>
+            </div>
+
+            <div class="vs-badge">VS</div>
+
+            <div class="team-card">
+                <div class="team-code" style="color: #c084fc;">{{ forecast.game.away_team_abbrev }}</div>
+                <div class="team-full">{{ forecast.game.away_team_name }} (Away)</div>
+            </div>
+        </div>
+
+        <!-- Win Probability Gauge -->
+        <div class="win-gauge-section">
+            <div class="gauge-title">Calibrated Pregame Win Probability</div>
+            <div class="gauge-bar-lg">
+                <div class="gauge-fill-home" style="width: {{ forecast.win_probability.home_win_probability * 100 }}%;">
+                    {{ forecast.game.home_team_abbrev }} {{ forecast.win_probability.home_win_pct_display }}
+                </div>
+                <div class="gauge-fill-away" style="width: {{ forecast.win_probability.away_win_probability * 100 }}%;">
+                    {{ forecast.game.away_team_abbrev }} {{ forecast.win_probability.away_win_pct_display }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2 Column Layout: Matrix & Explanations -->
+    <div class="grid-2col">
+        <!-- Poisson Score Matrix -->
+        <div class="panel-box">
+            <div class="panel-title">⚽ Goal Projection Matrix (10x10)</div>
+
+            <div class="disclaimer-tag">
+                ⚠️ {{ forecast.score_projection.disclaimer_label }}
+            </div>
+
+            <div style="margin-bottom: 1rem; font-size: 0.9rem;">
+                <strong>Expected Goals:</strong>
+                {{ forecast.game.home_team_abbrev }} ({{ forecast.score_projection.expected_home_goals }}) -
+                {{ forecast.game.away_team_abbrev }} ({{ forecast.score_projection.expected_away_goals }})
+            </div>
+
+            <!-- Heatmap Table -->
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th>H \ A</th>
+                        {% for a in range(10) %}
+                        <th>{{ a }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in range(10) %}
+                    <tr>
+                        <th>{{ h }}</th>
+                        {% for a in range(10) %}
+                        {% set prob = forecast.score_projection.score_matrix[h][a] %}
+                        <td style="background: rgba(56, 189, 248, {{ prob * 8.0 }});">
+                            {{ (prob * 100)|round(1) }}%
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Model Explanations -->
+        <div class="panel-box">
+            <div class="panel-title">💡 Model Explanations & Feature Contributions</div>
+
+            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 1rem;">
+                Model Architecture: <strong>{{ forecast.win_probability.model_type if forecast.win_probability else 'LogisticRegression' }}</strong>
+            </div>
+
+            {% for exp in forecast.explanations %}
+            <div class="feat-item">
+                <span class="feat-name">{{ exp.feature }}</span>
+                <span>
+                    <span style="color: #94a3b8; font-size: 0.8rem; margin-right: 0.5rem;">val: {{ exp.raw_value }}</span>
+                    {% if exp.signed_contribution > 0 %}
+                    <span class="contrib-pos">+{{ exp.signed_contribution }}</span>
+                    {% else %}
+                    <span class="contrib-neg">{{ exp.signed_contribution }}</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

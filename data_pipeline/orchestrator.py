@@ -15,6 +15,7 @@ class PipelineOrchestrator:
         self.api_client = NHLApiClient(raw_data_dir)
         self.normalizer = DataNormalizer()
         self.loader = DatabaseLoader(session)
+        self._roster_cache = {}
 
     def ingest_game(self, game_id: int, force_refresh: bool = False) -> tuple:
         """
@@ -43,7 +44,7 @@ class PipelineOrchestrator:
         # 2. Transform Phase
         try:
             # Game level
-            game_model = self.normalizer.transform_game(pbp_raw)
+            game_model = self.normalizer.transform_game(pbp_raw, data_source='nhl_api')
             
             # Teams
             home_team_raw = pbp_raw["homeTeam"]
@@ -61,43 +62,45 @@ class PipelineOrchestrator:
             away_team_model = self.normalizer.transform_team(away_team_raw["id"], away_team_raw["abbrev"], away_name)
             teams_list = [home_team_model, away_team_model]
             
-            # Fetch Season Rosters
+            # Fetch Season Rosters with in-memory caching
             season = str(pbp_raw.get("season", ""))
             roster_map = {}
             for team_raw in [home_team_raw, away_team_raw]:
                 abbr = team_raw.get("abbrev")
                 if abbr and season:
-                    logger.info(f"Fetching {abbr} roster for {season}")
-                    try:
-                        roster_data = self.api_client.get_season_roster(abbr, season)
-                        if roster_data:
-                            # Keep track of how many players were loaded
-                            loaded_count = 0
-                            for group in ["forwards", "defensemen", "goalies"]:
-                                for p_spot in roster_data.get(group, []):
-                                    pid = p_spot.get("id")
-                                    if pid:
-                                        loaded_count += 1
-                                        roster_map[pid] = {
-                                            "player_id": pid,
-                                            "first_name": p_spot.get("firstName", {}).get("default", ""),
-                                            "last_name": p_spot.get("lastName", {}).get("default", ""),
-                                            "sweater_number": p_spot.get("sweaterNumber"),
-                                            "position_code": p_spot.get("positionCode"),
-                                            "shoots_catches": p_spot.get("shootsCatches"),
-                                            "headshot_url": p_spot.get("headshot"),
-                                            "height_in_inches": p_spot.get("heightInInches"),
-                                            "height_in_centimeters": p_spot.get("heightInCentimeters"),
-                                            "weight_in_pounds": p_spot.get("weightInPounds"),
-                                            "weight_in_kilograms": p_spot.get("weightInKilograms"),
-                                            "birth_date": p_spot.get("birthDate"),
-                                            "birth_city": p_spot.get("birthCity", {}).get("default", "") if isinstance(p_spot.get("birthCity"), dict) else p_spot.get("birthCity", ""),
-                                            "birth_country": p_spot.get("birthCountry"),
-                                            "team_id": team_raw["id"]
-                                        }
-                            logger.info(f"Loaded {loaded_count} roster players for {abbr}")
-                    except Exception as e:
-                        logger.warning(f"Failed to fetch or parse roster for {abbr} in season {season}: {e}")
+                    cache_key = (abbr, season)
+                    if not force_refresh and cache_key in self._roster_cache:
+                        roster_map.update(self._roster_cache[cache_key])
+                    else:
+                        team_roster_map = {}
+                        try:
+                            roster_data = self.api_client.get_season_roster(abbr, season, force_refresh=force_refresh)
+                            if roster_data:
+                                for group in ["forwards", "defensemen", "goalies"]:
+                                    for p_spot in roster_data.get(group, []):
+                                        pid = p_spot.get("id")
+                                        if pid:
+                                            team_roster_map[pid] = {
+                                                "player_id": pid,
+                                                "first_name": p_spot.get("firstName", {}).get("default", ""),
+                                                "last_name": p_spot.get("lastName", {}).get("default", ""),
+                                                "sweater_number": p_spot.get("sweaterNumber"),
+                                                "position_code": p_spot.get("positionCode"),
+                                                "shoots_catches": p_spot.get("shootsCatches"),
+                                                "headshot_url": p_spot.get("headshot"),
+                                                "height_in_inches": p_spot.get("heightInInches"),
+                                                "height_in_centimeters": p_spot.get("heightInCentimeters"),
+                                                "weight_in_pounds": p_spot.get("weightInPounds"),
+                                                "weight_in_kilograms": p_spot.get("weightInKilograms"),
+                                                "birth_date": p_spot.get("birthDate"),
+                                                "birth_city": p_spot.get("birthCity", {}).get("default", "") if isinstance(p_spot.get("birthCity"), dict) else p_spot.get("birthCity", ""),
+                                                "birth_country": p_spot.get("birthCountry"),
+                                                "team_id": team_raw["id"]
+                                            }
+                                self._roster_cache[cache_key] = team_roster_map
+                                roster_map.update(team_roster_map)
+                        except Exception as e:
+                            logger.warning(f"Failed to fetch or parse roster for {abbr} in season {season}: {e}")
 
             # Players
             from app.models import Player

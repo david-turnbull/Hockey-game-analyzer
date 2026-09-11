@@ -1,0 +1,5 @@
+{
+  "status": "INVALIDATED",
+  "reason": "Synthetic data detected or insufficient complete real seasons in database. Production backtest requires 3+ complete regular seasons from NHL API with 0 synthetic games.",
+  "pending_validation": true
+}

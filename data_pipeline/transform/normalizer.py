@@ -247,12 +247,20 @@ class DataNormalizer:
         )
 
 
-    def transform_game(self, pbp_raw: dict) -> Game:
+    def transform_game(self, pbp_raw: dict, data_source: str = 'nhl_api') -> Game:
         """Constructs a Game model instance."""
         game_id = pbp_raw["id"]
         season = str(pbp_raw["season"])
         game_date = datetime.strptime(pbp_raw["gameDate"], "%Y-%m-%d").date()
         
+        raw_start = pbp_raw.get("startTimeUTC") or pbp_raw.get("startTime") or pbp_raw.get("start_time_utc")
+        start_time_utc = None
+        if raw_start:
+            try:
+                start_time_utc = datetime.fromisoformat(str(raw_start).replace('Z', '+00:00'))
+            except Exception:
+                start_time_utc = None
+
         raw_type = pbp_raw.get("gameType")
         game_type = 'R' if raw_type == 2 else ('P' if raw_type == 3 else str(raw_type))
         
@@ -266,12 +274,14 @@ class DataNormalizer:
             game_id=game_id,
             season=season,
             game_date=game_date,
+            start_time_utc=start_time_utc,
             game_type=game_type,
             home_team_id=home_team_id,
             away_team_id=away_team_id,
             home_score=home_score,
             away_score=away_score,
-            nhl_game_state=nhl_game_state
+            nhl_game_state=nhl_game_state,
+            data_source=data_source
         )
 
     def transform_event(self, play: dict, game_id: int, home_team_id: int, 

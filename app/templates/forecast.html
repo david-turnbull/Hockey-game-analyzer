@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}PuckLens - Forecast & Backtesting Center{% endblock %}
+
+{% block extra_css %}
+<style>
+    .forecast-container {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+    }
+    .hero-banner {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.9) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 2.5rem;
+        margin-bottom: 2.5rem;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+    .hero-title {
+        font-size: 2.25rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #38bdf8, #818cf8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.75rem;
+    }
+    .hero-subtitle {
+        color: #94a3b8;
+        font-size: 1.05rem;
+        max-width: 800px;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2.5rem;
+    }
+    .stat-card {
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 1.5rem;
+        backdrop-filter: blur(8px);
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(56, 189, 248, 0.4);
+    }
+    .stat-label {
+        font-size: 0.85rem;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
+    }
+    .stat-value {
+        font-size: 1.85rem;
+        font-weight: 700;
+        color: #f8fafc;
+    }
+    .stat-sub {
+        font-size: 0.8rem;
+        color: #38bdf8;
+        margin-top: 0.35rem;
+    }
+    .section-header {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #f8fafc;
+        margin-bottom: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .games-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+    .forecast-card {
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: all 0.2s ease;
+    }
+    .forecast-card:hover {
+        border-color: #38bdf8;
+        box-shadow: 0 10px 25px rgba(56, 189, 248, 0.15);
+    }
+    .card-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.8rem;
+        color: #64748b;
+        margin-bottom: 1rem;
+    }
+    .badge-status {
+        background: rgba(56, 189, 248, 0.15);
+        color: #38bdf8;
+        padding: 0.2rem 0.6rem;
+        border-radius: 9999px;
+        font-weight: 600;
+    }
+    .teams-matchup {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.25rem;
+    }
+    .team-block {
+        text-align: center;
+        flex: 1;
+    }
+    .team-abbrev {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #f1f5f9;
+    }
+    .team-name {
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+    .vs-divider {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #64748b;
+        padding: 0 0.5rem;
+    }
+    .prob-bar-container {
+        margin-bottom: 1rem;
+    }
+    .prob-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+    }
+    .prob-bar {
+        height: 10px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 5px;
+        overflow: hidden;
+        display: flex;
+    }
+    .prob-fill-home {
+        background: linear-gradient(90deg, #38bdf8, #0284c7);
+    }
+    .prob-fill-away {
+        background: linear-gradient(90deg, #a855f7, #7e22ce);
+    }
+    .exp-goals {
+        display: flex;
+        justify-content: space-around;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        padding: 0.6rem;
+        margin-bottom: 1.25rem;
+        font-size: 0.85rem;
+    }
+    .btn-forecast {
+        display: block;
+        text-align: center;
+        background: linear-gradient(90deg, #0284c7, #0369a1);
+        color: white;
+        text-decoration: none;
+        padding: 0.6rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: opacity 0.2s ease;
+    }
+    .btn-forecast:hover {
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="forecast-container">
+    <div class="hero-banner">
+        <h1 class="hero-title">PuckLens v1.4.0 Forecast & Backtesting Center</h1>
+        <p class="hero-subtitle">
+            Calibrated pregame win probability models, Poisson score projections, and auditable historical out-of-time backtesting evaluation.
+        </p>
+        <div style="margin-top: 1.25rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+            <a href="#game-forecasts" style="background: linear-gradient(90deg, #38bdf8, #0284c7); color: white; text-decoration: none; padding: 0.6rem 1.25rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem;">🔮 Game Forecasts</a>
+            <a href="#backtest-performance" style="background: rgba(255,255,255,0.08); color: #cbd5e1; text-decoration: none; padding: 0.6rem 1.25rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; border: 1px solid rgba(255,255,255,0.1);">🏆 Backtest Performance Metrics</a>
+        </div>
+    </div>
+
+    <!-- Upcoming Game Predictions (Primary Section) -->
+    <div id="game-forecasts" class="section-header">
+        <span>🔮</span> Game Forecasts & Projections
+    </div>
+
+    <div class="games-grid">
+        {% for f in forecasts %}
+        <div class="forecast-card">
+            <div>
+                <div class="card-meta">
+                    <span>{{ f.game.game_date }}</span>
+                    <span class="badge-status">{{ f.game.nhl_game_state }}</span>
+                </div>
+
+                <div class="teams-matchup">
+                    <div class="team-block">
+                        <div class="team-abbrev">{{ f.game.home_team_abbrev }}</div>
+                        <div class="team-name">{{ f.game.home_team_name }}</div>
+                    </div>
+                    <div class="vs-divider">VS</div>
+                    <div class="team-block">
+                        <div class="team-abbrev">{{ f.game.away_team_abbrev }}</div>
+                        <div class="team-name">{{ f.game.away_team_name }}</div>
+                    </div>
+                </div>
+
+                <div class="prob-bar-container">
+                    <div class="prob-labels">
+                        <span style="color: #38bdf8;">{{ f.win_probability.home_win_pct_display }}</span>
+                        <span style="color: #c084fc;">{{ f.win_probability.away_win_pct_display }}</span>
+                    </div>
+                    <div class="prob-bar">
+                        <div class="prob-fill-home" style="width: {{ f.win_probability.home_win_probability * 100 }}%;"></div>
+                        <div class="prob-fill-away" style="width: {{ f.win_probability.away_win_probability * 100 }}%;"></div>
+                    </div>
+                </div>
+
+                <div class="exp-goals">
+                    <div>Expected Goals:</div>
+                    <div><strong>{{ f.game.home_team_abbrev }}:</strong> {{ f.score_projection.expected_home_goals }}</div>
+                    <div><strong>{{ f.game.away_team_abbrev }}:</strong> {{ f.score_projection.expected_away_goals }}</div>
+                </div>
+            </div>
+
+            <a href="/forecast/game/{{ f.game_id }}" class="btn-forecast">View Full Forecast & Matrix</a>
+        </div>
+        {% else %}
+        <div style="color: #94a3b8; padding: 2rem;">No game forecasts available yet.</div>
+        {% endfor %}
+    </div>
+
+    <!-- Backtest Performance Summary -->
+    <div id="backtest-performance" class="section-header" style="margin-top: 2rem;">
+        <span>🏆</span> Historical Out-of-Time Backtest Performance (2024-25 Test Holdout)
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Model Architecture</div>
+            <div class="stat-value" style="font-size: 1.4rem; color: #38bdf8;">
+                {{ backtest.model_selection.selected_model if backtest and backtest.model_selection and backtest.model_selection.selected_model else 'Pending historical validation' }}
+            </div>
+            <div class="stat-sub">Selected via 2022-23 Log Loss</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Log Loss (Holdout)</div>
+            <div class="stat-value" style="font-size: 1.4rem;">
+                {{ backtest.test_season_20242025_eval.calibrated_model.log_loss if backtest and backtest.test_season_20242025_eval and backtest.test_season_20242025_eval.calibrated_model else 'Pending historical validation' }}
+            </div>
+            <div class="stat-sub">vs Elo Baseline: {{ backtest.test_season_20242025_eval.elo_baseline.log_loss if backtest and backtest.test_season_20242025_eval and backtest.test_season_20242025_eval.elo_baseline else 'Pending' }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Win Accuracy %</div>
+            <div class="stat-value" style="font-size: 1.4rem;">
+                {% if backtest and backtest.test_season_20242025_eval and backtest.test_season_20242025_eval.calibrated_model %}
+                    {{ backtest.test_season_20242025_eval.calibrated_model.accuracy }}%
+                {% else %}
+                    Pending historical validation
+                {% endif %}
+            </div>
+            <div class="stat-sub">Baseline: 50.0%</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Calibration Error (ECE)</div>
+            <div class="stat-value" style="font-size: 1.4rem;">
+                {{ backtest.test_season_20242025_eval.calibrated_model.ece if backtest and backtest.test_season_20242025_eval and backtest.test_season_20242025_eval.calibrated_model else 'Pending historical validation' }}
+            </div>
+            <div class="stat-sub">Calibrated via Isotonic 2023-24</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
