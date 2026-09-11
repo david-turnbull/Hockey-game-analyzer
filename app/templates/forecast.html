@@ -258,31 +258,35 @@
         <div class="stat-card">
             <div class="stat-label">Model Architecture</div>
             <div class="stat-value" style="font-size: 1.4rem; color: #38bdf8;">
-                {{ backtest.model_selection.selected_model if backtest and backtest.model_selection else 'Logistic Regression' }}
+                {{ backtest.model_selection.selected_model if backtest and backtest.model_selection and backtest.model_selection.selected_model else 'Pending historical validation' }}
             </div>
             <div class="stat-sub">Selected via 2022-23 Log Loss</div>
         </div>
 
         <div class="stat-card">
             <div class="stat-label">Log Loss (Holdout)</div>
-            <div class="stat-value">
-                {{ backtest.test_season_20242025_eval.calibrated_model.log_loss if backtest and backtest.test_season_20242025_eval else '0.6412' }}
+            <div class="stat-value" style="font-size: 1.4rem;">
+                {{ backtest.test_season_20242025_eval.calibrated_model.log_loss if backtest and backtest.test_season_20242025_eval and backtest.test_season_20242025_eval.calibrated_model else 'Pending historical validation' }}
             </div>
-            <div class="stat-sub">vs Elo Baseline: {{ backtest.test_season_20242025_eval.elo_baseline.log_loss if backtest and backtest.test_season_20242025_eval else '0.6720' }}</div>
+            <div class="stat-sub">vs Elo Baseline: {{ backtest.test_season_20242025_eval.elo_baseline.log_loss if backtest and backtest.test_season_20242025_eval and backtest.test_season_20242025_eval.elo_baseline else 'Pending' }}</div>
         </div>
 
         <div class="stat-card">
             <div class="stat-label">Win Accuracy %</div>
-            <div class="stat-value">
-                {{ backtest.test_season_20242025_eval.calibrated_model.accuracy if backtest and backtest.test_season_20242025_eval else '64.8' }}%
+            <div class="stat-value" style="font-size: 1.4rem;">
+                {% if backtest and backtest.test_season_20242025_eval and backtest.test_season_20242025_eval.calibrated_model %}
+                    {{ backtest.test_season_20242025_eval.calibrated_model.accuracy }}%
+                {% else %}
+                    Pending historical validation
+                {% endif %}
             </div>
             <div class="stat-sub">Baseline: 50.0%</div>
         </div>
 
         <div class="stat-card">
             <div class="stat-label">Calibration Error (ECE)</div>
-            <div class="stat-value">
-                {{ backtest.test_season_20242025_eval.calibrated_model.ece if backtest and backtest.test_season_20242025_eval else '0.0240' }}
+            <div class="stat-value" style="font-size: 1.4rem;">
+                {{ backtest.test_season_20242025_eval.calibrated_model.ece if backtest and backtest.test_season_20242025_eval and backtest.test_season_20242025_eval.calibrated_model else 'Pending historical validation' }}
             </div>
             <div class="stat-sub">Calibrated via Isotonic 2023-24</div>
         </div>

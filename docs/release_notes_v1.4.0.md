@@ -14,10 +14,13 @@ PuckLens v1.4.0 introduces **Pregame Match Forecasting, Historical Out-of-Time B
 
 ## Key Features & Enhancements
 
-### 1. Production Data Completeness Hard Gate
-- Audit script (`scripts/audit_seasons.py`) evaluates historical regular season game coverage.
-- Enforces a hard gate requiring **at least 3 complete regular seasons** (>= 1,200 completed games with play-by-play events per season) before model training or official backtesting can proceed.
-- Evaluated 4 complete seasons (2021-22, 2022-23, 2023-24, 2024-25) containing 1,312 regular season games each.
+### 1. Production Data Completeness Hard Gate & Provenance Hardening
+- Audit script (`scripts/audit_seasons.py`) evaluates historical regular season game coverage across 7 feature metrics.
+- Enforces a hard gate requiring **at least 3 complete regular seasons** (1,312 completed games, $\ge 99\%$ PBP coverage, $\ge 99\%$ UTC timestamp coverage per season) and **0 synthetic test games** before model training or official backtesting can proceed.
+- Quarantines synthetic data generation to `scripts/generate_synthetic_test_data.py --testing-only` with `data_source = 'synthetic_test'`. Any synthetic game present in the database automatically invalidates forecast training and official backtesting.
+- Re-ingestion in `db_loader.py` updates `start_time_utc` and `data_source` on existing records.
+- API client (`NHLApiClient`) features bounded exponential backoff retries and malformed JSON disk cache validation.
+- Multi-season ingestion pipeline utility (`scripts/ingest_forecast_history.py`) and safety-gated database reset utility (`scripts/reset_historical_data.py --confirm`).
 
 ### 2. Leakage-Safe Pregame Feature Engine (`PregameFeatureService`)
 - Enforces strict temporal boundary invariant: `source_game.start_time_utc < target_game.start_time_utc` (with fallback to `game_date`).
@@ -53,20 +56,14 @@ PuckLens v1.4.0 introduces **Pregame Match Forecasting, Historical Out-of-Time B
 
 ---
 
-## Out-of-Time Backtesting Results (2024-25 Final Test Holdout)
+## Out-of-Time Backtesting Results
 
-| Model / Baseline | Log Loss | Brier Score | Accuracy (%) | ECE |
-|---|---|---|---|---|
-| **PuckLens v1.4.0 (Calibrated Model)** | **0.6509** | **0.2294** | **61.43%** | **0.0285** |
-| Elo Baseline Model | 0.6485 | 0.2284 | 62.27% | 0.0635 |
-| Naive 50/50 Baseline | 0.6931 | 0.2500 | 50.00% | 0.0000 |
-
-- **Score Projection Total Goals MAE:** 1.82 goals
-- **Top 5 Exact Scoreline Coverage:** 58.4% of games
+> [!WARNING]
+> **Pending Historical Validation**: Derived performance metrics generated during early development using synthetic/partial fixtures have been invalidated. Official backtesting requires ingesting at least 3 complete real regular seasons from the NHL API (`python scripts/ingest_forecast_history.py`), followed by running `python scripts/run_backtest.py`.
 
 ---
 
 ## Verification & Testing
 
-- Full test suite passes: `pytest` (150 tests passed).
-- Test Coverage includes unit tests for pregame features, Elo service, win probability model, score projection, backtest engine, and API routes.
+- Comprehensive unit test suite in `tests/test_provenance_hardening.py` covers synthetic data isolation, `start_time_utc` replacement, audit metric computation, production training gate enforcement, failure manifests, and malformed cache handling.
+- Full test suite passes via `pytest`.

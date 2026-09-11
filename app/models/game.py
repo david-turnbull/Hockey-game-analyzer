@@ -16,6 +16,7 @@ class Game(db.Model):
     home_score = db.Column(db.Integer, default=0, nullable=False)
     away_score = db.Column(db.Integer, default=0, nullable=False)
     nhl_game_state = db.Column(db.String(20))             # Raw NHL game state code (e.g. OFF, LIVE, FUT)
+    data_source = db.Column(db.String(50), default='nhl_api', nullable=False) # 'nhl_api' or 'synthetic_test'
 
     @property
     def start_time(self):

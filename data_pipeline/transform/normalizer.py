@@ -247,7 +247,7 @@ class DataNormalizer:
         )
 
 
-    def transform_game(self, pbp_raw: dict) -> Game:
+    def transform_game(self, pbp_raw: dict, data_source: str = 'nhl_api') -> Game:
         """Constructs a Game model instance."""
         game_id = pbp_raw["id"]
         season = str(pbp_raw["season"])
@@ -280,7 +280,8 @@ class DataNormalizer:
             away_team_id=away_team_id,
             home_score=home_score,
             away_score=away_score,
-            nhl_game_state=nhl_game_state
+            nhl_game_state=nhl_game_state,
+            data_source=data_source
         )
 
     def transform_event(self, play: dict, game_id: int, home_team_id: int, 

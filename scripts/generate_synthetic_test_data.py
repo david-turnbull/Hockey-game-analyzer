@@ -1,6 +1,7 @@
 import os
 import sys
 import random
+import argparse
 from datetime import datetime, timedelta, timezone
 
 # Ensure project root in sys.path
@@ -10,7 +11,6 @@ if project_root not in sys.path:
 
 from app import create_app
 from app.models import db, Team, Player, Game, Event, Shot
-from data_pipeline.orchestrator import PipelineOrchestrator
 
 SEASONS = ['20212022', '20222023', '20232024', '20242025']
 TARGET_GAMES_PER_SEASON = 1312  # Standard 32-team 82-game regular season schedule
@@ -26,19 +26,26 @@ NHL_TEAMS = [
     (23, 'VAN', 'Vancouver Canucks'), (24, 'ANA', 'Anaheim Ducks'), (25, 'DAL', 'Dallas Stars'),
     (26, 'LAK', 'Los Angeles Kings'), (28, 'SJS', 'San Jose Sharks'), (29, 'CBJ', 'Columbus Blue Jackets'),
     (30, 'MIN', 'Minnesota Wild'), (52, 'WPG', 'Winnipeg Jets'), (53, 'ARI', 'Arizona Coyotes'),
-    (54, 'VGK', 'Vegas Golden Knights'), (55, 'Seattle Kraken', 'SEA')
+    (54, 'VGK', 'Vegas Golden Knights'), (55, 'SEA', 'Seattle Kraken')
 ]
 
-# Ensure 32 teams mapping
-TEAM_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29, 30, 52, 53, 54, 55]
+TEAM_IDS = [t[0] for t in NHL_TEAMS]
+
+def print_warning():
+    print("=" * 70)
+    print(" SYNTHETIC TEST DATA ONLY")
+    print(" This dataset must not be used for PuckLens production")
+    print(" forecast training, evaluation, or release metrics.")
+    print(" All generated records are tagged with data_source='synthetic_test'.")
+    print("=" * 70 + "\n")
 
 def seed_teams():
     for tid in TEAM_IDS:
         team = db.session.get(Team, tid)
         if not team:
             info = next((t for t in NHL_TEAMS if t[0] == tid), (tid, f"T{tid}", f"Team {tid}"))
-            abbrev = info[1] if len(info[1]) <= 3 else info[2]
-            name = info[2] if len(info[1]) <= 3 else info[1]
+            abbrev = info[1]
+            name = info[2]
             db.session.add(Team(team_id=tid, abbreviation=abbrev, name=name))
     db.session.commit()
 
@@ -48,14 +55,14 @@ def seed_teams():
         if not p:
             db.session.add(Player(
                 player_id=pid,
-                first_name=f"Player",
+                first_name="Player",
                 last_name=f"{tid}",
                 position="C",
                 current_team_id=tid
             ))
     db.session.commit()
 
-def generate_season_games(season: str):
+def generate_synthetic_season_games(season: str):
     start_year = int(season[:4])
     end_year = int(season[4:])
     
@@ -72,11 +79,10 @@ def generate_season_games(season: str):
         return
 
     needed = TARGET_GAMES_PER_SEASON - count_existing
-    print(f"[{season}] Generating {needed} regular season games...", flush=True)
+    print(f"[{season}] Generating {needed} synthetic regular season games...", flush=True)
 
-    random.seed(int(season))  # Deterministic seed per season
+    random.seed(int(season))
 
-    # Assign team strength offsets to create realistic standings
     team_strengths = {tid: random.gauss(0, 0.4) for tid in TEAM_IDS}
 
     new_games = []
@@ -88,13 +94,11 @@ def generate_season_games(season: str):
         if game_id in existing_game_ids:
             continue
 
-        # Distribute game dates evenly over season
         day_offset = int((idx / TARGET_GAMES_PER_SEASON) * total_days)
         game_time = start_date + timedelta(days=day_offset, hours=random.choice([0, 1, 2, 3]))
 
         home_id, away_id = random.sample(TEAM_IDS, 2)
         
-        # Skill-adjusted goal expectation
         home_lambda = max(1.2, 3.1 + team_strengths[home_id] - team_strengths[away_id]*0.5)
         away_lambda = max(1.0, 2.7 + team_strengths[away_id] - team_strengths[home_id]*0.5)
 
@@ -102,7 +106,6 @@ def generate_season_games(season: str):
         away_score = max(0, int(random.gauss(away_lambda, 1.1)))
         
         if home_score == away_score:
-            # Overtime / Shootout tie-breaker
             if random.random() < 0.54:
                 home_score += 1
             else:
@@ -118,11 +121,11 @@ def generate_season_games(season: str):
             away_team_id=away_id,
             home_score=home_score,
             away_score=away_score,
-            nhl_game_state='OFF'
+            nhl_game_state='OFF',
+            data_source='synthetic_test'  # CRITICAL PROVENANCE ISOLATION TAG
         )
         new_games.append(game)
 
-        # Generate lightweight event & shot records for rolling stats computation
         total_shots = 20
         for s_idx in range(total_shots):
             is_home = (s_idx % 2 == 0)
@@ -186,7 +189,6 @@ def generate_season_games(season: str):
             )
             new_shots.append(shot)
 
-        # Batch commit every 100 games to keep memory footprint light
         if len(new_games) >= 100:
             db.session.add_all(new_games)
             db.session.flush()
@@ -204,20 +206,30 @@ def generate_season_games(season: str):
         db.session.add_all(new_shots)
         db.session.commit()
 
-    print(f"[{season}] Backfill completed!")
+    print(f"[{season}] Synthetic test generation completed!")
 
 def main():
-    print("=" * 70)
-    print(" DEPRECATED: scripts/backfill_seasons.py")
-    print(" Synthetic data generation has been quarantined to:")
-    print("   python scripts/generate_synthetic_test_data.py --testing-only")
-    print(" Synthetic data MUST NOT be used for production forecasting.")
-    print("=" * 70 + "\n")
+    parser = argparse.ArgumentParser(description="Generate synthetic NHL test data for automated testing fixtures ONLY.")
+    parser.add_argument("--testing-only", action="store_true", help="Explicit safety flag required for generating synthetic test fixtures.")
+    args = parser.parse_args()
 
-    # Delegate to quarantined synthetic generator script with safety flag
-    from scripts.generate_synthetic_test_data import main as synthetic_main
-    sys.argv = [sys.argv[0], "--testing-only"]
-    synthetic_main()
+    if not args.testing_only:
+        print("[ERROR] Synthetic data generation is quarantined for test fixtures only.")
+        print("You MUST pass --testing-only to execute this script.")
+        sys.exit(1)
+
+    print_warning()
+
+    app = create_app('development')
+    with app.app_context():
+        db.create_all()
+        seed_teams()
+        
+        for season in SEASONS:
+            print(f"\n--- Generating Synthetic Test Fixtures for Season {season} ---")
+            generate_synthetic_season_games(season)
+
+        print("\nSynthetic test fixtures successfully generated!")
 
 if __name__ == '__main__':
     main()

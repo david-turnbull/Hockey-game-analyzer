@@ -40,7 +40,7 @@ def app():
 def test_win_probability_model_pipeline(app):
     with app.app_context():
         model = WinProbabilityModel()
-        res = model.train_and_select(train_season='20212022', select_season='20222023', calibrate_season='20232024')
+        res = model.train_and_select(train_season='20212022', select_season='20222023', calibrate_season='20232024', skip_gate=True)
         
         assert res["selected_model"] in ["LogisticRegression", "HistGradientBoosting"]
         assert model.model is not None

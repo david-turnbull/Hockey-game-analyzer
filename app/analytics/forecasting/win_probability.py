@@ -88,6 +88,7 @@ class WinProbabilityModel:
         games = Game.query.filter(
             Game.season == season,
             Game.game_type == 'R',
+            Game.data_source == 'nhl_api',
             Game.nhl_game_state.in_(['OFF', 'FINAL', 'OVER'])
         ).order_by(Game.game_date.asc(), Game.game_id.asc()).all()
 
@@ -113,11 +114,20 @@ class WinProbabilityModel:
         self,
         train_season: str = '20212022',
         select_season: str = '20222023',
-        calibrate_season: str = '20232024'
+        calibrate_season: str = '20232024',
+        skip_gate: bool = False
     ) -> Dict[str, Any]:
         """
         Executes strict multi-phase model training, model selection, combined refitting, and calibration.
         """
+        if not skip_gate:
+            from scripts.audit_seasons import audit_season_data
+            audit_summary = audit_season_data()
+            gate = audit_summary.get("production_forecast_data_gate", {})
+            if not gate.get("pass", False):
+                reasons = "; ".join(gate.get("reasons", ["Production training gate criteria not met"]))
+                raise RuntimeError(f"PRODUCTION FORECAST TRAINING BLOCKED: {reasons}")
+
         logger.info(f"Phase 1: Extracting features for Train ({train_season}), Select ({select_season}), Calibrate ({calibrate_season})...")
         PregameFeatureService.preload_all_stats()
         X_train, y_train, _ = self.extract_features_and_targets(train_season)

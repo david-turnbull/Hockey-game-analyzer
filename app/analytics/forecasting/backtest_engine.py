@@ -31,10 +31,18 @@ class BacktestEngine:
         self.elo_results = None
         self.model_selection_summary = None
 
-    def run_full_backtest(self) -> Dict[str, Any]:
+    def run_full_backtest(self, skip_gate: bool = False) -> Dict[str, Any]:
         """
         Executes the complete out-of-time historical backtest protocol across 4 seasons.
         """
+        if not skip_gate:
+            from scripts.audit_seasons import audit_season_data
+            audit_summary = audit_season_data()
+            gate = audit_summary.get("production_forecast_data_gate", {})
+            if not gate.get("pass", False):
+                reasons = "; ".join(gate.get("reasons", ["Production training gate criteria not met"]))
+                raise RuntimeError(f"PRODUCTION BACKTEST BLOCKED: {reasons}")
+
         logger.info("Step 0: Preloading pregame event stats into memory...")
         PregameFeatureService.preload_all_stats()
 
@@ -79,6 +87,7 @@ class BacktestEngine:
         games = Game.query.filter(
             Game.season == season,
             Game.game_type == 'R',
+            Game.data_source == 'nhl_api',
             Game.nhl_game_state.in_(['OFF', 'FINAL', 'OVER'])
         ).order_by(
             func.coalesce(Game.start_time_utc, Game.game_date).asc(),

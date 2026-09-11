@@ -79,12 +79,14 @@ class DatabaseLoader:
             if existing_game:
                 existing_game.season = game.season
                 existing_game.game_date = game.game_date
+                existing_game.start_time_utc = game.start_time_utc
                 existing_game.game_type = game.game_type
                 existing_game.home_team_id = game.home_team_id
                 existing_game.away_team_id = game.away_team_id
                 existing_game.home_score = game.home_score
                 existing_game.away_score = game.away_score
                 existing_game.nhl_game_state = game.nhl_game_state
+                existing_game.data_source = getattr(game, 'data_source', 'nhl_api') or 'nhl_api'
             else:
                 self.session.add(game)
                 

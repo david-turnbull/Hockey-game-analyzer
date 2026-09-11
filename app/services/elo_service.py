@@ -88,6 +88,7 @@ class EloService:
             games = Game.query.filter(
                 Game.season == season,
                 Game.game_type == 'R',
+                Game.data_source == 'nhl_api',
                 Game.nhl_game_state.in_(['OFF', 'FINAL', 'OVER'])
             ).order_by(
                 func.coalesce(Game.start_time_utc, Game.game_date).asc(),

@@ -10,9 +10,6 @@ def run_migrations(db):
     Checks if columns and tables added in v1.4 exist in the SQLite database,
     and creates missing tables or runs ALTER TABLE commands if missing.
     """
-    global _migrations_completed
-    if _migrations_completed:
-        return
     try:
         db.create_all()
         connection = db.session.connection()
@@ -91,6 +88,9 @@ def run_migrations(db):
             if "start_time_utc" not in existing_game_cols:
                 logger.info("Migrating: Adding column 'start_time_utc' to 'game' table")
                 connection.execute(text("ALTER TABLE game ADD COLUMN start_time_utc DATETIME"))
+            if "data_source" not in existing_game_cols:
+                logger.info("Migrating: Adding column 'data_source' to 'game' table")
+                connection.execute(text("ALTER TABLE game ADD COLUMN data_source VARCHAR(50) DEFAULT 'nhl_api'"))
 
         # 5. Check shot table coordinate column rename
         shot_exists = connection.execute(text(
