@@ -75,7 +75,10 @@ def run():
 
 ## Score Projection Model Evaluation (2024-25)
 
-- **Total Goals MAE:** {results['test_season_20242025_eval']['score_projection']['total_goals_mae']} goals
+- **Expected Total Goals MAE:** {results['test_season_20242025_eval']['score_projection']['expected_total_goals_mae']} goals
+- **Home Goals MAE:** {results['test_season_20242025_eval']['score_projection']['home_goals_mae']} goals
+- **Away Goals MAE:** {results['test_season_20242025_eval']['score_projection']['away_goals_mae']} goals
+- **Exact (Top 1) Scoreline Coverage:** {results['test_season_20242025_eval']['score_projection']['exact_scoreline_coverage_pct']}% of games
 - **Top 5 Exact Scoreline Coverage:** {results['test_season_20242025_eval']['score_projection']['top5_scoreline_coverage_pct']}% of games
 
 > [!NOTE]

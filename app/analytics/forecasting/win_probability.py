@@ -197,18 +197,66 @@ class WinProbabilityModel:
             "calibration_status": calib_status
         }
 
+    def generate_metadata_manifest(
+        self,
+        artifact_sha256: str,
+        train_season: str = '20212022',
+        select_season: str = '20222023',
+        calibrate_season: str = '20232024',
+        excluded_holdout: str = '20242025',
+        train_samples: int = 0,
+        calib_samples: int = 0,
+        git_sha: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Generates structured metadata manifest dictionary for model registry verification."""
+        import sys
+        import uuid
+        import sklearn
+        import numpy
+        from datetime import datetime, timezone
+
+        return {
+            "model_name": "pucklens-win",
+            "model_version": "v1.4.0",
+            "model_architecture": self.best_model_name or "LogisticRegression",
+            "artifact_sha256": artifact_sha256,
+            "generated_timestamp": datetime.now(timezone.utc).isoformat(),
+            "python_version": sys.version,
+            "key_library_versions": {
+                "scikit_learn": sklearn.__version__,
+                "numpy": numpy.__version__
+            },
+            "feature_names": list(self.feature_names),
+            "feature_ordering": list(self.feature_names),
+            "feature_schema_version": "v1",
+            "training_seasons": [train_season],
+            "selection_season": select_season,
+            "calibration_season": calibrate_season,
+            "excluded_holdout_seasons": [excluded_holdout],
+            "number_of_training_samples": train_samples,
+            "number_of_calibration_samples": calib_samples,
+            "selected_hyperparameters": {
+                "C": 1.0,
+                "max_iter": 1000,
+                "random_state": 42
+            } if self.best_model_name == "LogisticRegression" else {
+                "max_iter": 100,
+                "max_depth": 4,
+                "min_samples_leaf": 20,
+                "random_state": 42
+            },
+            "model_selection_metric": "log_loss",
+            "calibration_method": "isotonic" if self.calibrator is not None else "none",
+            "git_commit_sha": git_sha,
+            "run_uuid": str(uuid.uuid4())
+        }
+
     def predict_game_probability(self, pregame_features: Dict[str, Any]) -> Dict[str, Any]:
         """
         Predicts calibrated home win probability and feature explanations for a single game.
         """
         if self.model is None:
-            # Initialize lightweight baseline model fallback
-            X_dummy = np.zeros((10, len(self.feature_names)))
-            y_dummy = np.array([1, 0, 1, 0, 1, 0, 1, 0, 1, 0])
-            self.scaler = StandardScaler()
-            X_scaled = self.scaler.fit_transform(X_dummy)
-            self.model = LogisticRegression().fit(X_scaled, y_dummy)
-            self.best_model_name = "LogisticRegression"
+            raise RuntimeError("WinProbabilityModel is not fitted or loaded. Fail-closed: cannot generate predictions without a valid fitted model artifact.")
 
         vec = np.array([[pregame_features[fname] for fname in self.feature_names]], dtype=np.float64)
         vec_scaled = self.scaler.transform(vec)

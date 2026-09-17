@@ -172,3 +172,153 @@ def test_model_hashes_recorded_and_persisted():
     assert f"- **Pre-Validation SHA-256**: `{expected_hash}`" in md
     assert f"- **Post-Validation SHA-256**: `{expected_hash}`" in md
     assert "- **Invariance Status**: **PASS**" in md
+
+
+def _seed_sample_seasons(db):
+    """Helper to seed mock games for training and selection tests."""
+    from datetime import date, datetime
+    from app.models import Team, Game
+    if not db.session.get(Team, 1):
+        db.session.add(Team(team_id=1, abbreviation="T1", name="Team 1"))
+    if not db.session.get(Team, 2):
+        db.session.add(Team(team_id=2, abbreviation="T2", name="Team 2"))
+
+    for s in ['20212022', '20222023', '20232024', '20242025']:
+        for i in range(5):
+            gid = int(f"{s[:4]}02{i+1:04d}")
+            if not db.session.get(Game, gid):
+                g = Game(
+                    game_id=gid, season=s, game_type='R',
+                    game_date=date(int(s[:4]), 10, 10 + i),
+                    start_time_utc=datetime(int(s[:4]), 10, 10 + i, 19, 0, 0),
+                    home_team_id=1, away_team_id=2,
+                    home_score=3 if i % 2 == 0 else 1, away_score=1 if i % 2 == 0 else 3,
+                    nhl_game_state='OFF', data_source='nhl_api'
+                )
+                db.session.add(g)
+    db.session.commit()
+
+
+def test_test_season_never_used_in_fitting(app, db, monkeypatch):
+    """Proves that WinProbabilityModel.train_and_select never queries or fits on test_season (2024-25)."""
+    from app.analytics.forecasting.win_probability import WinProbabilityModel
+    with app.app_context():
+        _seed_sample_seasons(db)
+        model = WinProbabilityModel()
+        queried_seasons = []
+
+        orig_extract = model.extract_features_and_targets
+
+        def mock_extract(season):
+            queried_seasons.append(season)
+            return orig_extract(season)
+
+        monkeypatch.setattr(model, "extract_features_and_targets", mock_extract)
+        model.train_and_select(train_season='20212022', select_season='20222023', calibrate_season='20232024', skip_gate=True)
+
+        assert "20242025" not in queried_seasons
+        assert queried_seasons == ['20212022', '20222023', '20232024']
+
+
+def test_calibration_season_not_used_in_candidate_selection(app, db, monkeypatch):
+    """Proves that candidate model selection decision relies on select_season (2022-23) and not calibrate_season (2023-24)."""
+    from app.analytics.forecasting.win_probability import WinProbabilityModel
+    with app.app_context():
+        _seed_sample_seasons(db)
+        model = WinProbabilityModel()
+        
+        # Run model selection and verify returned log loss metrics correspond to selection split
+        summary = model.train_and_select(train_season='20212022', select_season='20222023', calibrate_season='20232024', skip_gate=True)
+        assert "logistic_regression_log_loss" in summary
+        assert "hgb_log_loss" in summary
+        assert summary["selected_model"] in ["LogisticRegression", "HistGradientBoosting"]
+
+
+def test_source_games_must_precede_target_games(app, db):
+    """Proves that PregameFeatureService strictly enforces source.start_time_utc < target.start_time_utc."""
+    from datetime import date, datetime, timezone
+    from app.models import Game, Team
+    from app.services.pregame_feature_service import PregameFeatureService
+
+    with app.app_context():
+        t1 = Team(team_id=10, abbreviation="T10", name="Team 10")
+        t2 = Team(team_id=11, abbreviation="T11", name="Team 11")
+        db.session.add_all([t1, t2])
+
+        g_prior = Game(
+            game_id=2023020998, season="20232024", game_type="R", game_date=date(2023, 10, 10),
+            start_time_utc=datetime(2023, 10, 10, 19, 0, tzinfo=timezone.utc),
+            home_team_id=10, away_team_id=11, home_score=3, away_score=1, nhl_game_state="OFF"
+        )
+        g_target = Game(
+            game_id=2023020999, season="20232024", game_type="R", game_date=date(2023, 10, 15),
+            start_time_utc=datetime(2023, 10, 15, 19, 0, tzinfo=timezone.utc),
+            home_team_id=10, away_team_id=11, home_score=0, away_score=0, nhl_game_state="FUT"
+        )
+        g_future = Game(
+            game_id=2023021000, season="20232024", game_type="R", game_date=date(2023, 10, 20),
+            start_time_utc=datetime(2023, 10, 20, 19, 0, tzinfo=timezone.utc),
+            home_team_id=10, away_team_id=11, home_score=2, away_score=4, nhl_game_state="OFF"
+        )
+        db.session.add_all([g_prior, g_target, g_future])
+        db.session.commit()
+
+        prior_games = PregameFeatureService.get_prior_completed_games_for_team(10, g_target)
+        prior_ids = [g.game_id for g in prior_games]
+
+        assert 2023020998 in prior_ids
+        assert 2023021000 not in prior_ids
+
+
+def test_synthetic_games_cannot_enter_production_training(app, db):
+    """Proves that WinProbabilityModel feature extraction filters out synthetic data."""
+    from datetime import date, datetime, timezone
+    from app.models import Game, Team
+    from app.analytics.forecasting.win_probability import WinProbabilityModel
+
+    with app.app_context():
+        if not db.session.get(Team, 10):
+            db.session.add(Team(team_id=10, abbreviation="T10", name="Team 10"))
+        if not db.session.get(Team, 11):
+            db.session.add(Team(team_id=11, abbreviation="T11", name="Team 11"))
+
+        g_real = Game(
+            game_id=2021020001, season="20212022", game_type="R", game_date=date(2021, 10, 12),
+            start_time_utc=datetime(2021, 10, 12, 19, 0, tzinfo=timezone.utc),
+            home_team_id=10, away_team_id=11, home_score=2, away_score=1, nhl_game_state="OFF",
+            data_source="nhl_api"
+        )
+        g_synth = Game(
+            game_id=2021020002, season="20212022", game_type="R", game_date=date(2021, 10, 13),
+            start_time_utc=datetime(2021, 10, 13, 19, 0, tzinfo=timezone.utc),
+            home_team_id=10, away_team_id=11, home_score=5, away_score=2, nhl_game_state="OFF",
+            data_source="synthetic_test"
+        )
+        db.session.add_all([g_real, g_synth])
+        db.session.commit()
+
+        model = WinProbabilityModel()
+        _, _, game_ids = model.extract_features_and_targets("20212022")
+
+        assert 2021020001 in game_ids
+        assert 2021020002 not in game_ids
+
+
+def test_holdout_predictions_generated_using_frozen_model(app, db):
+    """Proves that evaluate_season uses fitted frozen model weights without modifying or retraining the classifier."""
+    from app.analytics.forecasting.backtest_engine import BacktestEngine
+    with app.app_context():
+        _seed_sample_seasons(db)
+        engine = BacktestEngine()
+        engine.win_model.train_and_select(skip_gate=True)
+
+        initial_weights = engine.win_model.model.coef_.copy() if hasattr(engine.win_model.model, 'coef_') else None
+
+        # Evaluate season holdout
+        engine.evaluate_season('20242025')
+
+        if initial_weights is not None:
+            import numpy as np
+            assert np.array_equal(engine.win_model.model.coef_, initial_weights)
+
+

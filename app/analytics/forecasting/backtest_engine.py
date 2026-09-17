@@ -102,7 +102,10 @@ class BacktestEngine:
         y_prob = []
         
         tot_goals_mae = 0.0
-        top_score_hits = 0
+        home_goals_mae = 0.0
+        away_goals_mae = 0.0
+        exact_score_hits = 0
+        top5_score_hits = 0
 
         for g in games:
             feats = PregameFeatureService.get_pregame_features(g)
@@ -118,12 +121,15 @@ class BacktestEngine:
             actual_tot_goals = g.home_score + g.away_score
             proj_tot_goals = score_proj["expected_total_goals"]
             tot_goals_mae += abs(actual_tot_goals - proj_tot_goals)
+            home_goals_mae += abs(g.home_score - score_proj["expected_home_goals"])
+            away_goals_mae += abs(g.away_score - score_proj["expected_away_goals"])
 
-            # Check if actual score is in top 5 projected scorelines
             actual_score_str = f"{g.home_score}-{g.away_score}"
-            top_5_scores = [s["score"] for s in score_proj["top_scorelines"]]
-            if actual_score_str in top_5_scores:
-                top_score_hits += 1
+            top_scores = [s["score"] for s in score_proj.get("top_scorelines", [])]
+            if top_scores and actual_score_str == top_scores[0]:
+                exact_score_hits += 1
+            if actual_score_str in top_scores[:5]:
+                top5_score_hits += 1
 
             predictions.append({
                 "game_id": g.game_id,
@@ -148,7 +154,10 @@ class BacktestEngine:
             "elo_baseline": elo_season_metrics,
             "naive_50_50_log_loss": 0.6931,
             "score_projection": {
-                "total_goals_mae": round(tot_goals_mae / n, 2),
-                "top5_scoreline_coverage_pct": round((top_score_hits / n) * 100.0, 2)
+                "expected_total_goals_mae": round(tot_goals_mae / n, 2),
+                "home_goals_mae": round(home_goals_mae / n, 2),
+                "away_goals_mae": round(away_goals_mae / n, 2),
+                "exact_scoreline_coverage_pct": round((exact_score_hits / n) * 100.0, 2),
+                "top5_scoreline_coverage_pct": round((top5_score_hits / n) * 100.0, 2)
             }
         }

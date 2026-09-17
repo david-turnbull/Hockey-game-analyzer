@@ -12,35 +12,12 @@ from app.analytics.forecasting.score_projection import PoissonScoreModel
 
 logger = logging.getLogger(__name__)
 
-# Global singleton instance for trained model
-_win_model_instance: Optional[WinProbabilityModel] = None
-MODEL_FILE_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "analytics", "forecasting", "win_model_v1.4.0.pkl"
-)
+from app.analytics.forecasting.model_registry import ForecastModelRegistry, ModelUnavailableError
 
 def get_trained_win_model() -> WinProbabilityModel:
-    global _win_model_instance
-    if _win_model_instance is not None and _win_model_instance.model is not None:
-        return _win_model_instance
-
-    # Attempt to load pre-trained model from disk
-    if os.path.exists(MODEL_FILE_PATH):
-        try:
-            _win_model_instance = WinProbabilityModel.load_model(MODEL_FILE_PATH)
-            return _win_model_instance
-        except Exception as e:
-            logger.warning(f"Could not load saved model from {MODEL_FILE_PATH}: {e}")
-
-    # Fallback to train and save model to disk
-    _win_model_instance = WinProbabilityModel()
-    try:
-        PregameFeatureService.preload_all_stats()
-        _win_model_instance.train_and_select()
-        _win_model_instance.save_model(MODEL_FILE_PATH)
-    except Exception as e:
-        logger.warning(f"Could not auto-train WinProbabilityModel on init: {e}")
-    return _win_model_instance
+    """Loads active production WinProbabilityModel through ForecastModelRegistry. Fails closed if unavailable."""
+    model_instance, _ = ForecastModelRegistry.load_active_model()
+    return model_instance
 
 
 class ForecastService:
@@ -63,8 +40,12 @@ class ForecastService:
         if existing_pred:
             return cls.format_prediction_dict(existing_pred)
 
-        # Generate new prediction
-        win_model = get_trained_win_model()
+        # Generate new prediction (fail closed if model unavailable)
+        try:
+            win_model = get_trained_win_model()
+        except ModelUnavailableError as e:
+            logger.error(f"Prediction blocked for game {game_id}: {e}")
+            return {"error": "MODEL_UNAVAILABLE", "message": str(e)}
         pregame_feats = PregameFeatureService.get_pregame_features(game)
 
         win_res = win_model.predict_game_probability(pregame_feats)
