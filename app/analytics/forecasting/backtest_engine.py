@@ -79,6 +79,67 @@ class BacktestEngine:
 
         return summary
 
+    def evaluate_active_registry_model(self, season: str = '20242025') -> Dict[str, Any]:
+        """
+        Authoritative artifact-bound holdout evaluation.
+        Loads frozen active model from ForecastModelRegistry, asserts artifact SHA-256 consistency,
+        and evaluates untouched holdout season (2024-25 only) with zero fitting, refitting, or tuning.
+        """
+        import uuid
+        import subprocess
+        from app.analytics.forecasting.model_registry import ForecastModelRegistry
+
+        # Load active production model & manifest
+        win_model, manifest = ForecastModelRegistry.load_active_model()
+        self.win_model = win_model
+
+        # Get actual model pkl SHA-256 on disk
+        models_dir = ForecastModelRegistry.get_models_dir()
+        model_version = manifest["model_version"]
+        pkl_path = os.path.join(models_dir, f"pucklens-win-{model_version}.pkl")
+        actual_sha = ForecastModelRegistry.compute_sha256(pkl_path)
+
+        assert actual_sha == manifest["artifact_sha256"], (
+            f"Artifact SHA mismatch: computed {actual_sha} != manifest {manifest['artifact_sha256']}"
+        )
+
+        # Get Git commit SHA
+        try:
+            git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+        except Exception:
+            git_sha = manifest.get("git_commit_sha")
+
+        # Run Elo baseline for comparison
+        self.elo_results = EloService.run_elo_backtest(['20212022', '20222023', '20232024', season])
+
+        # Preload stats
+        PregameFeatureService.preload_all_stats()
+
+        # Evaluate target untouched holdout season only (no training/calibration)
+        holdout_eval = self.evaluate_season(season)
+
+        run_uuid = str(uuid.uuid4())
+        summary = {
+            "evaluation_type": "artifact_bound_holdout_evaluation",
+            "evaluated_at": datetime.now(timezone.utc).isoformat(),
+            "run_uuid": run_uuid,
+            "git_commit_sha": git_sha,
+            "model_version": model_version,
+            "artifact_sha256": actual_sha,
+            "feature_schema_version": manifest.get("feature_schema_version", "v1.4.0"),
+            "protocol": {
+                "train_season": "20212022",
+                "select_season": "20222023",
+                "refit_seasons": "20212022 + 20222023",
+                "calibrate_season": "20232024",
+                "test_season": f"{season} (Untouched Holdout)"
+            },
+            "manifest_metadata": manifest,
+            "test_season_20242025_eval": holdout_eval,
+            "elo_baseline_overall": self.elo_results.get("overall_metrics", {})
+        }
+        return summary
+
     def evaluate_season(self, season: str) -> Dict[str, Any]:
         """
         Evaluates pregame forecasts on a target season using the trained & calibrated WinProbabilityModel

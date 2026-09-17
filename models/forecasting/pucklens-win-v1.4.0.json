@@ -1,9 +1,10 @@
 {
   "model_name": "pucklens-win",
   "model_version": "v1.4.0",
+  "sklearn_version": "1.9.0",
   "model_architecture": "HistGradientBoosting",
   "artifact_sha256": "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9",
-  "generated_timestamp": "2026-09-17T01:28:54.610329+00:00",
+  "generated_timestamp": "2026-09-17T01:49:47.078870+00:00",
   "python_version": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
   "key_library_versions": {
     "scikit_learn": "1.9.0",
@@ -62,6 +63,6 @@
   },
   "model_selection_metric": "log_loss",
   "calibration_method": "isotonic",
-  "git_commit_sha": "0ede5594c80e702e18174a842e2fc564b55d1967",
-  "run_uuid": "4f66e064-2153-4c37-8ab4-e018f0c1f1a1"
+  "git_commit_sha": "f38f7f90cec9774c05452bd53347bf8a06c05dc2",
+  "run_uuid": "57036064-badb-4fc9-aae7-93b8c5f36676"
 }

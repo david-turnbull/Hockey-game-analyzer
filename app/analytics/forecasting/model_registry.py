@@ -107,6 +107,16 @@ class ForecastModelRegistry:
             logger.error(f"MODEL_UNAVAILABLE: Version mismatch. Manifest: {manifest_version}, Requested: {model_version}")
             raise ModelUnavailableError(f"Model version mismatch. Manifest version '{manifest_version}' does not match requested version '{model_version}'.")
 
+        # 4. Scikit-Learn Runtime Version Compatibility
+        import sklearn
+        manifest_sklearn_ver = manifest.get("sklearn_version") or manifest.get("key_library_versions", {}).get("scikit_learn")
+        if manifest_sklearn_ver:
+            installed_major_minor = ".".join(sklearn.__version__.split(".")[:2])
+            manifest_major_minor = ".".join(str(manifest_sklearn_ver).split(".")[:2])
+            if installed_major_minor != manifest_major_minor:
+                logger.error(f"MODEL_UNAVAILABLE: Incompatible scikit-learn version. Installed: {sklearn.__version__}, Manifest: {manifest_sklearn_ver}")
+                raise ModelUnavailableError(f"Runtime scikit-learn version ({sklearn.__version__}) is incompatible with model manifest scikit-learn version ({manifest_sklearn_ver}).")
+
         # Load Model Pickle
         try:
             model_instance = WinProbabilityModel.load_model(pkl_path)

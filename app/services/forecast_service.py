@@ -22,6 +22,16 @@ def get_trained_win_model() -> WinProbabilityModel:
     return model_instance
 
 
+def make_error_response(error_code: str, message: str, status_code: int = 400) -> Dict[str, Any]:
+    """Helper to return standardized structured API error responses with ISO UTC timestamps."""
+    return {
+        "error": error_code,
+        "message": message,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "status_code": status_code
+    }
+
+
 class ForecastService:
     """
     Service layer providing unified access to game forecasts, immutable prediction persistence,
@@ -33,64 +43,73 @@ class ForecastService:
         cls,
         game_id: int,
         prediction_type: str = 'official_pregame',
-        allow_retrospective: bool = False,
         run_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Retrieves existing GamePrediction snapshot by (game_id, model_version, prediction_type)
-        or generates and persists a new immutable prediction snapshot.
+        Retrieves existing GamePrediction snapshot or generates a new immutable prediction snapshot.
+        For official_pregame, returns any existing official snapshot for the game_id regardless of model version.
+        If no official snapshot exists, strictly enforces pre-puck-drop cutoff without exception.
         """
         game = db.session.get(Game, game_id)
         if not game:
-            return {"error": "GAME_NOT_FOUND", "message": f"Game {game_id} not found.", "status_code": 404}
+            return make_error_response("GAME_NOT_FOUND", f"Game {game_id} not found.", 404)
 
         if game.data_source != 'nhl_api':
-            return {"error": "SYNTHETIC_DATA_BLOCKED", "message": f"Predictions blocked on non-production data source '{game.data_source}'", "status_code": 400}
+            return make_error_response("SYNTHETIC_DATA_BLOCKED", f"Predictions blocked on non-production data source '{game.data_source}'", 400)
 
-        # Load active model & manifest
-        try:
-            win_model, manifest = ForecastModelRegistry.load_active_model()
-        except ModelUnavailableError as e:
-            logger.error(f"Prediction blocked for game {game_id}: {e}")
-            return {"error": "MODEL_UNAVAILABLE", "message": str(e), "status_code": 503}
-
-        model_version = manifest["model_version"]
-        model_sha256 = manifest["artifact_sha256"]
-        feature_schema_version = manifest.get("feature_schema_version", "v1")
-
-        # Check existing snapshot by exact identity
-        query = GamePrediction.query.filter_by(
-            game_id=game_id,
-            model_version=model_version,
-            prediction_type=prediction_type
-        )
-        if prediction_type == 'ad_hoc' and run_id:
-            query = query.filter_by(run_id=run_id)
-
-        existing_pred = query.first()
-        if existing_pred:
-            return cls.format_prediction_dict(existing_pred)
-
-        # Pregame Cutoff Safeguard for official_pregame predictions
+        # 1. Official Pregame Invariant: Always check for existing official snapshot BEFORE model resolution
         if prediction_type == 'official_pregame':
+            existing_official = GamePrediction.query.filter_by(
+                game_id=game_id,
+                prediction_type='official_pregame'
+            ).first()
+            if existing_official:
+                return cls.format_prediction_dict(existing_official)
+
+            # Strict Cutoff Safeguard: Puck drop timestamp MUST be in the future
             if not game.start_time_utc:
-                return {
-                    "error": "MISSING_START_TIME",
-                    "message": f"Official pregame predictions require a valid UTC start timestamp on game {game_id}.",
-                    "status_code": 400
-                }
+                return make_error_response(
+                    "MISSING_START_TIME",
+                    f"Official pregame predictions require a valid UTC start timestamp on game {game_id}.",
+                    400
+                )
 
             game_start = game.start_time_utc
             if game_start.tzinfo is None:
                 game_start = game_start.replace(tzinfo=timezone.utc)
             now_utc = datetime.now(timezone.utc)
 
-            if now_utc >= game_start and not allow_retrospective:
-                return {
-                    "error": "GAME_ALREADY_STARTED",
-                    "message": f"Official pregame prediction cannot be created after puck drop ({game_start.isoformat()}).",
-                    "status_code": 400
-                }
+            if now_utc >= game_start:
+                return make_error_response(
+                    "GAME_ALREADY_STARTED",
+                    f"Official pregame prediction cannot be created after puck drop ({game_start.isoformat()}).",
+                    400
+                )
+
+        # Load active production model & manifest
+        try:
+            win_model, manifest = ForecastModelRegistry.load_active_model()
+        except ModelUnavailableError as e:
+            logger.error(f"Prediction blocked for game {game_id}: {e}")
+            return make_error_response("MODEL_UNAVAILABLE", str(e), 503)
+
+        model_version = manifest["model_version"]
+        model_sha256 = manifest["artifact_sha256"]
+        feature_schema_version = manifest.get("feature_schema_version", "v1")
+
+        # 2. Non-Official Predictions: Check existing by exact identity (game_id, model_version, prediction_type, run_id)
+        if prediction_type != 'official_pregame':
+            query = GamePrediction.query.filter_by(
+                game_id=game_id,
+                model_version=model_version,
+                prediction_type=prediction_type
+            )
+            if prediction_type == 'ad_hoc' and run_id:
+                query = query.filter_by(run_id=run_id)
+
+            existing_pred = query.first()
+            if existing_pred:
+                return cls.format_prediction_dict(existing_pred)
 
         # Calculate pregame features & generate predictions
         pregame_feats = PregameFeatureService.get_pregame_features(game)
@@ -128,7 +147,10 @@ class ForecastService:
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
-            existing_pred = query.first()
+            if prediction_type == 'official_pregame':
+                existing_pred = GamePrediction.query.filter_by(game_id=game_id, prediction_type='official_pregame').first()
+            else:
+                existing_pred = GamePrediction.query.filter_by(game_id=game_id, model_version=model_version, prediction_type=prediction_type).first()
             if existing_pred:
                 return cls.format_prediction_dict(existing_pred)
             raise

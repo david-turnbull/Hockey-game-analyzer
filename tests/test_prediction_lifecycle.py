@@ -13,8 +13,8 @@ from app.analytics.forecasting.model_registry import ForecastModelRegistry
 def test_legacy_migration_classification(app, db):
     """Verifies that legacy prediction rows created after puck drop are classified as legacy_unverified."""
     with app.app_context():
-        t1 = Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
-        t2 = Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
+        t1 = db.session.get(Team, 1) or Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
+        t2 = db.session.get(Team, 2) or Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
         db.session.add_all([t1, t2])
 
         g1 = Game(
@@ -54,10 +54,10 @@ def test_legacy_migration_classification(app, db):
         assert p_unv_db.prediction_type == 'legacy_unverified'
 
 def test_duplicate_detection(app, db):
-    """Verifies that duplicate official_pregame predictions for (game_id, model_version) raise IntegrityError."""
+    """Verifies that duplicate official_pregame predictions for same game_id across model versions raise IntegrityError."""
     with app.app_context():
-        t1 = Team.query.get(1) or Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
-        t2 = Team.query.get(2) or Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
+        t1 = db.session.get(Team, 1) or Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
+        t2 = db.session.get(Team, 2) or Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
         db.session.add_all([t1, t2])
 
         g = Game(
@@ -78,13 +78,13 @@ def test_duplicate_detection(app, db):
             game_id=2023029002, created_at=datetime.now(timezone.utc),
             home_win_probability=0.54, away_win_probability=0.46,
             expected_home_goals=3.2, expected_away_goals=2.6,
-            model_version='v1.4.0', prediction_type='official_pregame', is_official=True
+            model_version='v1.4.1', prediction_type='official_pregame', is_official=True
         )
 
         db.session.add(p1)
         db.session.commit()
 
-        # Adding duplicate prediction_type='official_pregame' for same game & model_version triggers IntegrityError
+        # Adding second prediction_type='official_pregame' for same game_id EVEN under v1.4.1 triggers IntegrityError
         db.session.add(p2)
         with pytest.raises(IntegrityError):
             db.session.commit()
@@ -109,12 +109,12 @@ def test_duplicate_detection(app, db):
 def test_timezone_normalization_and_post_puck_drop_rejection(app, db):
     """Verifies naive SQLite datetimes are normalized to UTC and post-puck-drop creation requests are rejected."""
     with app.app_context():
-        t1 = Team.query.get(1) or Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
-        t2 = Team.query.get(2) or Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
+        t1 = db.session.get(Team, 1) or Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
+        t2 = db.session.get(Team, 2) or Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
         db.session.add_all([t1, t2])
 
         # Past game with naive start_time_utc
-        past_start_naive = datetime.utcnow() - timedelta(hours=2)
+        past_start_naive = datetime.now(timezone.utc) - timedelta(hours=2)
         g_past = Game(
             game_id=2023029003, season='20232024', game_date=past_start_naive.date(),
             start_time_utc=past_start_naive, game_type='R',
@@ -128,15 +128,16 @@ def test_timezone_normalization_and_post_puck_drop_rejection(app, db):
         assert "error" in res
         assert res["error"] == "GAME_ALREADY_STARTED"
         assert res["status_code"] == 400
+        assert "timestamp" in res
 
 def test_immutable_snapshot_retrieval(app, db):
     """Proves an existing official_pregame snapshot is returned unchanged even if game finishes or underlying data changes."""
     with app.app_context():
-        t1 = Team.query.get(1) or Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
-        t2 = Team.query.get(2) or Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
+        t1 = db.session.get(Team, 1) or Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
+        t2 = db.session.get(Team, 2) or Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
         db.session.add_all([t1, t2])
 
-        future_start = datetime.utcnow() + timedelta(days=1)
+        future_start = datetime.now(timezone.utc) + timedelta(days=1)
         g = Game(
             game_id=2023029004, season='20232024', game_date=future_start.date(),
             start_time_utc=future_start, game_type='R',
@@ -162,28 +163,77 @@ def test_immutable_snapshot_retrieval(app, db):
         assert pred2["win_probability"]["home_win_probability"] == orig_p_home
         assert pred2["prediction_id"] == pred1["prediction_id"]
 
-def test_model_version_specific_lookup(app, db):
-    """Verifies that prediction lookup queries exact (game_id, model_version, prediction_type)."""
+def test_official_snapshot_survives_active_model_version_change(app, db):
+    """Proves an existing official_pregame snapshot created under v1.4.0 is returned unchanged even if active model upgrades."""
     with app.app_context():
-        t1 = Team.query.get(1) or Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
-        t2 = Team.query.get(2) or Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
+        t1 = db.session.get(Team, 1) or Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
+        t2 = db.session.get(Team, 2) or Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
         db.session.add_all([t1, t2])
 
-        future_start = datetime.utcnow() + timedelta(days=2)
+        future_start = datetime.now(timezone.utc) + timedelta(days=3)
         g = Game(
-            game_id=2023029005, season='20232024', game_date=future_start.date(),
+            game_id=2023029006, season='20232024', game_date=future_start.date(),
             start_time_utc=future_start, game_type='R',
             home_team_id=1, away_team_id=2, nhl_game_state='FUT', data_source='nhl_api'
         )
         db.session.add(g)
         db.session.commit()
 
-        # Create snapshot under active model
-        pred = ForecastService.get_or_create_prediction(2023029005, prediction_type='official_pregame')
-        assert "error" not in pred
-        assert pred["game_id"] == 2023029005
-        assert pred["prediction_type"] == 'official_pregame'
-        assert pred["feature_payload_sha256"] is not None
+        # Insert official prediction under v1.4.0
+        p_v140 = GamePrediction(
+            game_id=2023029006, created_at=datetime.now(timezone.utc),
+            home_win_probability=0.58, away_win_probability=0.42,
+            expected_home_goals=3.2, expected_away_goals=2.4,
+            model_version='v1.4.0', prediction_type='official_pregame', is_official=True
+        )
+        db.session.add(p_v140)
+        db.session.commit()
+
+        # Call get_or_create_prediction for official_pregame
+        res = ForecastService.get_or_create_prediction(2023029006, prediction_type='official_pregame')
+        assert "error" not in res
+        assert res["model_version"] == 'v1.4.0'
+        assert res["prediction_id"] == p_v140.prediction_id
+        assert res["is_official"] is True
+
+def test_prediction_type_semantics_and_is_official_flag(app, db):
+    """Verifies strict prediction_type semantics (historical_backtest and ad_hoc persist with is_official=False)."""
+    with app.app_context():
+        t1 = db.session.get(Team, 1) or Team(team_id=1, abbreviation="CGY", name="Calgary Flames")
+        t2 = db.session.get(Team, 2) or Team(team_id=2, abbreviation="EDM", name="Edmonton Oilers")
+        db.session.add_all([t1, t2])
+
+        future_start = datetime.now(timezone.utc) + timedelta(days=4)
+        g = Game(
+            game_id=2023029007, season='20232024', game_date=future_start.date(),
+            start_time_utc=future_start, game_type='R',
+            home_team_id=1, away_team_id=2, nhl_game_state='FUT', data_source='nhl_api'
+        )
+        db.session.add(g)
+        db.session.commit()
+
+        # Create ad_hoc prediction
+        res_adhoc = ForecastService.get_or_create_prediction(2023029007, prediction_type='ad_hoc', run_id='test-run-1')
+        assert "error" not in res_adhoc
+        assert res_adhoc["is_official"] is False
+        assert res_adhoc["prediction_type"] == 'ad_hoc'
+        assert res_adhoc["run_id"] == 'test-run-1'
+
+        # Create historical_backtest prediction
+        res_backtest = ForecastService.get_or_create_prediction(2023029007, prediction_type='historical_backtest')
+        assert "error" not in res_backtest
+        assert res_backtest["is_official"] is False
+        assert res_backtest["prediction_type"] == 'historical_backtest'
+
+def test_structured_api_error_response_format(app, db):
+    """Verifies that API error responses include error, message, timestamp, and status_code."""
+    with app.app_context():
+        # Non-existent game
+        res = ForecastService.get_or_create_prediction(999999999)
+        assert "error" in res
+        assert res["error"] == "GAME_NOT_FOUND"
+        assert "timestamp" in res
+        assert res["status_code"] == 404
 
 def test_synthetic_data_exclusion_from_caches(app, db):
     """Proves that preload_all_stats() excludes synthetic test games (data_source == 'synthetic_test')."""

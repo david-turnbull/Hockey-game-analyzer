@@ -156,6 +156,22 @@ def run_migrations(db):
             """))
 
         # 7. Performance & Uniqueness Indexes
+        connection.execute(text("DROP INDEX IF EXISTS _game_model_official_pregame_uc"))
+
+        # Audit duplicate official_pregame records across model versions
+        dup_check = connection.execute(text("""
+            SELECT game_id, COUNT(*) as cnt 
+            FROM game_prediction 
+            WHERE prediction_type = 'official_pregame' 
+            GROUP BY game_id 
+            HAVING cnt > 1
+        """)).fetchall()
+        if dup_check:
+            dup_ids = [str(r[0]) for r in dup_check]
+            msg = f"DATA_INTEGRITY_FAILURE: Duplicate official_pregame prediction rows detected for game_ids: {', '.join(dup_ids)}"
+            logger.error(msg)
+            raise RuntimeError(msg)
+
         index_queries = [
             "CREATE INDEX IF NOT EXISTS idx_game_season_type ON game (season, game_type, nhl_game_state)",
             "CREATE INDEX IF NOT EXISTS idx_game_home_start ON game (home_team_id, game_type, nhl_game_state, start_time_utc)",
@@ -163,7 +179,7 @@ def run_migrations(db):
             "CREATE INDEX IF NOT EXISTS idx_game_start_utc ON game (start_time_utc)",
             "CREATE INDEX IF NOT EXISTS idx_game_date ON game (game_date)",
             "CREATE INDEX IF NOT EXISTS idx_game_prediction_game_official ON game_prediction (game_id, is_official)",
-            "CREATE UNIQUE INDEX IF NOT EXISTS _game_model_official_pregame_uc ON game_prediction (game_id, model_version) WHERE prediction_type = 'official_pregame'"
+            "CREATE UNIQUE INDEX IF NOT EXISTS _game_official_pregame_uc ON game_prediction (game_id) WHERE prediction_type = 'official_pregame'"
         ]
         for q in index_queries:
             connection.execute(text(q))

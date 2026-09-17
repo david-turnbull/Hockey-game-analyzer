@@ -307,6 +307,7 @@ class PregameFeatureService:
         else:
             h2h_games = Game.query.filter(
                 Game.game_type == 'R',
+                Game.data_source == 'nhl_api',
                 Game.nhl_game_state.in_(['OFF', 'FINAL', 'OVER']),
                 Game.game_id != target_game.game_id,
                 or_(

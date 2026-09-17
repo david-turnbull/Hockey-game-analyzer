@@ -74,7 +74,7 @@ class GamePrediction(db.Model):
     is_official = db.Column(db.Boolean, default=True, nullable=False)
 
     __table_args__ = (
-        db.Index('_game_model_official_pregame_uc', 'game_id', 'model_version', unique=True, sqlite_where=text("prediction_type = 'official_pregame'")),
+        db.Index('_game_official_pregame_uc', 'game_id', unique=True, sqlite_where=text("prediction_type = 'official_pregame'")),
     )
 
     # Immutable dynamic resolution of outcome via relationship (never stored/mutated on prediction)

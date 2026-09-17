@@ -1,21 +1,25 @@
-# PuckLens v1.4.0 Historical Out-of-Time Backtest Report
+# PuckLens v1.4.0 Authoritative Artifact-Bound Holdout Report (2024-25)
 
-**Run Timestamp:** 2026-09-17T01:33:37.760696+00:00  
-**Selected Model Architecture:** `HistGradientBoosting`
+- **Evaluation Timestamp:** `2026-09-17T01:50:24.084619+00:00`
+- **Run UUID:** `5025cbe0-ab93-4225-abf1-0a3a5e1d8d7f`
+- **Git Commit SHA:** `f38f7f90cec9774c05452bd53347bf8a06c05dc2`
+- **Model Version:** `v1.4.0`
+- **Model Artifact SHA-256:** `63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9`
+- **Feature Schema Version:** `v1`
 
-## Protocol & Temporal Splits
+## Protocol & Provenance Metadata
 
-- **Train Split (2021-22):** Model candidate parameter fitting
-- **Model Selection Split (2022-23):** Candidate selection via Log Loss (`LogisticRegression` vs `HistGradientBoosting`)
-- **Combined Refit (2021-22 + 2022-23):** Winner refitted on combined historical data
-- **Calibration Split (2023-24):** Isotonic Regression calibrator fit on 2023-24 validation predictions
-- **Final Out-of-Time Test (2024-25):** 100% untouched holdout evaluation
+- **Candidate Training Split (2021-22):** Model candidate parameter fitting
+- **Selection Split (2022-23):** Model selection criterion via Log Loss
+- **Production Refit (2021-22 + 2022-23):** Selected model refitted on combined historical dataset
+- **Calibration Split (2023-24):** Isotonic Regression calibrator fit on validation predictions
+- **Authoritative Untouched Holdout (2024-25):** 100% untouched test evaluation using `ForecastModelRegistry.load_active_model()`
 
 ## Out-of-Time Performance Comparison (2024-25 Test Holdout)
 
 | Model / Baseline | Log Loss | Brier Score | Accuracy (%) | ECE |
 |---|---|---|---|---|
-| **PuckLens v1.4.0 (Calibrated Model)** | **0.6848** | **0.2431** | **57.55%** | **0.0315** |
+| **PuckLens v1.4.0 (Production Artifact)** | **0.6848** | **0.2431** | **57.55%** | **0.0315** |
 | Elo Baseline Model | 0.6735 | 0.2403 | 58.16% | 0.0410 |
 | Naive 50/50 Baseline | 0.6931 | 0.2500 | 50.00% | 0.0000 |
 
@@ -27,5 +31,5 @@
 - **Exact (Top 1) Scoreline Coverage:** 3.89% of games
 - **Top 5 Exact Scoreline Coverage:** 18.9% of games
 
-> [!NOTE]
-> All pregame features enforce the strict temporal invariant (`start_time_utc < target_game.start_time_utc`), guaranteeing zero future leakage.
+> [!IMPORTANT]
+> This evaluation strictly loads the active frozen production model artifact using `ForecastModelRegistry.load_active_model()`. Zero fitting, refitting, calibrating, or hyperparameter tuning was executed during this evaluation.

@@ -218,6 +218,7 @@ class WinProbabilityModel:
         return {
             "model_name": "pucklens-win",
             "model_version": "v1.4.0",
+            "sklearn_version": sklearn.__version__,
             "model_architecture": self.best_model_name or "LogisticRegression",
             "artifact_sha256": artifact_sha256,
             "generated_timestamp": datetime.now(timezone.utc).isoformat(),
