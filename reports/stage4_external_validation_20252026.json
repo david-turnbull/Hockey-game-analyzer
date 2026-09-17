@@ -1,0 +1,648 @@
+{
+  "evaluation_type": "stage4_external_season_validation",
+  "evaluated_at": "2026-09-17T02:56:10.735694+00:00",
+  "run_uuid": "fc0cb4d0-30df-43cd-be75-2a7af2b704ad",
+  "model_training_git_sha": "f38f7f90cec9774c05452bd53347bf8a06c05dc2",
+  "evaluation_git_sha": "d07a5d9c2e7eb5e46e46b591ab18b60dac513864",
+  "model_version": "v1.4.0",
+  "artifact_sha256": "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9",
+  "feature_schema_version": "v1",
+  "data_audit_snapshot_hash": "a4aafb4d0dbfebf25d54cbe799678e529272be1111060975dbc373c35b648f09",
+  "protocol": {
+    "train_seasons": "20212022 + 20222023",
+    "calibration_season": "20232024",
+    "holdout_season": "20242025",
+    "external_validation_season": "20252026 (Untouched External)"
+  },
+  "external_season_20252026_eval": {
+    "season": "20252026",
+    "game_count": 1230,
+    "calibrated_model": {
+      "log_loss": 0.6957,
+      "brier_score": 0.2493,
+      "accuracy": 53.41,
+      "ece": 0.0415
+    },
+    "elo_baseline": {
+      "log_loss": 0.6955,
+      "brier_score": 0.2508,
+      "accuracy": 53.09,
+      "ece": 0.0616
+    },
+    "naive_50_50_log_loss": 0.6931,
+    "prediction_distribution": {
+      "mean": 0.5365,
+      "std": 0.095,
+      "min": 0.01,
+      "p25": 0.46,
+      "median": 0.5565,
+      "p75": 0.5822,
+      "max": 0.99,
+      "iqr": 0.1222
+    },
+    "calibration_bins": [
+      {
+        "bin_index": 1,
+        "bin_range": "[0.0, 0.1)",
+        "count": 1,
+        "avg_predicted_prob": 0.01,
+        "actual_win_rate": 0.0,
+        "abs_calibration_error": 0.01,
+        "bin_brier_score": 0.0001
+      },
+      {
+        "bin_index": 2,
+        "bin_range": "[0.1, 0.2)",
+        "count": 0,
+        "avg_predicted_prob": 0.15,
+        "actual_win_rate": 0.0,
+        "abs_calibration_error": 0.0,
+        "bin_brier_score": 0.0
+      },
+      {
+        "bin_index": 3,
+        "bin_range": "[0.2, 0.3)",
+        "count": 42,
+        "avg_predicted_prob": 0.2371,
+        "actual_win_rate": 0.4524,
+        "abs_calibration_error": 0.2152,
+        "bin_brier_score": 0.2913
+      },
+      {
+        "bin_index": 4,
+        "bin_range": "[0.3, 0.4)",
+        "count": 3,
+        "avg_predicted_prob": 0.3694,
+        "actual_win_rate": 0.0,
+        "abs_calibration_error": 0.3694,
+        "bin_brier_score": 0.1372
+      },
+      {
+        "bin_index": 5,
+        "bin_range": "[0.4, 0.5)",
+        "count": 270,
+        "avg_predicted_prob": 0.4599,
+        "actual_win_rate": 0.4889,
+        "abs_calibration_error": 0.029,
+        "bin_brier_score": 0.2506
+      },
+      {
+        "bin_index": 6,
+        "bin_range": "[0.5, 0.6)",
+        "count": 703,
+        "avg_predicted_prob": 0.5471,
+        "actual_win_rate": 0.5092,
+        "abs_calibration_error": 0.0379,
+        "bin_brier_score": 0.2516
+      },
+      {
+        "bin_index": 7,
+        "bin_range": "[0.6, 0.7)",
+        "count": 150,
+        "avg_predicted_prob": 0.6203,
+        "actual_win_rate": 0.6133,
+        "abs_calibration_error": 0.007,
+        "bin_brier_score": 0.2387
+      },
+      {
+        "bin_index": 8,
+        "bin_range": "[0.7, 0.8)",
+        "count": 46,
+        "avg_predicted_prob": 0.7432,
+        "actual_win_rate": 0.6739,
+        "abs_calibration_error": 0.0693,
+        "bin_brier_score": 0.2204
+      },
+      {
+        "bin_index": 9,
+        "bin_range": "[0.8, 0.9)",
+        "count": 11,
+        "avg_predicted_prob": 0.8,
+        "actual_win_rate": 0.8182,
+        "abs_calibration_error": 0.0182,
+        "bin_brier_score": 0.1491
+      },
+      {
+        "bin_index": 10,
+        "bin_range": "[0.9, 1.0]",
+        "count": 4,
+        "avg_predicted_prob": 0.99,
+        "actual_win_rate": 0.5,
+        "abs_calibration_error": 0.49,
+        "bin_brier_score": 0.4901
+      }
+    ],
+    "season_timeline_splits": {
+      "early_season": {
+        "game_count": 410,
+        "start_game_index": 1,
+        "end_game_index": 410,
+        "metrics": {
+          "log_loss": 0.7117,
+          "brier_score": 0.2559,
+          "accuracy": 50.24,
+          "ece": 0.0823
+        }
+      },
+      "mid_season": {
+        "game_count": 410,
+        "start_game_index": 411,
+        "end_game_index": 820,
+        "metrics": {
+          "log_loss": 0.6908,
+          "brier_score": 0.2488,
+          "accuracy": 53.41,
+          "ece": 0.0391
+        }
+      },
+      "late_season": {
+        "game_count": 410,
+        "start_game_index": 821,
+        "end_game_index": 1230,
+        "metrics": {
+          "log_loss": 0.6847,
+          "brier_score": 0.2433,
+          "accuracy": 56.59,
+          "ece": 0.0233
+        }
+      }
+    },
+    "score_projection": {
+      "expected_total_goals_mae": 2.06,
+      "home_goals_mae": 1.58,
+      "away_goals_mae": 1.47,
+      "exact_scoreline_coverage_pct": 3.82,
+      "top5_scoreline_coverage_pct": 17.07
+    }
+  },
+  "holdout_season_20242025_eval": {
+    "season": "20242025",
+    "game_count": 1312,
+    "calibrated_model": {
+      "log_loss": 0.6848,
+      "brier_score": 0.2431,
+      "accuracy": 57.55,
+      "ece": 0.0315
+    },
+    "elo_baseline": {
+      "log_loss": 0.6735,
+      "brier_score": 0.2403,
+      "accuracy": 58.16,
+      "ece": 0.041
+    },
+    "naive_50_50_log_loss": 0.6931,
+    "prediction_distribution": {
+      "mean": 0.5396,
+      "std": 0.1121,
+      "min": 0.01,
+      "p25": 0.46,
+      "median": 0.5565,
+      "p75": 0.5822,
+      "max": 0.99,
+      "iqr": 0.1222
+    },
+    "calibration_bins": [
+      {
+        "bin_index": 1,
+        "bin_range": "[0.0, 0.1)",
+        "count": 2,
+        "avg_predicted_prob": 0.01,
+        "actual_win_rate": 0.5,
+        "abs_calibration_error": 0.49,
+        "bin_brier_score": 0.4901
+      },
+      {
+        "bin_index": 2,
+        "bin_range": "[0.1, 0.2)",
+        "count": 0,
+        "avg_predicted_prob": 0.15,
+        "actual_win_rate": 0.0,
+        "abs_calibration_error": 0.0,
+        "bin_brier_score": 0.0
+      },
+      {
+        "bin_index": 3,
+        "bin_range": "[0.2, 0.3)",
+        "count": 62,
+        "avg_predicted_prob": 0.2407,
+        "actual_win_rate": 0.5,
+        "abs_calibration_error": 0.2593,
+        "bin_brier_score": 0.3216
+      },
+      {
+        "bin_index": 4,
+        "bin_range": "[0.3, 0.4)",
+        "count": 3,
+        "avg_predicted_prob": 0.3307,
+        "actual_win_rate": 0.6667,
+        "abs_calibration_error": 0.336,
+        "bin_brier_score": 0.3157
+      },
+      {
+        "bin_index": 5,
+        "bin_range": "[0.4, 0.5)",
+        "count": 300,
+        "avg_predicted_prob": 0.4601,
+        "actual_win_rate": 0.47,
+        "abs_calibration_error": 0.0099,
+        "bin_brier_score": 0.2493
+      },
+      {
+        "bin_index": 6,
+        "bin_range": "[0.5, 0.6)",
+        "count": 681,
+        "avg_predicted_prob": 0.5474,
+        "actual_win_rate": 0.5551,
+        "abs_calibration_error": 0.0076,
+        "bin_brier_score": 0.2443
+      },
+      {
+        "bin_index": 7,
+        "bin_range": "[0.6, 0.7)",
+        "count": 149,
+        "avg_predicted_prob": 0.6197,
+        "actual_win_rate": 0.6779,
+        "abs_calibration_error": 0.0582,
+        "bin_brier_score": 0.2215
+      },
+      {
+        "bin_index": 8,
+        "bin_range": "[0.7, 0.8)",
+        "count": 84,
+        "avg_predicted_prob": 0.7462,
+        "actual_win_rate": 0.7024,
+        "abs_calibration_error": 0.0438,
+        "bin_brier_score": 0.2102
+      },
+      {
+        "bin_index": 9,
+        "bin_range": "[0.8, 0.9)",
+        "count": 24,
+        "avg_predicted_prob": 0.8,
+        "actual_win_rate": 0.8333,
+        "abs_calibration_error": 0.0333,
+        "bin_brier_score": 0.14
+      },
+      {
+        "bin_index": 10,
+        "bin_range": "[0.9, 1.0]",
+        "count": 7,
+        "avg_predicted_prob": 0.99,
+        "actual_win_rate": 0.7143,
+        "abs_calibration_error": 0.2757,
+        "bin_brier_score": 0.2801
+      }
+    ],
+    "season_timeline_splits": {
+      "early_season": {
+        "game_count": 437,
+        "start_game_index": 1,
+        "end_game_index": 437,
+        "metrics": {
+          "log_loss": 0.6968,
+          "brier_score": 0.2437,
+          "accuracy": 59.27,
+          "ece": 0.0526
+        }
+      },
+      "mid_season": {
+        "game_count": 437,
+        "start_game_index": 438,
+        "end_game_index": 874,
+        "metrics": {
+          "log_loss": 0.6883,
+          "brier_score": 0.2473,
+          "accuracy": 54.46,
+          "ece": 0.052
+        }
+      },
+      "late_season": {
+        "game_count": 438,
+        "start_game_index": 875,
+        "end_game_index": 1312,
+        "metrics": {
+          "log_loss": 0.6693,
+          "brier_score": 0.2384,
+          "accuracy": 58.9,
+          "ece": 0.055
+        }
+      }
+    },
+    "score_projection": {
+      "expected_total_goals_mae": 2.06,
+      "home_goals_mae": 1.56,
+      "away_goals_mae": 1.48,
+      "exact_scoreline_coverage_pct": 3.89,
+      "top5_scoreline_coverage_pct": 18.9
+    }
+  },
+  "generalization_delta_metrics": {
+    "delta_log_loss": 0.0109,
+    "delta_brier_score": 0.0062,
+    "delta_ece": 0.01
+  },
+  "feature_drift_analysis": {
+    "rest_differential": {
+      "holdout_20242025": {
+        "mean": 0.1974,
+        "std": 1.1346,
+        "p25": -0.1,
+        "median": 0.0,
+        "p75": 0.9
+      },
+      "external_season": {
+        "mean": 0.1775,
+        "std": 1.1971,
+        "p25": -0.1,
+        "median": 0.0,
+        "p75": 0.9
+      },
+      "smd": -0.0171,
+      "ks_statistic": 0.03,
+      "ks_pvalue": 0.6043,
+      "drift_detected": false
+    },
+    "home_is_b2b": {
+      "holdout_20242025": {
+        "mean": 0.0899,
+        "std": 0.2861,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0
+      },
+      "external_season": {
+        "mean": 0.1179,
+        "std": 0.3225,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0
+      },
+      "smd": 0.0917,
+      "ks_statistic": 0.0279,
+      "ks_pvalue": 0.6905,
+      "drift_detected": false
+    },
+    "away_is_b2b": {
+      "holdout_20242025": {
+        "mean": 0.2073,
+        "std": 0.4054,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0
+      },
+      "external_season": {
+        "mean": 0.1959,
+        "std": 0.3969,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0
+      },
+      "smd": -0.0284,
+      "ks_statistic": 0.0114,
+      "ks_pvalue": 1.0,
+      "drift_detected": false
+    },
+    "l10_xgf_pct_diff": {
+      "holdout_20242025": {
+        "mean": 0.1449,
+        "std": 6.7638,
+        "p25": -4.53,
+        "median": 0.295,
+        "p75": 4.7525
+      },
+      "external_season": {
+        "mean": 0.1717,
+        "std": 6.1902,
+        "p25": -3.7,
+        "median": 0.14,
+        "p75": 4.33
+      },
+      "smd": 0.0041,
+      "ks_statistic": 0.0398,
+      "ks_pvalue": 0.2586,
+      "drift_detected": false
+    },
+    "l10_cf_pct_diff": {
+      "holdout_20242025": {
+        "mean": -0.0437,
+        "std": 5.6199,
+        "p25": -3.68,
+        "median": -0.11,
+        "p75": 3.74
+      },
+      "external_season": {
+        "mean": 0.0417,
+        "std": 5.5145,
+        "p25": -3.575,
+        "median": 0.015,
+        "p75": 3.7575
+      },
+      "smd": 0.0153,
+      "ks_statistic": 0.0241,
+      "ks_pvalue": 0.8419,
+      "drift_detected": false
+    },
+    "l10_goal_diff_per_game": {
+      "holdout_20242025": {
+        "mean": -0.033,
+        "std": 1.3019,
+        "p25": -1.0,
+        "median": -0.1,
+        "p75": 0.9
+      },
+      "external_season": {
+        "mean": -0.0228,
+        "std": 1.3006,
+        "p25": -0.9,
+        "median": 0.0,
+        "p75": 0.875
+      },
+      "smd": 0.0079,
+      "ks_statistic": 0.0339,
+      "ks_pvalue": 0.4469,
+      "drift_detected": false
+    },
+    "l20_xgf_pct_diff": {
+      "holdout_20242025": {
+        "mean": 0.083,
+        "std": 5.834,
+        "p25": -3.955,
+        "median": 0.215,
+        "p75": 3.9375
+      },
+      "external_season": {
+        "mean": 0.0677,
+        "std": 5.2828,
+        "p25": -3.39,
+        "median": 0.005,
+        "p75": 3.7775
+      },
+      "smd": -0.0027,
+      "ks_statistic": 0.0402,
+      "ks_pvalue": 0.2468,
+      "drift_detected": false
+    },
+    "home_venue_l10_win_pct": {
+      "holdout_20242025": {
+        "mean": 55.9438,
+        "std": 17.3778,
+        "p25": 40.0,
+        "median": 60.0,
+        "p75": 70.0
+      },
+      "external_season": {
+        "mean": 53.1301,
+        "std": 18.0345,
+        "p25": 40.0,
+        "median": 50.0,
+        "p75": 70.0
+      },
+      "smd": -0.1589,
+      "ks_statistic": 0.0491,
+      "ks_pvalue": 0.0894,
+      "drift_detected": false
+    },
+    "away_venue_l10_win_pct": {
+      "holdout_20242025": {
+        "mean": 44.1916,
+        "std": 17.6968,
+        "p25": 30.0,
+        "median": 40.0,
+        "p75": 60.0
+      },
+      "external_season": {
+        "mean": 46.8862,
+        "std": 16.542,
+        "p25": 40.0,
+        "median": 50.0,
+        "p75": 60.0
+      },
+      "smd": 0.1573,
+      "ks_statistic": 0.0842,
+      "ks_pvalue": 0.0002,
+      "drift_detected": true
+    },
+    "h2h_home_win_pct": {
+      "holdout_20242025": {
+        "mean": 49.2124,
+        "std": 25.4958,
+        "p25": 40.0,
+        "median": 40.0,
+        "p75": 60.0
+      },
+      "external_season": {
+        "mean": 49.8537,
+        "std": 23.4949,
+        "p25": 40.0,
+        "median": 40.0,
+        "p75": 60.0
+      },
+      "smd": 0.0262,
+      "ks_statistic": 0.0433,
+      "ks_pvalue": 0.1784,
+      "drift_detected": false
+    },
+    "h2h_home_gd_avg": {
+      "holdout_20242025": {
+        "mean": -0.0447,
+        "std": 1.3474,
+        "p25": -1.0,
+        "median": 0.0,
+        "p75": 0.8
+      },
+      "external_season": {
+        "mean": -0.013,
+        "std": 1.2503,
+        "p25": -0.8,
+        "median": 0.0,
+        "p75": 0.8
+      },
+      "smd": 0.0244,
+      "ks_statistic": 0.028,
+      "ks_pvalue": 0.6883,
+      "drift_detected": false
+    }
+  },
+  "bootstrap_confidence_intervals": {
+    "log_loss_difference": {
+      "mean_diff": 0.0002,
+      "ci_95_lower": -0.0129,
+      "ci_95_upper": 0.0157,
+      "std_error": 0.0072
+    },
+    "brier_score_difference": {
+      "mean_diff": -0.0015,
+      "ci_95_lower": -0.0067,
+      "ci_95_upper": 0.0041,
+      "std_error": 0.0028
+    }
+  },
+  "manifest_metadata": {
+    "model_name": "pucklens-win",
+    "model_version": "v1.4.0",
+    "sklearn_version": "1.9.0",
+    "model_architecture": "HistGradientBoosting",
+    "artifact_sha256": "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9",
+    "generated_timestamp": "2026-09-17T01:49:47.078870+00:00",
+    "python_version": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "key_library_versions": {
+      "scikit_learn": "1.9.0",
+      "numpy": "2.5.2"
+    },
+    "feature_names": [
+      "rest_differential",
+      "home_is_b2b",
+      "away_is_b2b",
+      "l10_xgf_pct_diff",
+      "l10_cf_pct_diff",
+      "l10_goal_diff_per_game",
+      "l20_xgf_pct_diff",
+      "home_venue_l10_win_pct",
+      "away_venue_l10_win_pct",
+      "h2h_home_win_pct",
+      "h2h_home_gd_avg"
+    ],
+    "feature_ordering": [
+      "rest_differential",
+      "home_is_b2b",
+      "away_is_b2b",
+      "l10_xgf_pct_diff",
+      "l10_cf_pct_diff",
+      "l10_goal_diff_per_game",
+      "l20_xgf_pct_diff",
+      "home_venue_l10_win_pct",
+      "away_venue_l10_win_pct",
+      "h2h_home_win_pct",
+      "h2h_home_gd_avg"
+    ],
+    "feature_schema_version": "v1",
+    "candidate_fit_seasons": [
+      "20212022"
+    ],
+    "selection_season": "20222023",
+    "production_refit_seasons": [
+      "20212022",
+      "20222023"
+    ],
+    "training_seasons": [
+      "20212022",
+      "20222023"
+    ],
+    "calibration_season": "20232024",
+    "excluded_holdout_seasons": [
+      "20242025"
+    ],
+    "number_of_training_samples": 2624,
+    "number_of_calibration_samples": 1312,
+    "selected_hyperparameters": {
+      "max_iter": 100,
+      "max_depth": 4,
+      "min_samples_leaf": 20,
+      "random_state": 42
+    },
+    "model_selection_metric": "log_loss",
+    "calibration_method": "isotonic",
+    "git_commit_sha": "f38f7f90cec9774c05452bd53347bf8a06c05dc2",
+    "run_uuid": "57036064-badb-4fc9-aae7-93b8c5f36676"
+  }
+}

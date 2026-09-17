@@ -138,8 +138,10 @@ class EloService:
             "final_ratings": {tid: round(r, 1) for tid, r in team_ratings.items()},
             "season_metrics": season_metrics,
             "overall_metrics": overall_metrics,
+            "predictions": predictions,
             "sample_predictions": predictions[:10]
         }
+
 
     @classmethod
     def evaluate_predictions(cls, predictions: List[Dict[str, Any]]) -> Dict[str, float]:

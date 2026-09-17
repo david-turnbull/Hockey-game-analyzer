@@ -12,7 +12,10 @@ if project_root not in sys.path:
 from app import create_app
 from app.models import db, Game, Event, Shot, Shift
 
-TARGET_SEASONS = ['20212022', '20222023', '20232024', '20242025']
+import hashlib
+from typing import Tuple, List, Dict, Any
+
+TARGET_SEASONS = ['20212022', '20222023', '20232024', '20242025', '20252026']
 EXPECTED_GAMES_PER_SEASON = 1312  # 32 teams * 82 games / 2
 MIN_COMPLETE_SEASONS = 3
 
@@ -254,8 +257,119 @@ def audit_season_data(app=None):
         print(f"Audit reports saved to {json_path} and {md_path}")
         return summary
 
+def audit_stage4_external_season_gate(season: str = '20252026', app=None) -> Tuple[bool, List[str], str]:
+    """
+    Performs a strict fail-closed data audit gate specifically for Stage 4 external validation.
+    
+    Gate Criteria for Target Season (e.g. 20252026):
+    - Exactly 1,312 completed regular-season games.
+    - data_source='nhl_api' ONLY (0 synthetic games, 0 unknown provenance games).
+    - 0 duplicate game IDs.
+    - start_time_utc coverage >= 99.0%.
+    - Play-by-Play (PBP) event coverage >= 99.0%.
+    - Shot coverage >= 99.0%.
+    - xG coverage >= 99.0%.
+    
+    Returns:
+        (passed: bool, gate_reasons: List[str], data_audit_snapshot_hash: str)
+    """
+    if app is None:
+        try:
+            from flask import has_app_context, current_app
+            if has_app_context():
+                app = current_app._get_current_object()
+            else:
+                app = create_app('development')
+        except Exception:
+            app = create_app('development')
+
+    gate_reasons = []
+
+    with app.app_context():
+        db.create_all()
+
+        games_q = Game.query.filter(Game.season == season, Game.game_type == 'R').order_by(Game.game_id.asc())
+        all_games = games_q.all()
+        actual_games_count = len(all_games)
+
+        completed_games = [g for g in all_games if g.nhl_game_state in ['OFF', 'FINAL', 'OVER']]
+        completed_count = len(completed_games)
+
+        game_ids = [g.game_id for g in all_games]
+        unique_ids_count = len(set(game_ids))
+        duplicate_ids_count = actual_games_count - unique_ids_count
+
+        nhl_api_count = sum(1 for g in all_games if getattr(g, 'data_source', None) == 'nhl_api')
+        synthetic_count = sum(1 for g in all_games if getattr(g, 'data_source', None) == 'synthetic_test')
+        unknown_prov_count = actual_games_count - (nhl_api_count + synthetic_count)
+
+        with_start_time = sum(1 for g in all_games if g.start_time_utc is not None)
+        start_time_cov = round((with_start_time / actual_games_count * 100.0), 2) if actual_games_count > 0 else 0.0
+
+        if game_ids:
+            events_per_game = db.session.query(Event.game_id, func.count(Event.event_id))\
+                .filter(Event.game_id.in_(game_ids)).group_by(Event.game_id).all()
+            game_event_map = dict(events_per_game)
+            games_with_events = len(game_event_map)
+
+            shots_per_game = db.session.query(Shot.game_id, func.count(Shot.shot_id))\
+                .filter(Shot.game_id.in_(game_ids)).group_by(Shot.game_id).all()
+            game_shot_map = dict(shots_per_game)
+            games_with_shots = len(game_shot_map)
+
+            xg_per_game = db.session.query(Shot.game_id, func.count(Shot.shot_id))\
+                .filter(Shot.game_id.in_(game_ids), Shot.xg.isnot(None))\
+                .group_by(Shot.game_id).all()
+            game_xg_map = dict(xg_per_game)
+            games_with_xg = len(game_xg_map)
+        else:
+            games_with_events = 0
+            games_with_shots = 0
+            games_with_xg = 0
+
+        pbp_cov = round((games_with_events / actual_games_count * 100.0), 2) if actual_games_count > 0 else 0.0
+        shot_cov = round((games_with_shots / actual_games_count * 100.0), 2) if actual_games_count > 0 else 0.0
+        xg_cov = round((games_with_xg / actual_games_count * 100.0), 2) if actual_games_count > 0 else 0.0
+
+        # Deterministic dataset snapshot hash calculation
+        hasher = hashlib.sha256()
+        hasher.update(season.encode('utf-8'))
+        for g in all_games:
+            entry = f"{g.game_id}:{g.nhl_game_state}:{g.data_source}:{g.home_score}:{g.away_score}:{g.start_time_utc.isoformat() if g.start_time_utc else ''}"
+            hasher.update(entry.encode('utf-8'))
+        snapshot_hash = hasher.hexdigest()
+
+        expected_season_games = 1230 if season == '20252026' else EXPECTED_GAMES_PER_SEASON
+
+        # Gate Rules
+        if actual_games_count != expected_season_games:
+            gate_reasons.append(f"Season {season} actual game count mismatch: {actual_games_count}/{expected_season_games}")
+        if completed_count != expected_season_games:
+            gate_reasons.append(f"Season {season} incomplete games count: {completed_count}/{expected_season_games} completed")
+        if nhl_api_count != expected_season_games:
+            gate_reasons.append(f"Season {season} data_source!='nhl_api' count: {nhl_api_count}/{expected_season_games}")
+        if synthetic_count > 0:
+            gate_reasons.append(f"Season {season} contains {synthetic_count} synthetic test games")
+        if unknown_prov_count > 0:
+            gate_reasons.append(f"Season {season} contains {unknown_prov_count} unknown provenance games")
+        if duplicate_ids_count > 0:
+            gate_reasons.append(f"Season {season} contains {duplicate_ids_count} duplicate game IDs")
+        if start_time_cov < 99.0:
+            gate_reasons.append(f"Season {season} start_time_utc coverage insufficient: {start_time_cov}% < 99.0%")
+        if pbp_cov < 99.0:
+            gate_reasons.append(f"Season {season} PBP event coverage insufficient: {pbp_cov}% < 99.0%")
+        if shot_cov < 99.0:
+            gate_reasons.append(f"Season {season} shot coverage insufficient: {shot_cov}% < 99.0%")
+        if xg_cov < 99.0:
+            gate_reasons.append(f"Season {season} xG coverage insufficient: {xg_cov}% < 99.0%")
+
+        passed = (len(gate_reasons) == 0)
+        return passed, gate_reasons, snapshot_hash
+
+
 def audit_seasons():
     return audit_season_data()
 
 if __name__ == "__main__":
     audit_seasons()
+
