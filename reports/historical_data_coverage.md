@@ -1,6 +1,6 @@
 # Historical Data Provenance & Coverage Audit Report
 
-**Audited At:** `2026-09-17T01:07:59.956720+00:00`  
+**Audited At:** `2026-09-17T01:13:33.190389+00:00`  
 **Production Gate Status:** `FAILED (PRODUCTION FORECAST TRAINING BLOCKED)`  
 **Complete Real Seasons:** 0/3  
 **Synthetic Games Detected:** 0  

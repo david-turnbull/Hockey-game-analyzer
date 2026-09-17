@@ -290,17 +290,28 @@ class PregameFeatureService:
         away_venue_win_pct = round((away_away_wins / len(away_venue_l10) * 100.0), 2) if away_venue_l10 else 50.0
 
         # 4. Head-to-head history
-        h2h_games = Game.query.filter(
-            Game.game_type == 'R',
-            Game.nhl_game_state.in_(['OFF', 'FINAL', 'OVER']),
-            Game.game_id != target_game.game_id,
-            or_(
-                and_(Game.home_team_id == home_id, Game.away_team_id == away_id),
-                and_(Game.home_team_id == away_id, Game.away_team_id == home_id)
-            )
-        ).filter(
-            Game.start_time_utc < target_time
-        ).order_by(Game.start_time_utc.desc(), Game.game_id.desc()).limit(5).all()
+        target_start = target_game.start_time
+        h2h_games = []
+        if home_id in cls._team_games_cache:
+            for g in reversed(cls._team_games_cache[home_id]):
+                if g.game_id == target_game.game_id:
+                    continue
+                if (g.home_team_id == away_id or g.away_team_id == away_id) and g.start_time < target_start:
+                    h2h_games.append(g)
+                    if len(h2h_games) >= 5:
+                        break
+        else:
+            h2h_games = Game.query.filter(
+                Game.game_type == 'R',
+                Game.nhl_game_state.in_(['OFF', 'FINAL', 'OVER']),
+                Game.game_id != target_game.game_id,
+                or_(
+                    and_(Game.home_team_id == home_id, Game.away_team_id == away_id),
+                    and_(Game.home_team_id == away_id, Game.away_team_id == home_id)
+                )
+            ).filter(
+                Game.start_time_utc < target_start if target_game.start_time_utc else Game.game_date < target_game.game_date
+            ).order_by(Game.start_time_utc.desc(), Game.game_id.desc()).limit(5).all()
 
         if h2h_games:
             h2h_wins = 0

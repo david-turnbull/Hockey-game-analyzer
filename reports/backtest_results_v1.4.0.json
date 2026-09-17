@@ -1,5 +1,95 @@
 {
-  "status": "INVALIDATED",
-  "reason": "Synthetic data detected or insufficient complete real seasons in database. Production backtest requires 3+ complete regular seasons from NHL API with 0 synthetic games.",
-  "pending_validation": true
+  "backtest_run_at": "2026-09-17T01:12:58.461367+00:00",
+  "protocol": {
+    "train_season": "20212022",
+    "select_season": "20222023",
+    "refit_seasons": "20212022 + 20222023",
+    "calibrate_season": "20232024",
+    "test_season": "20242025 (Holdout)"
+  },
+  "model_selection": {
+    "selected_model": "HistGradientBoosting",
+    "logistic_regression_log_loss": 1.1486,
+    "hgb_log_loss": 0.7889,
+    "refit_sample_count": 2624,
+    "calibration_status": "IsotonicRegression fitted on 2023-24"
+  },
+  "test_season_20242025_eval": {
+    "season": "20242025",
+    "game_count": 1312,
+    "calibrated_model": {
+      "log_loss": 0.6848,
+      "brier_score": 0.2431,
+      "accuracy": 57.55,
+      "ece": 0.0315
+    },
+    "elo_baseline": {
+      "log_loss": 0.6735,
+      "brier_score": 0.2403,
+      "accuracy": 58.16,
+      "ece": 0.041
+    },
+    "naive_50_50_log_loss": 0.6931,
+    "score_projection": {
+      "expected_total_goals_mae": 2.06,
+      "home_goals_mae": 1.56,
+      "away_goals_mae": 1.48,
+      "exact_scoreline_coverage_pct": 3.89,
+      "top5_scoreline_coverage_pct": 18.9
+    }
+  },
+  "calibrate_season_20232024_eval": {
+    "season": "20232024",
+    "game_count": 1312,
+    "calibrated_model": {
+      "log_loss": 0.6581,
+      "brier_score": 0.234,
+      "accuracy": 58.84,
+      "ece": 0.0001
+    },
+    "elo_baseline": {
+      "log_loss": 0.6687,
+      "brier_score": 0.238,
+      "accuracy": 59.15,
+      "ece": 0.035
+    },
+    "naive_50_50_log_loss": 0.6931,
+    "score_projection": {
+      "expected_total_goals_mae": 2.07,
+      "home_goals_mae": 1.56,
+      "away_goals_mae": 1.54,
+      "exact_scoreline_coverage_pct": 3.73,
+      "top5_scoreline_coverage_pct": 17.53
+    }
+  },
+  "select_season_20222023_eval": {
+    "season": "20222023",
+    "game_count": 1312,
+    "calibrated_model": {
+      "log_loss": 0.5897,
+      "brier_score": 0.2018,
+      "accuracy": 72.64,
+      "ece": 0.1391
+    },
+    "elo_baseline": {
+      "log_loss": 0.6791,
+      "brier_score": 0.243,
+      "accuracy": 56.71,
+      "ece": 0.0418
+    },
+    "naive_50_50_log_loss": 0.6931,
+    "score_projection": {
+      "expected_total_goals_mae": 2.09,
+      "home_goals_mae": 1.59,
+      "away_goals_mae": 1.5,
+      "exact_scoreline_coverage_pct": 2.74,
+      "top5_scoreline_coverage_pct": 17.15
+    }
+  },
+  "elo_baseline_overall": {
+    "log_loss": 0.6641,
+    "brier_score": 0.2359,
+    "accuracy": 59.36,
+    "ece": 0.021
+  }
 }
