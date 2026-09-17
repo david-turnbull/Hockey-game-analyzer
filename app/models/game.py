@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from sqlalchemy import text
 from app.models.base import db
 
 class Game(db.Model):
@@ -59,10 +60,22 @@ class GamePrediction(db.Model):
     expected_home_goals = db.Column(db.Float, nullable=False)
     expected_away_goals = db.Column(db.Float, nullable=False)
     
+    prediction_type = db.Column(db.String(30), default='official_pregame', nullable=False)
+    model_sha256 = db.Column(db.String(64), nullable=True)
+    feature_schema_version = db.Column(db.String(20), default='v1', nullable=False)
+    run_id = db.Column(db.String(36), nullable=True)
+    input_cutoff_time_utc = db.Column(db.DateTime, nullable=True)
+    feature_payload_json = db.Column(db.Text, nullable=True)
+    feature_payload_sha256 = db.Column(db.String(64), nullable=True)
+
     score_matrix_json = db.Column(db.Text, nullable=True)
     feature_importance_json = db.Column(db.Text, nullable=True)
     model_version = db.Column(db.String(50), default='v1.4.0', nullable=False)
     is_official = db.Column(db.Boolean, default=True, nullable=False)
+
+    __table_args__ = (
+        db.Index('_game_model_official_pregame_uc', 'game_id', 'model_version', unique=True, sqlite_where=text("prediction_type = 'official_pregame'")),
+    )
 
     # Immutable dynamic resolution of outcome via relationship (never stored/mutated on prediction)
     game = db.relationship('Game', back_populates='predictions')

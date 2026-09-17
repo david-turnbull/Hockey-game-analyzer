@@ -1,5 +1,5 @@
 import logging
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, abort
 from app.services.forecast_service import ForecastService
 
 logger = logging.getLogger(__name__)
@@ -15,13 +15,14 @@ def get_game_forecast_api(game_id: int):
     """
     pred_dict = ForecastService.get_or_create_prediction(game_id)
     if "error" in pred_dict:
-        return jsonify(pred_dict), 404
+        status_code = pred_dict.get("status_code", 400)
+        return jsonify(pred_dict), status_code
     return jsonify(pred_dict), 200
 
 @forecast_bp.route('/api/v1/forecast/upcoming', methods=['GET'])
 def get_upcoming_forecasts_api():
     """
-    Returns predictions for upcoming or recent games.
+    Returns predictions for upcoming future games.
     """
     limit = request.args.get('limit', 12, type=int)
     forecasts = ForecastService.get_upcoming_forecasts(limit=limit)
@@ -53,5 +54,7 @@ def forecast_game_page(game_id: int):
     """
     pred_dict = ForecastService.get_or_create_prediction(game_id)
     if "error" in pred_dict:
-        return render_template('404.html', message=pred_dict["error"]), 404
+        status_code = pred_dict.get("status_code", 404)
+        abort(status_code, description=pred_dict.get("message", pred_dict["error"]))
     return render_template('forecast_game.html', forecast=pred_dict)
+

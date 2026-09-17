@@ -1,5 +1,5 @@
 import pytest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from app import create_app
 from app.models import db, Team, Game, GamePrediction
 
@@ -12,18 +12,18 @@ def app():
         t2 = Team(team_id=2, abbreviation='T2', name='Team 2')
         db.session.add_all([t1, t2])
 
-        # Seed sample game
+        future_dt = datetime.now(timezone.utc) + timedelta(days=5)
         g = Game(
             game_id=2024020001,
             season='20242025',
-            game_date=date(2024, 10, 10),
-            start_time_utc=datetime(2024, 10, 10, 19, 0, 0),
+            game_date=future_dt.date(),
+            start_time_utc=future_dt,
             game_type='R',
             home_team_id=1,
             away_team_id=2,
-            home_score=3,
-            away_score=2,
-            nhl_game_state='OFF'
+            home_score=0,
+            away_score=0,
+            nhl_game_state='FUT'
         )
         db.session.add(g)
         db.session.commit()

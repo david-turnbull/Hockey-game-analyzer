@@ -3,7 +3,7 @@
   "model_version": "v1.4.0",
   "model_architecture": "HistGradientBoosting",
   "artifact_sha256": "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9",
-  "generated_timestamp": "2026-09-17T01:07:21.502631+00:00",
+  "generated_timestamp": "2026-09-17T01:28:54.610329+00:00",
   "python_version": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
   "key_library_versions": {
     "scikit_learn": "1.9.0",
@@ -36,10 +36,18 @@
     "h2h_home_gd_avg"
   ],
   "feature_schema_version": "v1",
-  "training_seasons": [
+  "candidate_fit_seasons": [
     "20212022"
   ],
   "selection_season": "20222023",
+  "production_refit_seasons": [
+    "20212022",
+    "20222023"
+  ],
+  "training_seasons": [
+    "20212022",
+    "20222023"
+  ],
   "calibration_season": "20232024",
   "excluded_holdout_seasons": [
     "20242025"
@@ -54,6 +62,6 @@
   },
   "model_selection_metric": "log_loss",
   "calibration_method": "isotonic",
-  "git_commit_sha": "164d66904342a5801d2a6d60f074da8a5443768c",
-  "run_uuid": "54a1ed5c-086f-4479-bca7-9d31c5a82893"
+  "git_commit_sha": "0ede5594c80e702e18174a842e2fc564b55d1967",
+  "run_uuid": "4f66e064-2153-4c37-8ab4-e018f0c1f1a1"
 }

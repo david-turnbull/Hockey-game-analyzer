@@ -1,6 +1,6 @@
 # PuckLens v1.4.0 Historical Out-of-Time Backtest Report
 
-**Run Timestamp:** 2026-09-17T01:12:58.461367+00:00  
+**Run Timestamp:** 2026-09-17T01:33:37.760696+00:00  
 **Selected Model Architecture:** `HistGradientBoosting`
 
 ## Protocol & Temporal Splits

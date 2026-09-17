@@ -121,14 +121,49 @@ def run_migrations(db):
                 "WHERE outcome = 'Blocked' AND (xg IS NOT NULL OR model_name IS NOT NULL OR model_version IS NOT NULL OR prediction_method IS NOT NULL)"
             ))
 
-        # 6. Performance Indexes for Forecasting & Pregame Queries
+        # 6. Check game_prediction table
+        gp_pred_exists = connection.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='game_prediction'"
+        )).first()
+        if gp_pred_exists:
+            result = connection.execute(text("PRAGMA table_info(game_prediction)")).fetchall()
+            existing_gp_pred_cols = {row[1] for row in result}
+
+            gp_pred_migrations = [
+                ("prediction_type", "VARCHAR(30) DEFAULT 'official_pregame'"),
+                ("model_sha256", "VARCHAR(64)"),
+                ("feature_schema_version", "VARCHAR(20) DEFAULT 'v1'"),
+                ("run_id", "VARCHAR(36)"),
+                ("input_cutoff_time_utc", "DATETIME"),
+                ("feature_payload_json", "TEXT"),
+                ("feature_payload_sha256", "VARCHAR(64)")
+            ]
+            for col_name, col_type in gp_pred_migrations:
+                if col_name not in existing_gp_pred_cols:
+                    logger.info(f"Migrating: Adding column '{col_name}' to 'game_prediction' table")
+                    connection.execute(text(f"ALTER TABLE game_prediction ADD COLUMN {col_name} {col_type}"))
+
+            # Audit legacy prediction rows: classify official_pregame ONLY if created_at < start_time_utc
+            connection.execute(text("""
+                UPDATE game_prediction 
+                SET prediction_type = CASE 
+                    WHEN created_at IS NOT NULL AND game_id IN (
+                        SELECT game_id FROM game WHERE start_time_utc IS NOT NULL AND game_prediction.created_at < game.start_time_utc
+                    ) THEN 'official_pregame'
+                    ELSE 'legacy_unverified'
+                END
+                WHERE prediction_type IS NULL OR prediction_type = '' OR prediction_type = 'official_pregame'
+            """))
+
+        # 7. Performance & Uniqueness Indexes
         index_queries = [
             "CREATE INDEX IF NOT EXISTS idx_game_season_type ON game (season, game_type, nhl_game_state)",
             "CREATE INDEX IF NOT EXISTS idx_game_home_start ON game (home_team_id, game_type, nhl_game_state, start_time_utc)",
             "CREATE INDEX IF NOT EXISTS idx_game_away_start ON game (away_team_id, game_type, nhl_game_state, start_time_utc)",
             "CREATE INDEX IF NOT EXISTS idx_game_start_utc ON game (start_time_utc)",
             "CREATE INDEX IF NOT EXISTS idx_game_date ON game (game_date)",
-            "CREATE INDEX IF NOT EXISTS idx_game_prediction_game_official ON game_prediction (game_id, is_official)"
+            "CREATE INDEX IF NOT EXISTS idx_game_prediction_game_official ON game_prediction (game_id, is_official)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS _game_model_official_pregame_uc ON game_prediction (game_id, model_version) WHERE prediction_type = 'official_pregame'"
         ]
         for q in index_queries:
             connection.execute(text(q))

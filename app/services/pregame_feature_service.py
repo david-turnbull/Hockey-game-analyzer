@@ -28,14 +28,16 @@ class PregameFeatureService:
         shot_types = ['shot-on-goal', 'goal', 'missed-shot', 'blocked-shot']
         events_q = db.session.query(
             Event.game_id, Event.team_id, Event.event_type, func.count(Event.event_id)
-        ).filter(
+        ).join(Game, Event.game_id == Game.game_id).filter(
+            Game.data_source == 'nhl_api',
             Event.event_type.in_(shot_types),
             or_(Event.period_type != 'SO', Event.period_type.is_(None))
         ).group_by(Event.game_id, Event.team_id, Event.event_type).all()
 
         xg_q = db.session.query(
             Event.game_id, Shot.team_id, func.sum(Shot.xg)
-        ).join(Event, Shot.shot_id == Event.event_id).filter(
+        ).join(Event, Shot.shot_id == Event.event_id).join(Game, Event.game_id == Game.game_id).filter(
+            Game.data_source == 'nhl_api',
             Shot.outcome.in_(['Goal', 'Saved', 'Missed']),
             or_(Event.period_type != 'SO', Event.period_type.is_(None))
         ).group_by(Event.game_id, Shot.team_id).all()
@@ -53,9 +55,10 @@ class PregameFeatureService:
                     cls._stats_cache[gid] = {"cf_by_team": {}, "sog_by_team": {}, "xg_by_team": {}}
                 cls._stats_cache[gid]["xg_by_team"][tid] = float(xg_val)
 
-        # Pre-index completed games per team sorted by start_time_utc
+        # Pre-index completed games per team sorted by start_time_utc (real nhl_api games only)
         all_games = Game.query.filter(
             Game.game_type == 'R',
+            Game.data_source == 'nhl_api',
             Game.nhl_game_state.in_(['OFF', 'FINAL', 'OVER'])
         ).order_by(
             func.coalesce(Game.start_time_utc, Game.game_date).asc(),
@@ -105,6 +108,7 @@ class PregameFeatureService:
 
         query = Game.query.filter(
             Game.game_type == 'R',
+            Game.data_source == 'nhl_api',
             Game.nhl_game_state.in_(['OFF', 'FINAL', 'OVER']),
             Game.game_id != target_game.game_id
         )

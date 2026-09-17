@@ -248,5 +248,19 @@
             {% endfor %}
         </div>
     </div>
+
+    <!-- Model Provenance Card -->
+    <div class="panel-box" style="margin-top: 1rem;">
+        <div class="panel-title">🛡️ Model Provenance & Registry Verification</div>
+        <div style="font-size: 0.85rem; color: #94a3b8; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+            <div><strong>Model Version:</strong> <span style="color: #38bdf8;">{{ forecast.model_version }}</span></div>
+            <div><strong>Model SHA-256:</strong> <span style="color: #cbd5e1;">{{ forecast.model_sha256[:16] if forecast.model_sha256 else 'N/A' }}...</span></div>
+            <div><strong>Schema Version:</strong> <span style="color: #cbd5e1;">{{ forecast.feature_schema_version }}</span></div>
+            <div><strong>Prediction Type:</strong> <span style="color: #a855f7;">{{ forecast.prediction_type }}</span></div>
+            <div><strong>Run ID:</strong> <span style="color: #cbd5e1;">{{ forecast.run_id[:16] if forecast.run_id else 'N/A' }}...</span></div>
+            <div><strong>Payload Checksum:</strong> <span style="color: #cbd5e1;">{{ forecast.feature_payload_sha256[:16] if forecast.feature_payload_sha256 else 'N/A' }}...</span></div>
+        </div>
+    </div>
+</div>
 </div>
 {% endblock %}
