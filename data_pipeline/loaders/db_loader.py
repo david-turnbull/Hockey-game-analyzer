@@ -112,21 +112,16 @@ class DatabaseLoader:
                 if event.team_id in team_id_map:
                     event.team_id = team_id_map[event.team_id]
                 self.session.add(event)
-            self.session.flush()
 
             for shot in shots:
                 if shot.team_id in team_id_map:
                     shot.team_id = team_id_map[shot.team_id]
                 self.session.add(shot)
-            self.session.flush()
-
 
             for shift in shifts:
                 if shift.team_id in team_id_map:
                     shift.team_id = team_id_map[shift.team_id]
                 self.session.add(shift)
-            self.session.flush()
-
 
             if game_players:
                 for gp in game_players:

@@ -19,12 +19,15 @@ TARGET_SEASONS = ['20212022', '20222023', '20232024', '20242025', '20252026']
 EXPECTED_GAMES_PER_SEASON = 1312  # 32 teams * 82 games / 2
 MIN_COMPLETE_SEASONS = 3
 
-def audit_season_data(app=None):
+def audit_season_data(app=None, save_report: bool = None):
     """
     Performs a strict feature-level completeness and data-provenance audit per season.
     Returns:
         summary (dict): Full audit report containing per-season metrics and hard gate status.
     """
+    if save_report is None:
+        save_report = (app is None)
+
     if app is None:
         try:
             from flask import has_app_context, current_app
@@ -219,16 +222,17 @@ def audit_season_data(app=None):
         print("=" * 70)
 
         # Write JSON and Markdown reports
-        reports_dir = os.path.join(project_root, "reports")
-        os.makedirs(reports_dir, exist_ok=True)
-        json_path = os.path.join(reports_dir, "historical_data_coverage.json")
-        md_path = os.path.join(reports_dir, "historical_data_coverage.md")
+        if save_report:
+            reports_dir = os.path.join(project_root, "reports")
+            os.makedirs(reports_dir, exist_ok=True)
+            json_path = os.path.join(reports_dir, "historical_data_coverage.json")
+            md_path = os.path.join(reports_dir, "historical_data_coverage.md")
 
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(summary, f, indent=2)
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(summary, f, indent=2)
 
-        status_text = "PASSED" if hard_gate_passed else "FAILED (PRODUCTION FORECAST TRAINING BLOCKED)"
-        md_content = f"""# Historical Data Provenance & Coverage Audit Report
+            status_text = "PASSED" if hard_gate_passed else "FAILED (PRODUCTION FORECAST TRAINING BLOCKED)"
+            md_content = f"""# Historical Data Provenance & Coverage Audit Report
 
 **Audited At:** `{summary['audited_at']}`  
 **Production Gate Status:** `{status_text}`  
@@ -240,21 +244,21 @@ def audit_season_data(app=None):
 | Season | Expected | Actual | Real NHL API | Synthetic | Start Time UTC % | PBP % | xG % | Shift % (Optional) | Status |
 |---|---|---|---|---|---|---|---|---|---|
 """
-        for season, d in results.items():
-            st_icon = "✅ COMPLETE" if d['status'] == 'COMPLETE' else ("⚠️ PARTIAL" if d['status'] == 'PARTIAL' else "❌ INVALID")
-            md_content += f"| {season} | {d['expected_regular_season_games']} | {d['actual_regular_season_games']} | {d['nhl_api_games']} | {d['synthetic_games']} | {d['start_time_coverage_pct']:.1f}% | {d['pbp_coverage_pct']:.1f}% | {d['xg_coverage_pct']:.1f}% | {d['shift_coverage_pct']:.1f}% | {st_icon} |\n"
+            for season, d in results.items():
+                st_icon = "✅ COMPLETE" if d['status'] == 'COMPLETE' else ("⚠️ PARTIAL" if d['status'] == 'PARTIAL' else "❌ INVALID")
+                md_content += f"| {season} | {d['expected_regular_season_games']} | {d['actual_regular_season_games']} | {d['nhl_api_games']} | {d['synthetic_games']} | {d['start_time_coverage_pct']:.1f}% | {d['pbp_coverage_pct']:.1f}% | {d['xg_coverage_pct']:.1f}% | {d['shift_coverage_pct']:.1f}% | {st_icon} |\n"
 
-        if not hard_gate_passed:
-            md_content += f"\n> [!CAUTION]\n> **PRODUCTION FORECAST TRAINING BLOCKED**\n> Reasons:\n"
-            for r in gate_reasons:
-                md_content += f"> - {r}\n"
-        else:
-            md_content += f"\n> [!NOTE]\n> Production data gate passed. All target seasons contain genuine NHL API data with no synthetic contamination.\n"
+            if not hard_gate_passed:
+                md_content += f"\n> [!CAUTION]\n> **PRODUCTION FORECAST TRAINING BLOCKED**\n> Reasons:\n"
+                for r in gate_reasons:
+                    md_content += f"> - {r}\n"
+            else:
+                md_content += f"\n> [!NOTE]\n> Production data gate passed. All target seasons contain genuine NHL API data with no synthetic contamination.\n"
 
-        with open(md_path, "w", encoding="utf-8") as f:
-            f.write(md_content)
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(md_content)
 
-        print(f"Audit reports saved to {json_path} and {md_path}")
+            print(f"Audit reports saved to {json_path} and {md_path}")
         return summary
 
 def audit_stage4_external_season_gate(season: str = '20252026', app=None) -> Tuple[bool, List[str], str]:

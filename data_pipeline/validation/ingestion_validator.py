@@ -151,6 +151,11 @@ class IngestionValidator:
                 self.add_warning("SHIFT_REJECT", "Missing Shift ID")
                 self.rejected_records_count += 1
                 continue
+
+            if not shift.player_id:
+                self.add_warning("SHIFT_REJECT", "Missing Player ID for shift", shift.shift_id)
+                self.rejected_records_count += 1
+                continue
                 
             if shift.shift_id in self.seen_shift_ids:
                 self.add_warning("SHIFT_WARN", f"Duplicate Shift ID skipped: {shift.shift_id}", shift.shift_id)

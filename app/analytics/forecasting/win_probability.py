@@ -122,7 +122,7 @@ class WinProbabilityModel:
         """
         if not skip_gate:
             from scripts.audit_seasons import audit_season_data
-            audit_summary = audit_season_data()
+            audit_summary = audit_season_data(save_report=False)
             gate = audit_summary.get("production_forecast_data_gate", {})
             if not gate.get("pass", False):
                 reasons = "; ".join(gate.get("reasons", ["Production training gate criteria not met"]))
