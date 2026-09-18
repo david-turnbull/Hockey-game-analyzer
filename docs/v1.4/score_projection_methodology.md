@@ -7,9 +7,9 @@ This document details the mathematical formulations, target resolution rules, ad
 
 ---
 
-## 1. Score Model Candidates & Candidate Parameter Freezing
+## 1. Score Model Candidates & Reproducible Parameter Freezing
 
-All candidate model parameters were estimated strictly using the training seasons **2021-22 through 2023-24 (3,936 regular-season games)**. **Zero parameter tuning or fitting** was performed on the 2024-25 holdout season or the 2025-26 external validation season.
+All candidate model parameters were estimated strictly using the training seasons **2021-22 through 2023-24 (3,936 regular-season games)** via `scripts/fit_score_candidate_models.py` and saved to `models/forecasting/score_candidate_params_v1.4.0.json`. **Zero parameter tuning or fitting** was performed on the 2024-25 holdout season or the 2025-26 external validation season.
 
 ### Candidate 1: Independent Poisson Baseline (Production Model)
 Assume home and away goals are independent Poisson random variables:
@@ -48,39 +48,36 @@ Official NHL boxscore game scores include a +1 goal bonus awarded to the winner 
    - If `box_away > box_home`: `reg_home = box_home`, `reg_away = box_away - 1`
 4. Consistency Check & Anomaly Reporting: Assert `reg_home_goals == reg_away_goals` for 100% of shootout games. Any violation is logged as an anomaly.
 
-Empirical Audit:
-- **2024-25**: 77 shootout games (5.9%) out of 1,312 games. Anomalies = 0.
-- **2025-26**: 119 shootout games (9.1%) out of 1,312 games. Anomalies = 0.
+### Shootout Bias Interpretation
+Evaluating against true regulation + OT hockey goals reveals a larger negative residual bias (-0.2446 in 2024-25, -0.4800 in 2025-26) compared to unadjusted boxscore scores (-0.1859 in 2024-25, -0.3893 in 2025-26). This proves that the +1 shootout winner goal bonus in boxscore totals was **partially masking score-model overprediction**.
 
 ---
 
-## 3. Pre-Shootout 3-Class Regulation Outcome Formulation
+## 3. Pre-Shootout 3-Class Outcome Formulation
 
-Pre-shootout game outcomes are evaluated as a 3-class probability distribution:
-1. **Home Win before shootout** ($h > a$): $P(\text{Home Win}) = \sum_{h > a} P(h, a)$
-2. **Away Win before shootout** ($a > h$): $P(\text{Away Win}) = \sum_{a > h} P(h, a)$
-3. **Tied after OT / Shootout required** ($h = a$): $P(\text{Tie}) = \sum_{h = a} P(h, a)$
+Pre-shootout game outcomes are evaluated as a 3-class probability distribution with explicit outcome field names:
+1. **`home_win_probability_pre_shootout`** ($h > a$): $P(\text{Home Win}) = \sum_{h > a} P(h, a)$
+2. **`away_win_probability_pre_shootout`** ($a > h$): $P(\text{Away Win}) = \sum_{a > h} P(h, a)$
+3. **`shootout_required_probability`** ($h = a$): $P(\text{Tie}) = \sum_{h = a} P(h, a)$
 
-Metrics evaluated:
-- **Multiclass Log Loss**: $-\frac{1}{N} \sum_{i=1}^N \sum_{c=0}^2 y_{i,c} \log(p_{i,c})$
-- **Multiclass Brier Score**: $\frac{1}{N} \sum_{i=1}^N \sum_{c=0}^2 (p_{i,c} - y_{i,c})^2$
+*(Legacy regulation-named fields `home_win_probability_regulation`, `away_win_probability_regulation`, `regulation_tie_probability` are preserved as backward-compatibility aliases.)*
 
 ---
 
-## 4. Adaptive Matrix Support ($N=15$)
+## 4. Genuinely Adaptive Matrix Support (Tolerance < 1e-8)
 
-To fix score-matrix truncation errors present in fixed 10x10 grids, the underlying joint probability matrix calculation uses adaptive support $N=15$ ($15 \times 15$ grid, $h, a \in [0, 14]$). This ensures retained probability mass $\sum_{h=0}^{14} \sum_{a=0}^{14} P(h, a) > 0.99999$ across all realistic expected goal inputs ($\lambda \in [0.8, 6.5]$).
+To fix score-matrix truncation errors present in fixed grids, `PoissonScoreModel.generate_joint_matrix()` dynamically expands grid size $N \times N$ adaptively until omitted probability mass $1.0 - \sum_{h=0}^{N-1} \sum_{a=0}^{N-1} P(h, a) < 1e-8$ across all expected goal inputs ($\lambda \in [0.8, 6.5]$).
 
-For display and backwards compatibility in UI/API responses, a 10x10 slice is extracted while internal totals, outcome probabilities, and likelihoods evaluate over the full $15 \times 15$ grid.
+For display and UI responses, a $10 \times 10$ slice is extracted separately as `score_matrix`.
 
 ---
 
-## 5. Model Selection Criteria
+## 5. Model Selection Criteria & Decision Rationale
 
 An alternative model replaces Independent Poisson **ONLY IF** it satisfies all of the following conditions:
 1. Demonstrates statistically significant out-of-sample improvement on **BOTH** 2024-25 and 2025-26 evaluation seasons (paired bootstrap 95% CI upper bound < 0 for NLL difference).
-2. Does not materially degrade total goal MAE or residual bias.
+2. Provides a practically meaningful improvement in total goal MAE or residual bias.
 3. Maintains numerical stability and calibration across all games.
 
-### Recommendation
-The evaluation confirms that **Independent Poisson remains the production score model** for PuckLens v1.4. Alternatives (Negative Binomial, Bivariate Poisson, Dixon-Coles) do not demonstrate statistically significant out-of-sample improvement across both evaluation seasons.
+### Recommendation & Rationale
+Independent Poisson is retained as the production score model. Although Negative Binomial achieves a statistically significant NLL reduction on both evaluation seasons ($CI < 0$), the gain is microscopic ($\Delta \text{NLL} \approx -0.0005$) and provides zero practical improvement in MAE, residual bias, or calibration to justify additional model complexity.

@@ -94,14 +94,31 @@ class PoissonScoreModel:
         return lmbda_home, lmbda_away
 
     @classmethod
-    def generate_joint_matrix(cls, lmbda_home: float, lmbda_away: float, model_type: str = "poisson", max_goals: int = 15, **kwargs) -> List[List[float]]:
+    def generate_joint_matrix(cls, lmbda_home: float, lmbda_away: float, model_type: str = "poisson", tol: float = 1e-8, max_support_cap: int = 50, **kwargs) -> Tuple[List[List[float]], int, float]:
         """
-        Generates N x N joint score probability matrix for specified model candidate.
+        Generates N x N joint score probability matrix with genuinely adaptive support until omitted mass < tol.
+        Returns (matrix, support_size_N, total_retained_mass).
         """
+        N = 10
+        # Determine N adaptively by checking marginal PMF sums
+        while N <= max_support_cap:
+            if model_type == "neg_binomial":
+                alpha = kwargs.get("alpha", 0.001)
+                cdf_h = sum(cls.neg_binomial_pmf(h, lmbda_home, alpha) for h in range(N))
+                cdf_a = sum(cls.neg_binomial_pmf(a, lmbda_away, alpha) for a in range(N))
+            else:
+                cdf_h = sum(cls.poisson_pmf(h, lmbda_home) for h in range(N))
+                cdf_a = sum(cls.poisson_pmf(a, lmbda_away) for a in range(N))
+
+            if (1.0 - (cdf_h * cdf_a)) < tol or N >= max_support_cap:
+                break
+            N += 1
+
         matrix = []
-        for h in range(max_goals):
+        total_prob = 0.0
+        for h in range(N):
             row = []
-            for a in range(max_goals):
+            for a in range(N):
                 if model_type == "neg_binomial":
                     alpha = kwargs.get("alpha", 0.001)
                     p_cell = cls.neg_binomial_pmf(h, lmbda_home, alpha) * cls.neg_binomial_pmf(a, lmbda_away, alpha)
@@ -115,33 +132,33 @@ class PoissonScoreModel:
                 else:  # default poisson
                     p_cell = cls.poisson_pmf(h, lmbda_home) * cls.poisson_pmf(a, lmbda_away)
                 row.append(p_cell)
+                total_prob += p_cell
             matrix.append(row)
-        return matrix
+
+        return matrix, N, total_prob
 
     @classmethod
-    def project_score_distribution(cls, pregame_features: Dict[str, Any], max_goals: int = 15, display_max_goals: int = 10, model_type: str = "poisson", **kwargs) -> Dict[str, Any]:
+    def project_score_distribution(cls, pregame_features: Dict[str, Any], display_max_goals: int = 10, model_type: str = "poisson", tol: float = 1e-8, **kwargs) -> Dict[str, Any]:
         """
-        Generates score probability matrix and outcome probabilities using adaptive support N=15.
+        Generates score probability matrix and pre-shootout outcome probabilities using genuinely adaptive support (omitted mass < tol).
         """
         lmbda_home, lmbda_away = cls.calculate_expected_goals(pregame_features)
-        raw_matrix = cls.generate_joint_matrix(lmbda_home, lmbda_away, model_type=model_type, max_goals=max_goals, **kwargs)
+        raw_matrix, support_N, total_prob = cls.generate_joint_matrix(lmbda_home, lmbda_away, model_type=model_type, tol=tol, **kwargs)
 
         home_win_prob = 0.0
         away_win_prob = 0.0
         tie_prob = 0.0
-        total_prob = 0.0
 
         display_matrix = []
-        for h in range(max_goals):
+        for h in range(support_N):
             if h < display_max_goals:
                 row_disp = []
                 for a in range(display_max_goals):
                     row_disp.append(round(raw_matrix[h][a], 5))
                 display_matrix.append(row_disp)
 
-            for a in range(max_goals):
+            for a in range(support_N):
                 p_cell = raw_matrix[h][a]
-                total_prob += p_cell
                 if h > a:
                     home_win_prob += p_cell
                 elif a > h:
@@ -156,8 +173,8 @@ class PoissonScoreModel:
             prob_under = 0.0
             prob_push = 0.0
 
-            for h in range(max_goals):
-                for a in range(max_goals):
+            for h in range(support_N):
+                for a in range(support_N):
                     tot = h + a
                     p_cell = raw_matrix[h][a]
                     if tot > total_line:
@@ -175,8 +192,8 @@ class PoissonScoreModel:
 
         # Most probable exact scorelines
         scorelines = []
-        for h in range(max_goals):
-            for a in range(max_goals):
+        for h in range(support_N):
+            for a in range(support_N):
                 scorelines.append({
                     "score": f"{h}-{a}",
                     "home_goals": h,
@@ -192,10 +209,15 @@ class PoissonScoreModel:
             "expected_home_goals": lmbda_home,
             "expected_away_goals": lmbda_away,
             "expected_total_goals": round(lmbda_home + lmbda_away, 2),
+            "home_win_probability_pre_shootout": round(home_win_prob, 4),
+            "away_win_probability_pre_shootout": round(away_win_prob, 4),
+            "shootout_required_probability": round(tie_prob, 4),
+            # Compatibility aliases
             "home_win_probability_regulation": round(home_win_prob, 4),
             "away_win_probability_regulation": round(away_win_prob, 4),
             "regulation_tie_probability": round(tie_prob, 4),
-            "total_probability_mass": round(total_prob, 6),
+            "adaptive_support_N": support_N,
+            "total_probability_mass": round(total_prob, 8),
             "score_matrix": display_matrix,
             "top_scorelines": top_scorelines,
             "totals_projections": over_under
