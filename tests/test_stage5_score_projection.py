@@ -1,9 +1,10 @@
 import pytest
 import hashlib
 import json
+from datetime import date
 from pathlib import Path
 from app import create_app
-from app.models import db, Game, Event
+from app.models import db, Game, Event, Team
 from app.analytics.forecasting.score_projection import PoissonScoreModel
 from scripts.run_stage5_score_validation import extract_game_targets, load_frozen_candidate_params
 
@@ -114,8 +115,14 @@ def test_extract_game_targets_logic():
     with app.app_context():
         db.create_all()
         try:
+            # Create team fixtures
+            t1 = Team(team_id=1, abbreviation='AAA', name='Team A')
+            t2 = Team(team_id=2, abbreviation='BBB', name='Team B')
+            db.session.add_all([t1, t2])
+            db.session.commit()
+
             # 1. Non-shootout game: Boxscore 4-2
-            g_reg = Game(game_id=999901, season="20242025", game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=4, away_score=2)
+            g_reg = Game(game_id=999901, season="20242025", game_date=date(2024, 10, 15), home_team_id=1, away_team_id=2, game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=4, away_score=2)
             db.session.add(g_reg)
             db.session.commit()
 
@@ -129,8 +136,8 @@ def test_extract_game_targets_logic():
             assert res_reg["anomaly"] is False
 
             # 2. Home Shootout Win: Boxscore 3-2 with Event SO
-            g_so_home = Game(game_id=999902, season="20242025", game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=3, away_score=2)
-            so_event_1 = Event(game_id=999902, period_num=5, period_type='SO', event_type='SHOT', time_in_period='00:00')
+            g_so_home = Game(game_id=999902, season="20242025", game_date=date(2024, 10, 15), home_team_id=1, away_team_id=2, game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=3, away_score=2)
+            so_event_1 = Event(event_id="999902_1", game_id=999902, period=5, period_type='SO', event_type='SHOT', period_time='00:00')
             db.session.add(g_so_home)
             db.session.add(so_event_1)
             db.session.commit()
@@ -143,8 +150,8 @@ def test_extract_game_targets_logic():
             assert res_so_home["anomaly"] is False
 
             # 3. Away Shootout Win: Boxscore 2-3 with Event SO
-            g_so_away = Game(game_id=999903, season="20242025", game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=2, away_score=3)
-            so_event_2 = Event(game_id=999903, period_num=5, period_type='SO', event_type='SHOT', time_in_period='00:00')
+            g_so_away = Game(game_id=999903, season="20242025", game_date=date(2024, 10, 15), home_team_id=1, away_team_id=2, game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=2, away_score=3)
+            so_event_2 = Event(event_id="999903_1", game_id=999903, period=5, period_type='SO', event_type='SHOT', period_time='00:00')
             db.session.add(g_so_away)
             db.session.add(so_event_2)
             db.session.commit()
@@ -157,8 +164,8 @@ def test_extract_game_targets_logic():
             assert res_so_away["anomaly"] is False
 
             # 4. Shootout Anomaly Case: Boxscore 4-2 with Event SO (reg scores unequal after adjustment)
-            g_so_anom = Game(game_id=999904, season="20242025", game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=4, away_score=2)
-            so_event_3 = Event(game_id=999904, period_num=5, period_type='SO', event_type='SHOT', time_in_period='00:00')
+            g_so_anom = Game(game_id=999904, season="20242025", game_date=date(2024, 10, 15), home_team_id=1, away_team_id=2, game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=4, away_score=2)
+            so_event_3 = Event(event_id="999904_1", game_id=999904, period=5, period_type='SO', event_type='SHOT', period_time='00:00')
             db.session.add(g_so_anom)
             db.session.add(so_event_3)
             db.session.commit()
@@ -172,4 +179,3 @@ def test_extract_game_targets_logic():
         finally:
             db.session.rollback()
             db.drop_all()
-
