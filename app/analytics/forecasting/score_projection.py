@@ -23,6 +23,48 @@ class PoissonScoreModel:
             return 0.0
         return (math.pow(lmbda, k) * math.exp(-lmbda)) / math.factorial(k)
 
+    @staticmethod
+    def neg_binomial_pmf(k: int, lmbda: float, alpha: float = 0.001) -> float:
+        """Calculates Negative Binomial probability P(X = k) for mean lmbda and dispersion alpha."""
+        if k < 0 or lmbda <= 0:
+            return 0.0
+        if alpha <= 1e-6:
+            return PoissonScoreModel.poisson_pmf(k, lmbda)
+        r = 1.0 / alpha
+        p = r / (r + lmbda)
+        # P(X = k) = gamma(k + r) / (k! gamma(r)) * p^r * (1-p)^k
+        return math.exp(math.lgamma(k + r) - math.lgamma(r) - math.lgamma(k + 1)) * math.pow(p, r) * math.pow(1 - p, k)
+
+    @staticmethod
+    def bivariate_poisson_pmf(h: int, a: int, lmbda_h: float, lmbda_a: float, lmbda3: float = 0.001) -> float:
+        """Calculates Bivariate Poisson joint probability P(H=h, A=a) with shared intensity lmbda3."""
+        if h < 0 or a < 0 or lmbda_h <= 0 or lmbda_a <= 0:
+            return 0.0
+        lmbda1 = max(1e-4, lmbda_h - lmbda3)
+        lmbda2 = max(1e-4, lmbda_a - lmbda3)
+        l3 = max(0.0, lmbda3)
+        prob = 0.0
+        for k in range(min(h, a) + 1):
+            term = (math.pow(lmbda1, h - k) / math.factorial(h - k)) * \
+                   (math.pow(lmbda2, a - k) / math.factorial(a - k)) * \
+                   (math.pow(l3, k) / math.factorial(k))
+            prob += term
+        return math.exp(-(lmbda1 + lmbda2 + l3)) * prob
+
+    @staticmethod
+    def dixon_coles_adj(h: int, a: int, lmbda_h: float, lmbda_a: float, gamma: float = 0.0543) -> float:
+        """Dixon-Coles low score adjustment multiplier tau(h, a)."""
+        if h == 0 and a == 0:
+            return max(0.0, 1.0 - lmbda_h * lmbda_a * gamma)
+        elif h == 1 and a == 0:
+            return max(0.0, 1.0 + lmbda_a * gamma)
+        elif h == 0 and a == 1:
+            return max(0.0, 1.0 + lmbda_h * gamma)
+        elif h == 1 and a == 1:
+            return max(0.0, 1.0 - gamma)
+        else:
+            return 1.0
+
     @classmethod
     def calculate_expected_goals(cls, pregame_features: Dict[str, Any]) -> Tuple[float, float]:
         """
@@ -52,37 +94,60 @@ class PoissonScoreModel:
         return lmbda_home, lmbda_away
 
     @classmethod
-    def project_score_distribution(cls, pregame_features: Dict[str, Any], max_goals: int = 10) -> Dict[str, Any]:
+    def generate_joint_matrix(cls, lmbda_home: float, lmbda_away: float, model_type: str = "poisson", max_goals: int = 15, **kwargs) -> List[List[float]]:
         """
-        Generates 10x10 joint probability matrix and outcome probabilities.
+        Generates N x N joint score probability matrix for specified model candidate.
         """
-        lmbda_home, lmbda_away = cls.calculate_expected_goals(pregame_features)
-
-        home_pmf = [cls.poisson_pmf(i, lmbda_home) for i in range(max_goals)]
-        away_pmf = [cls.poisson_pmf(j, lmbda_away) for j in range(max_goals)]
-
-        # 10x10 Matrix: matrix[home_goals][away_goals]
         matrix = []
-        home_win_prob = 0.0
-        away_win_prob = 0.0
-        tie_prob = 0.0
-
-        total_prob = 0.0
-
         for h in range(max_goals):
             row = []
             for a in range(max_goals):
-                p_cell = home_pmf[h] * away_pmf[a]
-                row.append(round(p_cell, 5))
-                total_prob += p_cell
+                if model_type == "neg_binomial":
+                    alpha = kwargs.get("alpha", 0.001)
+                    p_cell = cls.neg_binomial_pmf(h, lmbda_home, alpha) * cls.neg_binomial_pmf(a, lmbda_away, alpha)
+                elif model_type == "bivariate_poisson":
+                    lambda3 = kwargs.get("lambda3", 0.001)
+                    p_cell = cls.bivariate_poisson_pmf(h, a, lmbda_home, lmbda_away, lambda3)
+                elif model_type == "dixon_coles":
+                    gamma = kwargs.get("gamma", 0.0543)
+                    tau = cls.dixon_coles_adj(h, a, lmbda_home, lmbda_away, gamma)
+                    p_cell = tau * cls.poisson_pmf(h, lmbda_home) * cls.poisson_pmf(a, lmbda_away)
+                else:  # default poisson
+                    p_cell = cls.poisson_pmf(h, lmbda_home) * cls.poisson_pmf(a, lmbda_away)
+                row.append(p_cell)
+            matrix.append(row)
+        return matrix
 
+    @classmethod
+    def project_score_distribution(cls, pregame_features: Dict[str, Any], max_goals: int = 15, display_max_goals: int = 10, model_type: str = "poisson", **kwargs) -> Dict[str, Any]:
+        """
+        Generates score probability matrix and outcome probabilities using adaptive support N=15.
+        """
+        lmbda_home, lmbda_away = cls.calculate_expected_goals(pregame_features)
+        raw_matrix = cls.generate_joint_matrix(lmbda_home, lmbda_away, model_type=model_type, max_goals=max_goals, **kwargs)
+
+        home_win_prob = 0.0
+        away_win_prob = 0.0
+        tie_prob = 0.0
+        total_prob = 0.0
+
+        display_matrix = []
+        for h in range(max_goals):
+            if h < display_max_goals:
+                row_disp = []
+                for a in range(display_max_goals):
+                    row_disp.append(round(raw_matrix[h][a], 5))
+                display_matrix.append(row_disp)
+
+            for a in range(max_goals):
+                p_cell = raw_matrix[h][a]
+                total_prob += p_cell
                 if h > a:
                     home_win_prob += p_cell
                 elif a > h:
                     away_win_prob += p_cell
                 else:
                     tie_prob += p_cell
-            matrix.append(row)
 
         # Totals Over/Under probabilities for standard lines (5.5, 6.0, 6.5)
         over_under = {}
@@ -94,7 +159,7 @@ class PoissonScoreModel:
             for h in range(max_goals):
                 for a in range(max_goals):
                     tot = h + a
-                    p_cell = matrix[h][a]
+                    p_cell = raw_matrix[h][a]
                     if tot > total_line:
                         prob_over += p_cell
                     elif tot < total_line:
@@ -116,7 +181,7 @@ class PoissonScoreModel:
                     "score": f"{h}-{a}",
                     "home_goals": h,
                     "away_goals": a,
-                    "probability": round(matrix[h][a], 4)
+                    "probability": round(raw_matrix[h][a], 4)
                 })
 
         scorelines.sort(key=lambda x: x["probability"], reverse=True)
@@ -130,7 +195,8 @@ class PoissonScoreModel:
             "home_win_probability_regulation": round(home_win_prob, 4),
             "away_win_probability_regulation": round(away_win_prob, 4),
             "regulation_tie_probability": round(tie_prob, 4),
-            "score_matrix": matrix,
+            "total_probability_mass": round(total_prob, 6),
+            "score_matrix": display_matrix,
             "top_scorelines": top_scorelines,
             "totals_projections": over_under
         }
