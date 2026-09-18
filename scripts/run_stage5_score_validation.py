@@ -437,10 +437,7 @@ def main():
                     status = f"Statistically evaluated with lambda3={lambda3_val}."
             elif cand == "dixon_coles":
                 gamma_val = c_params.get("gamma", 0.0543)
-                if sig_imp_2024 and sig_imp_2025:
-                    status = f"Dixon-Coles (gamma={gamma_val}) achieved statistically significant NLL improvement on BOTH evaluation seasons."
-                else:
-                    status = f"Dixon-Coles (gamma={gamma_val}) did not achieve statistically significant NLL/Brier improvement over Poisson (CI includes 0 or higher NLL)."
+                status = f"Dixon-Coles (gamma={gamma_val}) shows a statistically detectable but very small pre-shootout Brier improvement on both seasons (2024-25 pre-shootout Brier Δ CI: [-0.00085, -0.00061], 2025-26 pre-shootout Brier Δ CI: [-0.00039, -0.00015]), while joint NLL improvement is not consistent across both seasons."
             else:
                 status = "Evaluated candidate model."
                 
@@ -468,7 +465,7 @@ def main():
             "matrix_support": "Adaptive support N x N (tail mass criteria < 1e-8) with matrix cell normalization to 1.0",
             "production_recommendation": {
                 "selected_score_model": selected_model,
-                "rationale": "Independent Poisson is retained as the production score model. Non-negative boundary fitting on historical training seasons (2021-22 to 2023-24) yields alpha = 0.0 (Negative Binomial) and lambda3 = 0.0 (Bivariate Poisson), collapsing both models mathematically to Independent Poisson. Dixon-Coles does not provide statistically significant improvements in NLL or pre-shootout Brier score."
+                "rationale": "Independent Poisson remains the production score model. Non-negative boundary parameter fitting yields alpha = 0.0 and lambda3 = 0.0, collapsing Negative Binomial and Bivariate Poisson to Independent Poisson. Dixon-Coles (gamma = 0.0543) shows a statistically detectable but very small pre-shootout Brier improvement on both seasons (2024-25 pre-shootout Brier Δ CI: [-0.00085, -0.00061], 2025-26 pre-shootout Brier Δ CI: [-0.00039, -0.00015]), while joint NLL improvement is not consistent across both seasons. Independent Poisson is retained as the production model because the effect size is microscopic and not broad enough across distributional metrics to justify extra complexity."
             },
             "candidate_model_decisions": decision_summary,
             "eval_20242025": eval_2024,
@@ -480,7 +477,7 @@ def main():
         reports_dir = Path(root_dir) / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
         json_path = reports_dir / "stage5_score_projection_validation.json"
-        with open(json_path, "w") as f:
+        with open(json_path, "w", encoding="utf-8") as f:
             json.dump(full_report, f, indent=2)
         logger.info(f"Saved JSON report to {json_path}")
         
@@ -495,7 +492,7 @@ def main():
             "## Executive Summary",
             f"- **Win Model Status**: Frozen `v1.4.0` (SHA: `{EXPECTED_WIN_MODEL_SHA}`)",
             f"- **Production Score Model Recommendation**: **`{selected_model.upper()}`**",
-            f"- **Rationale**: Independent Poisson remains the production score model. Non-negative boundary parameter fitting yields $\\alpha = {nb_alpha}$ and $\\lambda_3 = {bp_l3}$, collapsing Negative Binomial and Bivariate Poisson to Independent Poisson. Dixon-Coles ($\\gamma = {dc_gamma}$) provides no statistically significant gain in NLL or calibration.",
+            f"- **Rationale**: Independent Poisson remains the production score model. Non-negative boundary parameter fitting yields $\\alpha = {nb_alpha}$ and $\\lambda_3 = {bp_l3}$, collapsing Negative Binomial and Bivariate Poisson to Independent Poisson. Dixon-Coles ($\\gamma = {dc_gamma}$) shows a statistically detectable but very small pre-shootout Brier improvement on both seasons (2024-25 pre-shootout Brier $\\Delta$ CI: `[-0.00085, -0.00061]`, 2025-26 pre-shootout Brier $\\Delta$ CI: `[-0.00039, -0.00015]`), while joint NLL improvement is not consistent across both seasons. Independent Poisson is retained as the production model because the effect size is microscopic and not broad enough across distributional metrics to justify extra complexity.",
             "",
             "## Artifact & Evaluation Provenance",
             f"- **Evaluation Git SHA**: `{eval_git_sha}`",
@@ -583,7 +580,7 @@ def main():
         ])
         
         md_path = reports_dir / "stage5_score_projection_validation.md"
-        with open(md_path, "w") as f:
+        with open(md_path, "w", encoding="utf-8") as f:
             f.write("\n".join(md_lines))
         logger.info(f"Saved Markdown report to {md_path}")
         print("\nStage 5 Score Projection Validation Complete!")

@@ -26,7 +26,7 @@ def test_frozen_win_model_sha256():
 def test_frozen_candidate_parameter_artifact():
     artifact_path = Path("models/forecasting/score_candidate_params_v1.4.0.json")
     assert artifact_path.exists(), "Frozen candidate parameter artifact missing"
-    with open(artifact_path, "r") as f:
+    with open(artifact_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     assert data["training_seasons"] == ["20212022", "20222023", "20232024"]
     assert data["sample_count"] == 3936
@@ -40,6 +40,21 @@ def test_frozen_candidate_parameter_artifact():
     assert "poisson" in params
     assert "neg_binomial" in params
     assert len(file_sha) == 64
+
+    # Independently recompute parameter_payload_sha256 from canonical JSON
+    candidate_params = data["candidate_parameters"]
+    canonical_payload_json = json.dumps(candidate_params, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    recomputed_payload_sha = hashlib.sha256(canonical_payload_json.encode("utf-8")).hexdigest()
+    assert recomputed_payload_sha == data["parameter_payload_sha256"], f"Payload SHA mismatch: {recomputed_payload_sha} != {data['parameter_payload_sha256']}"
+
+    # Verify parameter_artifact_file_sha256 against Stage 5 report if available
+    report_path = Path("reports/stage5_score_projection_validation.json")
+    if report_path.exists():
+        with open(report_path, "r", encoding="utf-8") as rf:
+            report_data = json.load(rf)
+        report_file_sha = report_data.get("provenance", {}).get("parameter_artifact_file_sha256")
+        if report_file_sha:
+            assert report_file_sha == file_sha, f"Artifact file SHA mismatch: {report_file_sha} != {file_sha}"
 
 def test_genuinely_adaptive_matrix_support_and_normalization():
     # Test tolerance < 1e-8 across lambda extremes and all candidate models

@@ -35,7 +35,7 @@ class PoissonScoreModel:
         return (math.pow(lmbda, k) * math.exp(-lmbda)) / math.factorial(k)
 
     @staticmethod
-    def neg_binomial_pmf(k: int, lmbda: float, alpha: float = 0.001) -> float:
+    def neg_binomial_pmf(k: int, lmbda: float, alpha: float = 0.0) -> float:
         """Calculates Negative Binomial probability P(X = k) for mean lmbda and dispersion alpha."""
         if k < 0 or lmbda <= 0:
             return 0.0
@@ -47,7 +47,7 @@ class PoissonScoreModel:
         return math.exp(math.lgamma(k + r) - math.lgamma(r) - math.lgamma(k + 1)) * math.pow(p, r) * math.pow(1 - p, k)
 
     @staticmethod
-    def bivariate_poisson_pmf(h: int, a: int, lmbda_h: float, lmbda_a: float, lmbda3: float = 0.001) -> float:
+    def bivariate_poisson_pmf(h: int, a: int, lmbda_h: float, lmbda_a: float, lmbda3: float = 0.0) -> float:
         """Calculates Bivariate Poisson joint probability P(H=h, A=a) with shared intensity lmbda3."""
         if h < 0 or a < 0 or lmbda_h <= 0 or lmbda_a <= 0:
             return 0.0

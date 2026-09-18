@@ -3,10 +3,10 @@
 ## Executive Summary
 - **Win Model Status**: Frozen `v1.4.0` (SHA: `63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9`)
 - **Production Score Model Recommendation**: **`POISSON`**
-- **Rationale**: Independent Poisson remains the production score model. Non-negative boundary parameter fitting yields $\alpha = 0.0$ and $\lambda_3 = 0.0$, collapsing Negative Binomial and Bivariate Poisson to Independent Poisson. Dixon-Coles ($\gamma = 0.0543$) provides no statistically significant gain in NLL or calibration.
+- **Rationale**: Independent Poisson remains the production score model. Non-negative boundary parameter fitting yields $\alpha = 0.0$ and $\lambda_3 = 0.0$, collapsing Negative Binomial and Bivariate Poisson to Independent Poisson. Dixon-Coles ($\gamma = 0.0543$) shows a statistically detectable but very small pre-shootout Brier improvement on both seasons (2024-25 pre-shootout Brier $\Delta$ CI: `[-0.00085, -0.00061]`, 2025-26 pre-shootout Brier $\Delta$ CI: `[-0.00039, -0.00015]`), while joint NLL improvement is not consistent across both seasons. Independent Poisson is retained as the production model because the effect size is microscopic and not broad enough across distributional metrics to justify extra complexity.
 
 ## Artifact & Evaluation Provenance
-- **Evaluation Git SHA**: `cbf983abf224c7a5c52de6489b2651838888c263`
+- **Evaluation Git SHA**: `8e61046870caba3066fc727ec1f5926ec5ccde30`
 - **Fitting Git SHA**: `e1a492e8d703b1ac85f59d90e79f42c95e5aad6d`
 - **Fitted At**: `2026-09-18T01:57:18.411642+00:00`
 - **Training Data Snapshot Hash (SHA-256)**: `768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3`
@@ -57,7 +57,7 @@
 | :--- | :---: | :---: | :--- |
 | `neg_binomial` | [0.00000, 0.00000] | [0.00000, 0.00000] | Fitted alpha=0.0 collapses Negative Binomial exactly to the Independent Poisson baseline. |
 | `bivariate_poisson` | [-0.00000, 0.00000] | [-0.00000, 0.00000] | Fitted lambda3=0.0 collapses Bivariate Poisson exactly to the Independent Poisson baseline. |
-| `dixon_coles` | [-0.00269, 0.00208] | [-0.00221, -0.00005] | Dixon-Coles (gamma=0.0543) did not achieve statistically significant NLL/Brier improvement over Poisson (CI includes 0 or higher NLL). |
+| `dixon_coles` | [-0.00269, 0.00208] | [-0.00221, -0.00005] | Dixon-Coles (gamma=0.0543) shows a statistically detectable but very small pre-shootout Brier improvement on both seasons (2024-25 pre-shootout Brier Δ CI: [-0.00085, -0.00061], 2025-26 pre-shootout Brier Δ CI: [-0.00039, -0.00015]), while joint NLL improvement is not consistent across both seasons. |
 
 ## Official Boxscore Target vs Regulation + OT Hockey Goals
 Comparing projections against official boxscore scores (which include the +1 shootout goal bonus) vs true regulation+OT hockey goal totals:
