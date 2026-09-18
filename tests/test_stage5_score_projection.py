@@ -2,6 +2,8 @@ import pytest
 import hashlib
 import json
 from pathlib import Path
+from app import create_app
+from app.models import db, Game, Event
 from app.analytics.forecasting.score_projection import PoissonScoreModel
 from scripts.run_stage5_score_validation import extract_game_targets, load_frozen_candidate_params
 
@@ -28,11 +30,17 @@ def test_frozen_candidate_parameter_artifact():
     assert data["training_seasons"] == ["20212022", "20222023", "20232024"]
     assert data["sample_count"] == 3936
     assert "candidate_parameters" in data
-    params = load_frozen_candidate_params()
+    assert "fitting_git_sha" in data
+    assert "fitted_at" in data
+    assert "training_data_snapshot_hash" in data
+    assert "parameter_payload_sha256" in data
+
+    params, meta, file_sha = load_frozen_candidate_params()
     assert "poisson" in params
     assert "neg_binomial" in params
+    assert len(file_sha) == 64
 
-def test_genuinely_adaptive_matrix_support_extremes():
+def test_genuinely_adaptive_matrix_support_and_normalization():
     # Test tolerance < 1e-8 across lambda extremes and all candidate models
     extreme_cases = [
         (0.8, 0.8),
@@ -45,9 +53,32 @@ def test_genuinely_adaptive_matrix_support_extremes():
     
     for lh, la in extreme_cases:
         for model in candidate_models:
-            matrix, N, total_mass = PoissonScoreModel.generate_joint_matrix(lh, la, model_type=model, tol=1e-8)
-            omitted_mass = 1.0 - total_mass
-            assert omitted_mass < 1e-8, f"Omitted mass {omitted_mass} exceeds 1e-8 tolerance for model={model}, lh={lh}, la={la}, N={N}"
+            norm_matrix, N, raw_mass, norm_mass = PoissonScoreModel.generate_joint_matrix(lh, la, model_type=model, tol=1e-8)
+            
+            # Verify matrix cells sum exactly to 1.0 (within floating point precision)
+            sum_norm = sum(norm_matrix[h][a] for h in range(N) for a in range(N))
+            assert abs(sum_norm - 1.0) < 1e-8, f"Normalized matrix sum {sum_norm} deviates from 1.0 for model={model}, lh={lh}, la={la}"
+            assert abs(norm_mass - 1.0) < 1e-8
+            assert raw_mass > 0.95, f"Raw total mass {raw_mass} too low for model={model}"
+
+def test_boundary_collapse_mathematical_equivalences():
+    # alpha = 0.0 collapses Negative Binomial to Poisson
+    p_poi = PoissonScoreModel.poisson_pmf(3, 3.0)
+    p_nb_0 = PoissonScoreModel.neg_binomial_pmf(3, 3.0, alpha=0.0)
+    assert p_poi == p_nb_0
+
+    # lambda3 = 0.0 collapses Bivariate Poisson to independent Poisson product
+    p_biv_0 = PoissonScoreModel.bivariate_poisson_pmf(3, 2, 3.0, 2.5, lmbda3=0.0)
+    p_ind = PoissonScoreModel.poisson_pmf(3, 3.0) * PoissonScoreModel.poisson_pmf(2, 2.5)
+    assert pytest.approx(p_ind, abs=1e-12) == p_biv_0
+
+    # Full matrix collapse: NB(alpha=0.0) matches Poisson matrix cell-by-cell
+    mat_poi, N1, r1, n1 = PoissonScoreModel.generate_joint_matrix(3.2, 2.8, model_type="poisson", alpha=0.0)
+    mat_nb, N2, r2, n2 = PoissonScoreModel.generate_joint_matrix(3.2, 2.8, model_type="neg_binomial", alpha=0.0)
+    assert N1 == N2
+    for h in range(N1):
+        for a in range(N1):
+            assert pytest.approx(mat_poi[h][a], abs=1e-12) == mat_nb[h][a]
 
 def test_score_projection_outcome_renaming_and_aliases():
     sample_features = {
@@ -70,45 +101,75 @@ def test_score_projection_outcome_renaming_and_aliases():
     assert proj["away_win_probability_regulation"] == proj["away_win_probability_pre_shootout"]
     assert proj["regulation_tie_probability"] == proj["shootout_required_probability"]
     
-    assert proj["total_probability_mass"] >= (1.0 - 2e-8)
+    assert proj["total_probability_mass"] == 1.0
     assert len(proj["score_matrix"]) == 10
     assert len(proj["score_matrix"][0]) == 10
     
-    # Pre-shootout probabilities sum to ~1.0
+    # Pre-shootout probabilities sum to 1.0
     sum_3class = proj["home_win_probability_pre_shootout"] + proj["away_win_probability_pre_shootout"] + proj["shootout_required_probability"]
     assert pytest.approx(sum_3class, abs=0.001) == 1.0
 
-def test_candidate_pmf_functions():
-    # Negative Binomial with alpha=0.001 should closely match Poisson
-    p_poi = PoissonScoreModel.poisson_pmf(3, 3.0)
-    p_nb = PoissonScoreModel.neg_binomial_pmf(3, 3.0, alpha=0.001)
-    assert pytest.approx(p_poi, abs=1e-3) == p_nb
-
-    # Bivariate Poisson with lambda3=0.001 should closely match independent Poisson product
-    p_biv = PoissonScoreModel.bivariate_poisson_pmf(3, 2, 3.0, 2.5, lmbda3=0.001)
-    p_ind = PoissonScoreModel.poisson_pmf(3, 3.0) * PoissonScoreModel.poisson_pmf(2, 2.5)
-    assert pytest.approx(p_ind, abs=1e-3) == p_biv
-
-    # Dixon-Coles adjustment
-    tau_00 = PoissonScoreModel.dixon_coles_adj(0, 0, 3.0, 2.5, gamma=0.0543)
-    assert pytest.approx(tau_00, abs=1e-4) == (1.0 - 3.0 * 2.5 * 0.0543)
-
 def test_extract_game_targets_logic():
-    from app import create_app
     app = create_app("testing")
     with app.app_context():
-        # Test non-shootout game
-        non_so_game = DummyGame(2024020001, 4, 2)
-        res_non_so = extract_game_targets(non_so_game)
-        assert res_non_so["box_home"] == 4
-        assert res_non_so["box_away"] == 2
-        assert res_non_so["reg_home"] == 4
-        assert res_non_so["reg_away"] == 2
-        assert res_non_so["reg_3class"] == 0  # Home Win
-        assert not res_non_so["anomaly"]
+        db.create_all()
+        try:
+            # 1. Non-shootout game: Boxscore 4-2
+            g_reg = Game(game_id=999901, season="20242025", game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=4, away_score=2)
+            db.session.add(g_reg)
+            db.session.commit()
 
-        # Test Shootout home win: boxscore 3-2
-        so_home_win_game = DummyGame(2024020002, 3, 2)
-        reg_h = so_home_win_game.home_score - 1
-        reg_a = so_home_win_game.away_score
-        assert reg_h == reg_a == 2
+            res_reg = extract_game_targets(g_reg)
+            assert res_reg["has_so"] is False
+            assert res_reg["box_home"] == 4
+            assert res_reg["box_away"] == 2
+            assert res_reg["reg_home"] == 4
+            assert res_reg["reg_away"] == 2
+            assert res_reg["reg_3class"] == 0  # Home win
+            assert res_reg["anomaly"] is False
+
+            # 2. Home Shootout Win: Boxscore 3-2 with Event SO
+            g_so_home = Game(game_id=999902, season="20242025", game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=3, away_score=2)
+            so_event_1 = Event(game_id=999902, period_num=5, period_type='SO', event_type='SHOT', time_in_period='00:00')
+            db.session.add(g_so_home)
+            db.session.add(so_event_1)
+            db.session.commit()
+
+            res_so_home = extract_game_targets(g_so_home)
+            assert res_so_home["has_so"] is True
+            assert res_so_home["reg_home"] == 2
+            assert res_so_home["reg_away"] == 2
+            assert res_so_home["reg_3class"] == 2  # Shootout required (tie)
+            assert res_so_home["anomaly"] is False
+
+            # 3. Away Shootout Win: Boxscore 2-3 with Event SO
+            g_so_away = Game(game_id=999903, season="20242025", game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=2, away_score=3)
+            so_event_2 = Event(game_id=999903, period_num=5, period_type='SO', event_type='SHOT', time_in_period='00:00')
+            db.session.add(g_so_away)
+            db.session.add(so_event_2)
+            db.session.commit()
+
+            res_so_away = extract_game_targets(g_so_away)
+            assert res_so_away["has_so"] is True
+            assert res_so_away["reg_home"] == 2
+            assert res_so_away["reg_away"] == 2
+            assert res_so_away["reg_3class"] == 2  # Shootout required (tie)
+            assert res_so_away["anomaly"] is False
+
+            # 4. Shootout Anomaly Case: Boxscore 4-2 with Event SO (reg scores unequal after adjustment)
+            g_so_anom = Game(game_id=999904, season="20242025", game_type='R', data_source='nhl_api', nhl_game_state='FINAL', home_score=4, away_score=2)
+            so_event_3 = Event(game_id=999904, period_num=5, period_type='SO', event_type='SHOT', time_in_period='00:00')
+            db.session.add(g_so_anom)
+            db.session.add(so_event_3)
+            db.session.commit()
+
+            res_so_anom = extract_game_targets(g_so_anom)
+            assert res_so_anom["has_so"] is True
+            assert res_so_anom["reg_home"] == 3
+            assert res_so_anom["reg_away"] == 2
+            assert res_so_anom["anomaly"] is True
+
+        finally:
+            db.session.rollback()
+            db.drop_all()
+

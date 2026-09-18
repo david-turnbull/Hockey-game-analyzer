@@ -10,10 +10,21 @@ HOME_ATTACK_MULT = 1.08
 class PoissonScoreModel:
     """
     Poisson expected score projection model.
-    Generates joint score distribution matrices (0..9 x 0..9) for home and away goals.
+    Generates joint score distribution matrices for home and away goals.
     
     Mandatory Label:
     "projected hockey-goal score distribution (excluding shootout bonus)"
+    
+    Boundary Behavior:
+    - alpha == 0.0 collapses Negative Binomial to Independent Poisson.
+    - lambda3 == 0.0 collapses Bivariate Poisson to Independent Poisson.
+    
+    Feature Service Score Target Limitation (Win Model Freezing Constraint):
+    PregameFeatureService computes rolling 10-game goals for (l10_gf_per_game) and
+    goals against (l10_ga_per_game) using official boxscore scores (Game.home_score/away_score),
+    which include the +1 shootout winner goal bonus. Because the production win probability model
+    (v1.4.0, SHA 63cf3cec...) is strictly frozen and depends on PregameFeatureService,
+    PregameFeatureService is not modified in v1.4 to preserve win model compatibility.
     """
 
     @staticmethod
@@ -94,36 +105,49 @@ class PoissonScoreModel:
         return lmbda_home, lmbda_away
 
     @classmethod
-    def generate_joint_matrix(cls, lmbda_home: float, lmbda_away: float, model_type: str = "poisson", tol: float = 1e-8, max_support_cap: int = 50, **kwargs) -> Tuple[List[List[float]], int, float]:
+    def generate_joint_matrix(cls, lmbda_home: float, lmbda_away: float, model_type: str = "poisson", tol: float = 1e-8, max_support_cap: int = 50, **kwargs) -> Tuple[List[List[float]], int, float, float]:
         """
-        Generates N x N joint score probability matrix with genuinely adaptive support until omitted mass < tol.
-        Returns (matrix, support_size_N, total_retained_mass).
+        Generates N x N joint score probability matrix with adaptive support selection and probability normalization.
+        
+        Step 1: Determine support size N adaptively based on tail probability criteria (omitted tail mass < tol).
+        Step 2: Generate raw N x N cell probabilities and calculate raw_total_mass.
+        Step 3: Normalize all matrix cells so cell probabilities sum to 1.0 (normalized_total_mass = 1.0).
+        
+        Returns (normalized_matrix, support_size_N, raw_total_mass, normalized_total_mass).
         """
         N = 10
-        # Determine N adaptively by checking marginal PMF sums
+        # Step 1: Support selection based on tail probability
         while N <= max_support_cap:
             if model_type == "neg_binomial":
-                alpha = kwargs.get("alpha", 0.001)
+                alpha = kwargs.get("alpha", 0.0)
                 cdf_h = sum(cls.neg_binomial_pmf(h, lmbda_home, alpha) for h in range(N))
                 cdf_a = sum(cls.neg_binomial_pmf(a, lmbda_away, alpha) for a in range(N))
-            else:
+                omitted_tail = 1.0 - (cdf_h * cdf_a)
+            elif model_type == "bivariate_poisson":
+                lambda3 = kwargs.get("lambda3", 0.0)
+                # Compute accumulated joint mass for candidate support N
+                accum_mass = sum(cls.bivariate_poisson_pmf(h, a, lmbda_home, lmbda_away, lambda3) for h in range(N) for a in range(N))
+                omitted_tail = 1.0 - accum_mass
+            else:  # default poisson, dixon_coles
                 cdf_h = sum(cls.poisson_pmf(h, lmbda_home) for h in range(N))
                 cdf_a = sum(cls.poisson_pmf(a, lmbda_away) for a in range(N))
+                omitted_tail = 1.0 - (cdf_h * cdf_a)
 
-            if (1.0 - (cdf_h * cdf_a)) < tol or N >= max_support_cap:
+            if omitted_tail < tol or N >= max_support_cap:
                 break
             N += 1
 
-        matrix = []
-        total_prob = 0.0
+        # Step 2: Generate raw matrix cell probabilities
+        raw_matrix = []
+        raw_total_mass = 0.0
         for h in range(N):
             row = []
             for a in range(N):
                 if model_type == "neg_binomial":
-                    alpha = kwargs.get("alpha", 0.001)
+                    alpha = kwargs.get("alpha", 0.0)
                     p_cell = cls.neg_binomial_pmf(h, lmbda_home, alpha) * cls.neg_binomial_pmf(a, lmbda_away, alpha)
                 elif model_type == "bivariate_poisson":
-                    lambda3 = kwargs.get("lambda3", 0.001)
+                    lambda3 = kwargs.get("lambda3", 0.0)
                     p_cell = cls.bivariate_poisson_pmf(h, a, lmbda_home, lmbda_away, lambda3)
                 elif model_type == "dixon_coles":
                     gamma = kwargs.get("gamma", 0.0543)
@@ -132,18 +156,30 @@ class PoissonScoreModel:
                 else:  # default poisson
                     p_cell = cls.poisson_pmf(h, lmbda_home) * cls.poisson_pmf(a, lmbda_away)
                 row.append(p_cell)
-                total_prob += p_cell
-            matrix.append(row)
+                raw_total_mass += p_cell
+            raw_matrix.append(row)
 
-        return matrix, N, total_prob
+        # Step 3: Normalize cell probabilities so joint sum equals 1.0
+        norm_matrix = []
+        normalized_total_mass = 0.0
+        scale = (1.0 / raw_total_mass) if raw_total_mass > 0 else 1.0
+        for h in range(N):
+            row_norm = []
+            for a in range(N):
+                cell_norm = raw_matrix[h][a] * scale
+                row_norm.append(cell_norm)
+                normalized_total_mass += cell_norm
+            norm_matrix.append(row_norm)
+
+        return norm_matrix, N, raw_total_mass, normalized_total_mass
 
     @classmethod
     def project_score_distribution(cls, pregame_features: Dict[str, Any], display_max_goals: int = 10, model_type: str = "poisson", tol: float = 1e-8, **kwargs) -> Dict[str, Any]:
         """
-        Generates score probability matrix and pre-shootout outcome probabilities using genuinely adaptive support (omitted mass < tol).
+        Generates score probability matrix and pre-shootout outcome probabilities using adaptive support and normalized probability matrix.
         """
         lmbda_home, lmbda_away = cls.calculate_expected_goals(pregame_features)
-        raw_matrix, support_N, total_prob = cls.generate_joint_matrix(lmbda_home, lmbda_away, model_type=model_type, tol=tol, **kwargs)
+        norm_matrix, support_N, raw_total_mass, norm_total_mass = cls.generate_joint_matrix(lmbda_home, lmbda_away, model_type=model_type, tol=tol, **kwargs)
 
         home_win_prob = 0.0
         away_win_prob = 0.0
@@ -154,11 +190,11 @@ class PoissonScoreModel:
             if h < display_max_goals:
                 row_disp = []
                 for a in range(display_max_goals):
-                    row_disp.append(round(raw_matrix[h][a], 5))
+                    row_disp.append(round(norm_matrix[h][a], 5))
                 display_matrix.append(row_disp)
 
             for a in range(support_N):
-                p_cell = raw_matrix[h][a]
+                p_cell = norm_matrix[h][a]
                 if h > a:
                     home_win_prob += p_cell
                 elif a > h:
@@ -176,7 +212,7 @@ class PoissonScoreModel:
             for h in range(support_N):
                 for a in range(support_N):
                     tot = h + a
-                    p_cell = raw_matrix[h][a]
+                    p_cell = norm_matrix[h][a]
                     if tot > total_line:
                         prob_over += p_cell
                     elif tot < total_line:
@@ -198,7 +234,7 @@ class PoissonScoreModel:
                     "score": f"{h}-{a}",
                     "home_goals": h,
                     "away_goals": a,
-                    "probability": round(raw_matrix[h][a], 4)
+                    "probability": round(norm_matrix[h][a], 4)
                 })
 
         scorelines.sort(key=lambda x: x["probability"], reverse=True)
@@ -217,7 +253,8 @@ class PoissonScoreModel:
             "away_win_probability_regulation": round(away_win_prob, 4),
             "regulation_tie_probability": round(tie_prob, 4),
             "adaptive_support_N": support_N,
-            "total_probability_mass": round(total_prob, 8),
+            "raw_total_mass": round(raw_total_mass, 8),
+            "total_probability_mass": round(norm_total_mass, 8),
             "score_matrix": display_matrix,
             "top_scorelines": top_scorelines,
             "totals_projections": over_under

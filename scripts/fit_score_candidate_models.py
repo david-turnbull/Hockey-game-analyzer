@@ -24,6 +24,7 @@ import datetime
 import subprocess
 import logging
 import numpy as np
+from typing import Dict, List, Any, Tuple
 from pathlib import Path
 from scipy.optimize import minimize
 
@@ -40,6 +41,12 @@ logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(m
 logger = logging.getLogger(__name__)
 
 TRAIN_SEASONS = ["20212022", "20222023", "20232024"]
+
+import hashlib
+
+def canonical_json_sha256(payload: Any) -> str:
+    s = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 def get_git_sha() -> str:
     try:
@@ -87,6 +94,7 @@ def fit_candidate_parameters():
         pred_h = []
         pred_a = []
 
+        training_records = []
         for g in games:
             feats = PregameFeatureService.get_pregame_features(g)
             lh, la = PoissonScoreModel.calculate_expected_goals(feats)
@@ -97,6 +105,21 @@ def fit_candidate_parameters():
             pred_h.append(lh)
             pred_a.append(la)
 
+            training_records.append({
+                "game_id": g.game_id,
+                "season": g.season,
+                "game_date": str(g.game_date),
+                "home_team_id": g.home_team_id,
+                "away_team_id": g.away_team_id,
+                "reg_home_goals": int(rh),
+                "reg_away_goals": int(ra),
+                "expected_home_goals": round(float(lh), 4),
+                "expected_away_goals": round(float(la), 4)
+            })
+
+        training_records.sort(key=lambda x: (x["game_date"], x["game_id"]))
+        training_data_snapshot_hash = canonical_json_sha256(training_records)
+
         ah = np.array(actual_h)
         aa = np.array(actual_a)
         ph = np.array(pred_h)
@@ -106,13 +129,15 @@ def fit_candidate_parameters():
         disp_h = (np.var(ah) - np.mean(ah)) / (np.mean(ah) ** 2)
         disp_a = (np.var(aa) - np.mean(aa)) / (np.mean(aa) ** 2)
         alpha_raw = float((disp_h + disp_a) / 2.0)
-        # Hockey goal counts exhibit slight under-dispersion (Var < Mean), so alpha is floored at 0.001
-        alpha_est = max(0.001, round(alpha_raw, 4))
+        # Goal counts in regular season hockey exhibit slight under-dispersion (Var < Mean).
+        # Alpha is fitted on non-negative boundary alpha >= 0.0 (alpha=0 collapses to Poisson).
+        alpha_est = max(0.0, round(alpha_raw, 4))
         logger.info(f"Estimated Negative Binomial alpha: {alpha_est} (raw: {alpha_raw:.4f})")
 
         # 2. Bivariate Poisson lambda3 (residual goal covariance Cov(e_h, e_a))
         cov_res = float(np.cov(ah - ph, aa - pa)[0, 1])
-        lambda3_est = max(0.001, round(cov_res, 4))
+        # Lambda3 is fitted on non-negative boundary lambda3 >= 0.0 (lambda3=0 collapses to Independent Poisson).
+        lambda3_est = max(0.0, round(cov_res, 4))
         logger.info(f"Estimated Bivariate Poisson lambda3: {lambda3_est} (raw covariance: {cov_res:.4f})")
 
         # 3. Dixon-Coles gamma (minimizing NLL on low-score tie adjustments)
@@ -129,11 +154,21 @@ def fit_candidate_parameters():
         gamma_est = round(float(res.x[0]), 4)
         logger.info(f"Estimated Dixon-Coles gamma: {gamma_est}")
 
+        candidate_parameters = {
+            "poisson": {},
+            "neg_binomial": {"alpha": alpha_est},
+            "bivariate_poisson": {"lambda3": lambda3_est},
+            "dixon_coles": {"gamma": gamma_est}
+        }
+        parameter_payload_sha256 = canonical_json_sha256(candidate_parameters)
+
         artifact = {
             "model_version": "v1.4.0",
             "artifact_type": "score_candidate_frozen_parameters",
-            "git_sha": get_git_sha(),
-            "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "fitting_git_sha": get_git_sha(),
+            "fitted_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "training_data_snapshot_hash": training_data_snapshot_hash,
+            "parameter_payload_sha256": parameter_payload_sha256,
             "training_seasons": TRAIN_SEASONS,
             "sample_count": sample_count,
             "filters": {
@@ -143,16 +178,11 @@ def fit_candidate_parameters():
             },
             "fitting_methodology": {
                 "poisson": "Baseline expected goals (lh, la) from PregameFeatureService",
-                "neg_binomial": "Method of moments over-dispersion ratio alpha = max(0.001, (Var - Mean) / Mean^2)",
-                "bivariate_poisson": "Residual goal covariance lambda3 = max(0.001, Cov(e_h, e_a))",
+                "neg_binomial": "Method of moments over-dispersion ratio alpha = max(0.0, (Var - Mean) / Mean^2)",
+                "bivariate_poisson": "Residual goal covariance lambda3 = max(0.0, Cov(e_h, e_a))",
                 "dixon_coles": "Maximum likelihood estimation minimizing NLL for low-score tie multiplier tau(h, a; gamma)"
             },
-            "candidate_parameters": {
-                "poisson": {},
-                "neg_binomial": {"alpha": alpha_est},
-                "bivariate_poisson": {"lambda3": lambda3_est},
-                "dixon_coles": {"gamma": gamma_est}
-            }
+            "candidate_parameters": candidate_parameters
         }
 
         output_dir = Path(root_dir) / "models" / "forecasting"
