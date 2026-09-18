@@ -1,8 +1,10 @@
 {
   "model_version": "v1.4.0",
   "artifact_type": "score_candidate_frozen_parameters",
-  "git_sha": "1f9ec859b3816d8a4626d770a09c4427aed5126d",
-  "timestamp_utc": "2026-09-18T01:28:43.625310+00:00",
+  "fitting_git_sha": "8cb010429ad6e18f2b4afc3fcb37a68eb6b55a44",
+  "fitted_at": "2026-09-18T01:52:51.329638+00:00",
+  "training_data_snapshot_hash": "768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3",
+  "parameter_payload_sha256": "c1587ea4d9e0fb6c586dd37c8d918cc8338b5488f03945ebbd40f89fa5c28c32",
   "training_seasons": [
     "20212022",
     "20222023",
@@ -20,17 +22,17 @@
   },
   "fitting_methodology": {
     "poisson": "Baseline expected goals (lh, la) from PregameFeatureService",
-    "neg_binomial": "Method of moments over-dispersion ratio alpha = max(0.001, (Var - Mean) / Mean^2)",
-    "bivariate_poisson": "Residual goal covariance lambda3 = max(0.001, Cov(e_h, e_a))",
+    "neg_binomial": "Method of moments over-dispersion ratio alpha = max(0.0, (Var - Mean) / Mean^2)",
+    "bivariate_poisson": "Residual goal covariance lambda3 = max(0.0, Cov(e_h, e_a))",
     "dixon_coles": "Maximum likelihood estimation minimizing NLL for low-score tie multiplier tau(h, a; gamma)"
   },
   "candidate_parameters": {
     "poisson": {},
     "neg_binomial": {
-      "alpha": 0.001
+      "alpha": 0.0
     },
     "bivariate_poisson": {
-      "lambda3": 0.001
+      "lambda3": 0.0
     },
     "dixon_coles": {
       "gamma": 0.0543
