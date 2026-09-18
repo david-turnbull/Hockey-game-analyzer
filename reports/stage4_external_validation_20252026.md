@@ -1,10 +1,10 @@
 # Stage 4: 2025-26 External Season Validation Report
 
-**Evaluated At:** `2026-09-18T00:32:56.352687+00:00`  
-**Run UUID:** `8721f963-0789-4dbc-b0f2-9e9043fe1597`  
+**Evaluated At:** `2026-09-18T01:01:13.039288+00:00`  
+**Run UUID:** `a6debc82-ce3b-4eca-bf32-c2a557183e68`  
 **Model Version:** `v1.4.0`  
 **Model Training Git SHA:** `f38f7f90cec9774c05452bd53347bf8a06c05dc2`  
-**Evaluation Git SHA:** `9e23d640a26c172fe14dde8804cd69a1eea3470d`  
+**Evaluation Git SHA:** `6c0cee4ec20a9ad9d4d1a90727fba228b8cbbc9b`  
 **Artifact SHA-256:** `63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9`  
 **Feature Schema Version:** `v1`  
 **Data Audit Snapshot Hash:** `7e1e00ef63d03e613097833e3c73d21b36e951aebc49fd6a4dfcc9bead7a4608`  
@@ -25,16 +25,16 @@
 
 | Dataset / Model | Log Loss | Brier Score | Accuracy (%) | ECE |
 |---|---|---|---|---|
-| **2024-25 Frozen Holdout (Model)** | **0.6848** | **0.2431** | **57.55%** | **0.0315** |
+| **2024-25 Frozen Holdout (Model)** | **0.6843** | **0.2429** | **57.70%** | **0.0277** |
 | **2025-26 External Season (Model)** | **0.6910** | **0.2479** | **54.19%** | **0.0332** |
 | 2025-26 Continuous Elo Baseline | 0.6959 | 0.2510 | 53.20% | 0.0600 |
 | Naive 50/50 Baseline | 0.6931 | 0.2500 | 50.00% | 0.0000 |
 
 ## Generalization Delta Analysis (2025-26 vs 2024-25 Holdout)
 
-- **Δ Log Loss:** `+0.0062`
-- **Δ Brier Score:** `+0.0048`
-- **Δ Expected Calibration Error (ECE):** `+0.0017`
+- **Δ Log Loss:** `+0.0067`
+- **Δ Brier Score:** `+0.0050`
+- **Δ Expected Calibration Error (ECE):** `+0.0055`
 
 ## 10 Probability Calibration Bins (2025-26)
 
