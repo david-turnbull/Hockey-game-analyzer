@@ -6,12 +6,12 @@
 - **Rationale**: Independent Poisson remains the production score model. Non-negative boundary parameter fitting yields $\alpha = 0.0$ and $\lambda_3 = 0.0$, collapsing Negative Binomial and Bivariate Poisson to Independent Poisson. Dixon-Coles ($\gamma = 0.0543$) provides no statistically significant gain in NLL or calibration.
 
 ## Artifact & Evaluation Provenance
-- **Evaluation Git SHA**: `unknown`
-- **Fitting Git SHA**: `8cb010429ad6e18f2b4afc3fcb37a68eb6b55a44`
-- **Fitted At**: `2026-09-18T01:52:51.329638+00:00`
+- **Evaluation Git SHA**: `cbf983abf224c7a5c52de6489b2651838888c263`
+- **Fitting Git SHA**: `e1a492e8d703b1ac85f59d90e79f42c95e5aad6d`
+- **Fitted At**: `2026-09-18T01:57:18.411642+00:00`
 - **Training Data Snapshot Hash (SHA-256)**: `768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3`
 - **Parameter Payload Hash (SHA-256)**: `c1587ea4d9e0fb6c586dd37c8d918cc8338b5488f03945ebbd40f89fa5c28c32`
-- **Parameter Artifact File Hash (SHA-256)**: `367521c7883a26045899b0849f7f3a4f064dd9e6fd1bdf4be67248e7a4881960`
+- **Parameter Artifact File Hash (SHA-256)**: `28d4f5b31d3f2fd39d77f26e630323b9f7a7f1df383d62bf9809122dfe983447`
 
 ## Frozen Candidate Parameter Estimation (2021-22 to 2023-24 Training Set)
 - Loaded from frozen artifact `models/forecasting/score_candidate_params_v1.4.0.json` (3936 training games).

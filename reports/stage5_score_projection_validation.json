@@ -3,12 +3,12 @@
   "win_model_version": "v1.4.0",
   "win_model_sha256": "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9",
   "provenance": {
-    "evaluation_git_sha": "unknown",
-    "fitting_git_sha": "8cb010429ad6e18f2b4afc3fcb37a68eb6b55a44",
-    "fitted_at": "2026-09-18T01:52:51.329638+00:00",
+    "evaluation_git_sha": "cbf983abf224c7a5c52de6489b2651838888c263",
+    "fitting_git_sha": "e1a492e8d703b1ac85f59d90e79f42c95e5aad6d",
+    "fitted_at": "2026-09-18T01:57:18.411642+00:00",
     "training_data_snapshot_hash": "768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3",
     "parameter_payload_sha256": "c1587ea4d9e0fb6c586dd37c8d918cc8338b5488f03945ebbd40f89fa5c28c32",
-    "parameter_artifact_file_sha256": "367521c7883a26045899b0849f7f3a4f064dd9e6fd1bdf4be67248e7a4881960"
+    "parameter_artifact_file_sha256": "28d4f5b31d3f2fd39d77f26e630323b9f7a7f1df383d62bf9809122dfe983447"
   },
   "candidate_frozen_parameters": {
     "poisson": {},
