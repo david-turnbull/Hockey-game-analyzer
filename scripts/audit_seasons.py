@@ -335,19 +335,19 @@ def audit_stage4_external_season_gate(season: str = '20252026', app=None) -> Tup
         hasher = hashlib.sha256()
         hasher.update(season.encode('utf-8'))
         for g in all_games:
-            entry = f"{g.game_id}:{g.nhl_game_state}:{g.data_source}:{g.home_score}:{g.away_score}:{g.start_time_utc.isoformat() if g.start_time_utc else ''}"
+            st_str = g.start_time_utc.isoformat() if hasattr(g.start_time_utc, 'isoformat') else str(g.start_time_utc or '')
+            entry = f"{g.game_id}:{g.nhl_game_state}:{g.data_source}:{g.home_score}:{g.away_score}:{st_str}"
             hasher.update(entry.encode('utf-8'))
         snapshot_hash = hasher.hexdigest()
 
-        expected_season_games = 1230 if season == '20252026' else EXPECTED_GAMES_PER_SEASON
 
-        # Gate Rules
-        if actual_games_count != expected_season_games:
-            gate_reasons.append(f"Season {season} actual game count mismatch: {actual_games_count}/{expected_season_games}")
-        if completed_count != expected_season_games:
-            gate_reasons.append(f"Season {season} incomplete games count: {completed_count}/{expected_season_games} completed")
-        if nhl_api_count != expected_season_games:
-            gate_reasons.append(f"Season {season} data_source!='nhl_api' count: {nhl_api_count}/{expected_season_games}")
+        # Gate Rules - Enforce EXPECTED_GAMES_PER_SEASON == 1312 for all target seasons
+        if actual_games_count != EXPECTED_GAMES_PER_SEASON:
+            gate_reasons.append(f"Season {season} actual game count mismatch: {actual_games_count}/{EXPECTED_GAMES_PER_SEASON}")
+        if completed_count != EXPECTED_GAMES_PER_SEASON:
+            gate_reasons.append(f"Season {season} incomplete games count: {completed_count}/{EXPECTED_GAMES_PER_SEASON} completed")
+        if nhl_api_count != EXPECTED_GAMES_PER_SEASON:
+            gate_reasons.append(f"Season {season} data_source!='nhl_api' count: {nhl_api_count}/{EXPECTED_GAMES_PER_SEASON}")
         if synthetic_count > 0:
             gate_reasons.append(f"Season {season} contains {synthetic_count} synthetic test games")
         if unknown_prov_count > 0:
@@ -365,6 +365,7 @@ def audit_stage4_external_season_gate(season: str = '20252026', app=None) -> Tup
 
         passed = (len(gate_reasons) == 0)
         return passed, gate_reasons, snapshot_hash
+
 
 
 def audit_seasons():

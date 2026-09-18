@@ -387,11 +387,12 @@ class PipelineOrchestrator:
             game_state = game.get("gameState")
 
             # Safeguard for partial/incomplete seasons: skip non-final games
-            if game_state not in ['OFF', 'FINAL']:
+            if game_state not in ['OFF', 'FINAL', 'OVER']:
                 logger.info(f"Skipping game {game_id} because state is {game_state} (not final).")
                 skipped_games += 1
                 game_summaries[game_id] = {"error": f"Game state is {game_state} (not final)", "skipped": True}
                 continue
+
 
             was_cached = self.api_client.is_game_cached(game_id)
             success, summary = self.ingest_game(game_id, force_refresh=force_refresh)

@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from app.analytics.forecasting.backtest_engine import BacktestEngine
 from scripts.audit_seasons import audit_stage4_external_season_gate
+from data_pipeline.orchestrator import PipelineOrchestrator
 
 def test_stage4_data_gate_missing_games(app):
     """Stage 4 data gate must fail closed if games are missing or incomplete."""
@@ -11,6 +12,56 @@ def test_stage4_data_gate_missing_games(app):
         assert any("game count mismatch" in r or "incomplete" in r for r in reasons)
         assert isinstance(snapshot_hash, str)
         assert len(snapshot_hash) == 64  # SHA-256 hex string
+
+def test_stage4_gate_fails_on_1230_games(app):
+    """Regression test proving a 1,230-game 2025-26 season explicitly fails the Stage 4 gate."""
+    mock_games = []
+    for i in range(1230):
+        g = MagicMock()
+        g.game_id = 2025020001 + i
+        g.season = '20252026'
+        g.game_type = 'R'
+        g.nhl_game_state = 'FINAL'
+        g.data_source = 'nhl_api'
+        g.start_time_utc = '2025-10-01T00:00:00Z'
+        g.home_score = 3
+        g.away_score = 2
+        mock_games.append(g)
+
+    with app.app_context(), \
+         patch("app.models.Game.query") as mock_query, \
+         patch("app.models.db.session.query") as mock_db_query:
+        
+        mock_query.filter.return_value.order_by.return_value.all.return_value = mock_games
+        # Mock coverage counts to 1230 games
+        mock_db_query.return_value.filter.return_value.group_by.return_value.all.return_value = [(g.game_id, 100) for g in mock_games]
+
+        passed, reasons, snapshot_hash = audit_stage4_external_season_gate('20252026')
+        assert passed is False
+        assert any("1230/1312" in r for r in reasons)
+
+def test_orchestrator_ingests_over_game_state(app):
+    """Unit test proving that a game with gameState 'OVER' is ingested rather than skipped."""
+    orchestrator = PipelineOrchestrator()
+    mock_schedule = {
+        "games": [
+            {
+                "id": 2025020999,
+                "gameType": 2,
+                "gameState": "OVER",
+                "gameDate": "2026-01-15"
+            }
+        ]
+    }
+    with patch.object(orchestrator.api_client, "get_season_schedule", return_value=mock_schedule), \
+         patch.object(orchestrator.api_client, "is_game_cached", return_value=True), \
+         patch.object(orchestrator, "ingest_game", return_value=(True, {"events_count": 10, "shots_count": 5, "shifts_count": 20, "player_ids": [1001]})):
+
+        results = orchestrator.ingest_season(season="20252026", all_teams=False, team_abbr="TOR")
+
+        assert results["games_requested"] == 1
+        assert results["games_skipped"] == 0
+        assert results["games_successfully_ingested"] == 1
 
 def test_stage4_data_gate_synthetic_contamination(app):
     """Stage 4 data gate must fail closed if synthetic data is present."""
