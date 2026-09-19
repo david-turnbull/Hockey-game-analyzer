@@ -6,7 +6,7 @@
 - **Rationale**: Independent Poisson remains the production score model. Non-negative boundary parameter fitting yields $\alpha = 0.0$ and $\lambda_3 = 0.0$, collapsing Negative Binomial and Bivariate Poisson to Independent Poisson. Dixon-Coles ($\gamma = 0.0543$) shows a statistically detectable but very small pre-shootout Brier improvement on both seasons (2024-25 pre-shootout Brier $\Delta$ CI: `[-0.00085, -0.00061]`, 2025-26 pre-shootout Brier $\Delta$ CI: `[-0.00039, -0.00015]`), while joint NLL improvement is not consistent across both seasons. Independent Poisson is retained as the production model because the effect size is microscopic and not broad enough across distributional metrics to justify extra complexity.
 
 ## Artifact & Evaluation Provenance
-- **Evaluation Git SHA**: `8e61046870caba3066fc727ec1f5926ec5ccde30`
+- **Evaluation Git SHA**: `8f14543d41d457c44006440441a0d66a3e108a9b`
 - **Fitting Git SHA**: `e1a492e8d703b1ac85f59d90e79f42c95e5aad6d`
 - **Fitted At**: `2026-09-18T01:57:18.411642+00:00`
 - **Training Data Snapshot Hash (SHA-256)**: `768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3`

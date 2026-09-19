@@ -3,7 +3,7 @@
   "win_model_version": "v1.4.0",
   "win_model_sha256": "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9",
   "provenance": {
-    "evaluation_git_sha": "8e61046870caba3066fc727ec1f5926ec5ccde30",
+    "evaluation_git_sha": "8f14543d41d457c44006440441a0d66a3e108a9b",
     "fitting_git_sha": "e1a492e8d703b1ac85f59d90e79f42c95e5aad6d",
     "fitted_at": "2026-09-18T01:57:18.411642+00:00",
     "training_data_snapshot_hash": "768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3",

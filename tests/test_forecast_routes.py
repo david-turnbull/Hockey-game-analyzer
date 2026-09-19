@@ -32,12 +32,12 @@ def app():
             data_source='nhl_api'
         )
 
-        # Game outside 48-hour horizon (72h out)
-        g_outside = Game(
-            game_id=2024020002,
+        # Game inside 48-hour horizon but past 24h (30h out)
+        g_30h = Game(
+            game_id=2024020030,
             season='20242025',
-            game_date=(now_utc + timedelta(hours=72)).date(),
-            start_time_utc=now_utc + timedelta(hours=72),
+            game_date=(now_utc + timedelta(hours=30)).date(),
+            start_time_utc=now_utc + timedelta(hours=30),
             game_type='R',
             home_team_id=1,
             away_team_id=2,
@@ -47,7 +47,22 @@ def app():
             data_source='nhl_api'
         )
 
-        db.session.add_all([g_inside, g_outside])
+        # Game specifically at +49h (outside 48-hour horizon)
+        g_49h = Game(
+            game_id=2024020049,
+            season='20242025',
+            game_date=(now_utc + timedelta(hours=49)).date(),
+            start_time_utc=now_utc + timedelta(hours=49),
+            game_type='R',
+            home_team_id=1,
+            away_team_id=2,
+            home_score=0,
+            away_score=0,
+            nhl_game_state='FUT',
+            data_source='nhl_api'
+        )
+
+        db.session.add_all([g_inside, g_30h, g_49h])
         db.session.commit()
 
         yield app
@@ -78,41 +93,67 @@ def test_forecast_api_game_prediction(app, client):
     assert "score_projection" in data
     assert data["is_official"] is True
 
-def test_forecast_api_upcoming_48h_horizon_and_metadata(client):
+def test_forecast_api_upcoming_48h_horizon_and_counts(app, client):
+    """Verifies metadata fields: count, available_count, missing_count, lookahead_hours, window timestamps."""
+    # Create prediction for g_inside (24h out)
+    with app.app_context():
+        ForecastService.create_prediction(2024020001, prediction_type='official_pregame')
+
     res = client.get('/api/v1/forecast/upcoming')
     assert res.status_code == 200
     data = res.get_json()
     assert data["lookahead_hours"] == 48
     assert "window_start_utc" in data
     assert "window_end_utc" in data
-    assert data["count"] == 1
-    assert data["available_count"] == 0
+    assert data["count"] == 2
+    assert data["available_count"] == 1
     assert data["missing_count"] == 1
 
     forecasts = data["forecasts"]
-    assert len(forecasts) == 1
-    assert forecasts[0]["game_id"] == 2024020001
-    assert forecasts[0]["prediction_status"] == "missing"
-    assert forecasts[0]["win_probability"] is None
-    assert forecasts[0]["score_projection"] is None
+    assert len(forecasts) == 2
+    
+    # 2024020001 is available
+    f_avail = next(f for f in forecasts if f["game_id"] == 2024020001)
+    assert f_avail["prediction_status"] == "available"
+    assert f_avail["win_probability"] is not None
 
-def test_games_inside_and_outside_horizon(client):
-    # Default 48h horizon returns only game 2024020001
+    # 2024020030 is missing
+    f_miss = next(f for f in forecasts if f["game_id"] == 2024020030)
+    assert f_miss["prediction_status"] == "missing"
+    assert f_miss["win_probability"] is None
+    assert f_miss["score_projection"] is None
+
+def test_games_inside_48h_included_and_49h_excluded(client):
+    """Proves game inside 48h is included while game at +49h is excluded under default horizon."""
     res_default = client.get('/api/v1/forecast/upcoming')
     assert res_default.status_code == 200
     data_def = res_default.get_json()
     game_ids_def = [f["game_id"] for f in data_def["forecasts"]]
     assert 2024020001 in game_ids_def
-    assert 2024020002 not in game_ids_def
+    assert 2024020030 in game_ids_def
+    assert 2024020049 not in game_ids_def
 
-    # Explicit 96h lookahead returns both games
-    res_custom = client.get('/api/v1/forecast/upcoming?lookahead_hours=96')
-    assert res_custom.status_code == 200
-    data_cust = res_custom.get_json()
-    assert data_cust["lookahead_hours"] == 96
-    game_ids_cust = [f["game_id"] for f in data_cust["forecasts"]]
-    assert 2024020001 in game_ids_cust
-    assert 2024020002 in game_ids_cust
+def test_explicit_lookahead_hours_override(client):
+    """Proves explicit lookahead_hours=24 overrides configured 48h default."""
+    # lookahead=24 includes 24h game, excludes 30h and 49h games
+    res_24 = client.get('/api/v1/forecast/upcoming?lookahead_hours=24')
+    assert res_24.status_code == 200
+    data_24 = res_24.get_json()
+    assert data_24["lookahead_hours"] == 24
+    game_ids_24 = [f["game_id"] for f in data_24["forecasts"]]
+    assert 2024020001 in game_ids_24
+    assert 2024020030 not in game_ids_24
+    assert 2024020049 not in game_ids_24
+
+    # lookahead=72 includes all three games
+    res_72 = client.get('/api/v1/forecast/upcoming?lookahead_hours=72')
+    assert res_72.status_code == 200
+    data_72 = res_72.get_json()
+    assert data_72["lookahead_hours"] == 72
+    game_ids_72 = [f["game_id"] for f in data_72["forecasts"]]
+    assert 2024020001 in game_ids_72
+    assert 2024020030 in game_ids_72
+    assert 2024020049 in game_ids_72
 
 def test_all_games_shown_without_default_limit_of_12(app, client):
     """Verifies that more than 12 games in the 48h window are all returned when no limit is supplied."""
@@ -137,12 +178,18 @@ def test_all_games_shown_without_default_limit_of_12(app, client):
         db.session.add_all(many_games)
         db.session.commit()
 
+    # Query without limit returns all 17 games in window (2 fixture + 15 new)
     res = client.get('/api/v1/forecast/upcoming')
     assert res.status_code == 200
     data = res.get_json()
-    # 1 game from fixture + 15 new games = 16 games inside 48h horizon
-    assert data["count"] >= 15
-    assert len(data["forecasts"]) >= 15
+    assert data["count"] == 17
+    assert len(data["forecasts"]) == 17
+
+    # Query with explicit limit=5 returns only 5 games
+    res_limit = client.get('/api/v1/forecast/upcoming?limit=5')
+    assert res_limit.status_code == 200
+    data_lim = res_limit.get_json()
+    assert len(data_lim["forecasts"]) == 5
 
 def test_forecast_ui_missing_prediction_pending_state(app, client):
     res = client.get('/forecast')
