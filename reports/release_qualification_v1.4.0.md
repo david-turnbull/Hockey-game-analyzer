@@ -9,13 +9,12 @@
 
 ## 1. System & Environment Runtime Verification
 
-* **Final Release Git SHA:** `2afde4ca8a19768e4377bb1dfd870076fa5defcd`
-* **Python Runtime:** `Python 3.12.10`
-* **scikit-learn Version:** `1.9.0`
-* **numpy Version:** `2.5.2`
+* **Qualification Implementation Commit SHA:** `2afde4ca8a19768e4377bb1dfd870076fa5defcd` *(Note: The final immutable release Git SHA and tag will be established externally upon tagging `v1.4.0`)*
+* **Authoritative Model-Training Runtime:** `Python 3.12.10` | `scikit-learn 1.9.0` | `numpy 2.5.2`
+* **CI Qualification Runtime:** `Python 3.12.10` (Pinned in `.github/workflows/tests.yml`)
 * **Flask Version:** `3.1.2`
 * **SQLAlchemy Version:** `2.0.38`
-* **Dependency Lock Files:** [`constraints.txt`](file:///c:/Users/david/hockey/constraints.txt), [`requirements-release.txt`](file:///c:/Users/david/hockey/requirements-release.txt)
+* **Dependency Lock Files:** [`constraints.txt`](constraints.txt), [`requirements-release.txt`](requirements-release.txt)
 * **InconsistentVersionWarning Status:** VERIFIED ZERO (All model artifacts load under authoritative runtime without version mismatch warnings)
 
 ---
@@ -24,15 +23,15 @@
 
 | Artifact Description | File Path | Expected SHA-256 | Verified Status |
 | :--- | :--- | :--- | :---: |
-| **Win Probability Classifier** | [`models/forecasting/pucklens-win-v1.4.0.pkl`](file:///c:/Users/david/hockey/models/forecasting/pucklens-win-v1.4.0.pkl) | `63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9` | **MATCH** |
-| **Win Probability Manifest** | [`models/forecasting/pucklens-win-v1.4.0.json`](file:///c:/Users/david/hockey/models/forecasting/pucklens-win-v1.4.0.json) | Manifest metadata & schema version `v1` | **MATCH** |
-| **Score Candidate Parameters** | [`models/forecasting/score_candidate_params_v1.4.0.json`](file:///c:/Users/david/hockey/models/forecasting/score_candidate_params_v1.4.0.json) | `a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701` | **MATCH** |
+| **Win Probability Classifier** | [`models/forecasting/pucklens-win-v1.4.0.pkl`](models/forecasting/pucklens-win-v1.4.0.pkl) | `63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9` | **MATCH** |
+| **Win Probability Manifest** | [`models/forecasting/pucklens-win-v1.4.0.json`](models/forecasting/pucklens-win-v1.4.0.json) | Manifest metadata & schema version `v1` | **MATCH** |
+| **Score Candidate Parameters** | [`models/forecasting/score_candidate_params_v1.4.0.json`](models/forecasting/score_candidate_params_v1.4.0.json) | `a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701` | **MATCH** |
 
 ---
 
 ## 3. Database Schema & Index Verification
 
-Migration script [`app/utils/db_migrator.py`](file:///c:/Users/david/hockey/app/utils/db_migrator.py) executes automatically on startup. Schema and index integrity verified:
+Migration script [`app/utils/db_migrator.py`](app/utils/db_migrator.py) executes automatically on startup. Schema and index integrity verified:
 
 - [x] Table `game_prediction` contains required columns: `prediction_type`, `model_sha256`, `feature_schema_version`, `run_id`, `input_cutoff_time_utc`, `scheduled_start_time_utc`, `feature_payload_json`, `feature_payload_sha256`.
 - [x] Partial unique index `_game_official_pregame_uc` verified on `game_prediction (game_id) WHERE prediction_type = 'official_pregame'`.
@@ -52,6 +51,7 @@ Migration script [`app/utils/db_migrator.py`](file:///c:/Users/david/hockey/app/
 | **Complete Schedule Parity** | Stage 4 | **PASSED** | 5 seasons audited (2021-22 to 2025-26); exactly 1,312/1,312 games each; 32 teams x 82 games. |
 | **Independent Poisson Retained** | Stage 5 | **PASSED** | Score model evaluation confirmed Poisson baseline retained; NegBinomial (`alpha=0.0`) and Bivariate (`lambda3=0.0`) collapse to Poisson. Dixon-Coles improvement negligible. |
 | **Read-Only GET Routes** | Stage 6 | **PASSED** | `/forecast` and `/api/v1/forecast/upcoming` perform zero prediction side-effects. |
+| **Prediction Automation Pathways** | Stage 6 | **PASSED** | CLI (`scripts/generate_official_predictions.py`) provides primary scheduled path; `POST /api/v1/forecast/game/<game_id>/generate` provides fail-closed administrative path. |
 | **48-Hour Forecast Horizon** | Stage 6 | **PASSED** | Configured via `FORECAST_DEFAULT_LOOKAHEAD_HOURS=48` across API, UI, CLI generator, and monitoring. |
 | **Operational Health & Readiness** | Stage 6 | **PASSED** | `/api/v1/health` and `/api/v1/ready` probes operational; fail-closed on DB, index, artifact, or secret key failure. |
 | **Sample-Aware Monitoring** | Stage 6 | **PASSED** | Operational calibration groups metrics by model version and SHA; clips probabilities (`1e-15`); handles small samples. |
@@ -72,19 +72,23 @@ Migration script [`app/utils/db_migrator.py`](file:///c:/Users/david/hockey/app/
 
 * **Public Ingestion Default:** `ALLOW_PUBLIC_INGESTION=False` in `ProductionConfig`.
 * **Prediction Generation Default:** `ALLOW_PREDICTION_GENERATION=False` in `ProductionConfig`.
+* **Prediction Generation API Route:** `POST /api/v1/forecast/game/<game_id>/generate` (Requires `ALLOW_PREDICTION_GENERATION=True` and `X-Generation-Token` / `Bearer` token).
 * **Prediction Token:** `PREDICTION_GENERATION_TOKEN` driven exclusively by environment variable.
 * **Production Secret Key:** `SECRET_KEY` enforced at startup (`create_app`) and readiness probe (`/api/v1/ready`); missing key causes immediate fail-closed startup error (`ValueError`) and 503 readiness status.
 
 ---
 
-## 7. CI & Automated Test Suite Results
+## 7. Automated Test Suite Qualification Environments
 
-* **Test Framework:** `pytest 9.1.1`
-* **Test Suite Execution Result:** **199 PASSED, 0 FAILED, 3 WARNINGS**
-* **Execution Time:** ~36.89s
-* **Non-Blocking Warnings Summary:**
-  1. DeprecationWarning regarding default sqlite3 date adapter in Python 3.12 (standard library / SQLAlchemy interaction).
-  2. LegacyAPIWarning regarding `Query.get()` in test helper fixture (non-production test code).
+* **Pinned Release Test Framework:** `pytest 8.3.4` (Lock file `requirements-release.txt`)
+* **Local Qualification Run:**
+  - **Runtime:** Python `3.12.10` | pytest `8.3.4`
+  - **Result:** **199 PASSED, 0 FAILED, 3 WARNINGS** (~34.0s)
+  - **Non-Blocking Warnings:** SQLite date adapter deprecation (1) & SQLAlchemy legacy `Query.get()` (2).
+* **GitHub Actions CI Qualification Run:**
+  - **Runtime:** Python `3.12.10` | pytest `8.3.4`
+  - **Result:** **199 PASSED, 0 FAILED, 24 WARNINGS**
+  - **Non-Blocking Warnings:** Deprecation and feature warnings under CI test runner environment.
 
 ---
 
@@ -95,6 +99,6 @@ Migration script [`app/utils/db_migrator.py`](file:///c:/Users/david/hockey/app/
 - [x] Schedule parity verified across 5 seasons (6,560 total games).
 - [x] Full test suite (199 tests) passing cleanly under Python 3.12.10.
 - [x] Production fail-closed security safeguards active.
-- [x] Documentation ([`README.md`](file:///c:/Users/david/hockey/README.md), [`docs/RELEASE_NOTES_v1.4.0.md`](file:///c:/Users/david/hockey/docs/RELEASE_NOTES_v1.4.0.md)) fully updated for `v1.4.0`.
+- [x] Documentation ([`README.md`](README.md), [`docs/release_notes_v1.4.0.md`](docs/release_notes_v1.4.0.md)) fully updated for `v1.4.0`.
 
 **PuckLens v1.4.0 is certified RELEASE QUALIFIED and ready for production deployment.**

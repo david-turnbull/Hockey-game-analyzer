@@ -40,7 +40,7 @@ PuckLens v1.4.0 marks the transition of PuckLens into an end-to-end, production-
 * Dixon-Coles tie adjustment (`gamma = 0.0543`) yielded microscopic pre-shootout Brier score improvement (0.00002) that did not justify replacing the simpler Independent Poisson baseline.
 
 ### Stage 6 — Production Automation, Monitoring & Operational Reliability
-* Built race-safe, idempotent CLI pregame prediction generator (`scripts/generate_predictions.py`).
+* Built race-safe, idempotent CLI pregame prediction generator (`scripts/generate_official_predictions.py`).
 * Implemented unified **48-Hour Forecast Horizon** across API (`/api/v1/forecast/upcoming`), UI (`/forecast`), CLI generator, and operational monitoring.
 * Made all GET forecast routes strictly read-only with zero hidden prediction generation side-effects.
 * Added health (`/api/v1/health`) and readiness (`/api/v1/ready`) probes validating DB, foreign keys, indexes, model loading, artifact SHA, and production secrets.
@@ -48,7 +48,7 @@ PuckLens v1.4.0 marks the transition of PuckLens into an end-to-end, production-
 
 ### Stage 7 — Release Qualification
 * Formally locked release environment dependencies in `requirements-release.txt` and `constraints.txt`.
-* Verified complete test suite passing (199 passed, 0 failures, 3 non-blocking warnings).
+* Verified complete test suite passing (199 passed, 0 failures; 3 warnings on local qualification run, 24 warnings on GitHub CI qualification run).
 * Hardened production configuration with fail-closed checks for missing `SECRET_KEY`, public ingestion defaults (`ALLOW_PUBLIC_INGESTION=False`), and generation defaults (`ALLOW_PREDICTION_GENERATION=False`).
 
 ---
@@ -82,8 +82,8 @@ PuckLens v1.4.0 marks the transition of PuckLens into an end-to-end, production-
 * `GET /api/v1/forecast/upcoming` — Upcoming 48-hour game forecasts with availability metadata
 * `GET /api/v1/monitoring/summary` — Pregame prediction coverage & unresolved game counts
 * `GET /api/v1/monitoring/calibration` — Sample-aware calibration metrics grouped by model version
-* `POST /api/v1/forecast/generate` — Admin/CLI pregame prediction generation endpoint (requires token + config flag)
-* `python scripts/generate_predictions.py --lookahead-hours 48` — Primary production pregame prediction automation CLI
+* `POST /api/v1/forecast/game/<game_id>/generate` — Admin pregame prediction generation endpoint (requires token + config flag)
+* `python scripts/generate_official_predictions.py --lookahead-hours 48` — Primary scheduled pregame prediction automation CLI
 
 ---
 

@@ -14,8 +14,8 @@ PuckLens is an independent, production-grade hockey-operations analytics and pre
 - **Score Projection Engine** — Independent Poisson score distribution engine estimating home and away team expected goals and goal probability matrices.
 - **Strict Prediction Lifecycle & Immutable Provenance** — Immutable pregame prediction provenance capturing feature cutoff time, scheduled puck drop, feature payloads, and SHA-256 signatures, protected by database unique constraint `_game_official_pregame_uc`.
 - **48-Hour Operational Forecast Horizon** — Standardized 48-hour default forecast lookahead window across the UI dashboard, REST API endpoints, CLI pregame generator, and monitoring probes.
-- **Automated Pregame Prediction CLI** — Race-safe, idempotent prediction generation CLI (`scripts/generate_predictions.py`) designed for external cron/task scheduler automation.
-- **Read-Only Forecast GET Semantics** — API and UI forecast routes are strictly read-only; prediction generation occurs exclusively through authorized background CLI tasks.
+- **Automated Pregame Prediction CLI** — Race-safe, idempotent prediction generation CLI (`scripts/generate_official_predictions.py`) designed for external cron/task scheduler automation.
+- **Read-Only Forecast GET Semantics & Dual Generation Paths** — API and UI forecast GET routes are strictly read-only. Prediction generation occurs primarily via scheduled CLI automation (`scripts/generate_official_predictions.py`) or via an authorized, fail-closed POST route (`POST /api/v1/forecast/game/<game_id>/generate`).
 - **Production Health & Readiness Probes** — `/api/v1/health` for liveness and `/api/v1/ready` for comprehensive operational readiness (DB connection, SQLite foreign keys, index presence, model registry availability, artifact SHA verification, and production secret key checks).
 - **Sample-Aware Calibration Monitoring** — Real-time operational metric tracking (`/api/v1/monitoring/calibration`) grouping Log Loss, Brier score, and accuracy by model version and SHA.
 - **Statistically Trained Expected Goals (xG)** — Machine-learning shot-quality pipeline with feature engineering, versioned model registry, and persistent database scoring.
@@ -39,10 +39,10 @@ flowchart TD
     C --> D[SQLite / SQLAlchemy DB]
     D --> E["Pregame Feature Service<br/>(Rest, B2B, L10 xGF%, Venue, H2H)"]
     E --> F["Forecast Model Registry<br/>(pucklens-win-v1.4.0.pkl / manifest)"]
-    F --> G["Prediction Generator CLI<br/>(scripts/generate_predictions.py)"]
+    F --> G["Prediction Generator CLI<br/>(scripts/generate_official_predictions.py)"]
     G --> H["GamePrediction Table<br/>(Immutable Provenance & _game_official_pregame_uc)"]
     H --> I["Service Layer<br/>(ForecastService, GameService, MonitoringService)"]
-    I --> J["Read-Only REST API & Readiness Probes<br/>(/api/v1/forecast, /v1/ready, /v1/monitoring)"]
+    I --> J["Read-Only REST API & Readiness Probes<br/>(/api/v1/forecast, /api/v1/ready, /api/v1/monitoring)"]
     I --> K[Analytics UI & Forecast Dashboard]
 ```
 
@@ -77,7 +77,8 @@ PuckLens v1.4.0 introduces an end-to-end predictive forecasting pipeline evaluat
 * Comparative validation of Independent Poisson, Negative Binomial (`alpha=0.0`), Bivariate Poisson (`lambda3=0.0`), and Dixon-Coles (`gamma=0.0543`). Independent Poisson retained as the robust production baseline.
 
 ### 6. Stage 6 — Production Automation & Operational Reliability
-* Idempotent CLI pregame prediction generator (`python scripts/generate_predictions.py`).
+* Idempotent CLI pregame prediction generator (`python scripts/generate_official_predictions.py`).
+* Fail-closed administrative HTTP route (`POST /api/v1/forecast/game/<game_id>/generate`).
 * Read-only forecast GET routes.
 * Operational readiness probe (`/api/v1/ready`) verifying database connection, SQLite foreign keys, index presence, active model loading, artifact SHA checksums, and production secrets.
 
@@ -123,7 +124,7 @@ python scripts/initialize_database.py
 ### 3. Generate Pregame Predictions via CLI
 
 ```powershell
-python scripts/generate_predictions.py --lookahead-hours 48
+python scripts/generate_official_predictions.py --lookahead-hours 48
 ```
 
 ### 4. Run the Production / Development Server
@@ -144,7 +145,9 @@ Run the full automated test suite:
 pytest
 ```
 
-**Verified Release Result:** `199 passed, 0 failed, 3 non-blocking warnings` in ~36.89s.
+**Verified Qualification Results:**
+- **Local Qualification Run:** `199 passed, 0 failed, 3 warnings` in ~34.0s (Python 3.12.10, pytest 8.3.4).
+- **GitHub Actions CI Qualification Run:** `199 passed, 0 failed, 24 warnings` (Python 3.12.10, pytest 8.3.4).
 
 ### Health & Readiness API Endpoints
 
