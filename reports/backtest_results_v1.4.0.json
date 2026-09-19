@@ -1,0 +1,114 @@
+{
+  "evaluation_type": "artifact_bound_holdout_evaluation",
+  "evaluated_at": "2026-09-17T01:50:24.084619+00:00",
+  "run_uuid": "5025cbe0-ab93-4225-abf1-0a3a5e1d8d7f",
+  "git_commit_sha": "f38f7f90cec9774c05452bd53347bf8a06c05dc2",
+  "model_version": "v1.4.0",
+  "artifact_sha256": "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9",
+  "feature_schema_version": "v1",
+  "protocol": {
+    "train_season": "20212022",
+    "select_season": "20222023",
+    "refit_seasons": "20212022 + 20222023",
+    "calibrate_season": "20232024",
+    "test_season": "20242025 (Untouched Holdout)"
+  },
+  "manifest_metadata": {
+    "model_name": "pucklens-win",
+    "model_version": "v1.4.0",
+    "sklearn_version": "1.9.0",
+    "model_architecture": "HistGradientBoosting",
+    "artifact_sha256": "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9",
+    "generated_timestamp": "2026-09-17T01:49:47.078870+00:00",
+    "python_version": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "key_library_versions": {
+      "scikit_learn": "1.9.0",
+      "numpy": "2.5.2"
+    },
+    "feature_names": [
+      "rest_differential",
+      "home_is_b2b",
+      "away_is_b2b",
+      "l10_xgf_pct_diff",
+      "l10_cf_pct_diff",
+      "l10_goal_diff_per_game",
+      "l20_xgf_pct_diff",
+      "home_venue_l10_win_pct",
+      "away_venue_l10_win_pct",
+      "h2h_home_win_pct",
+      "h2h_home_gd_avg"
+    ],
+    "feature_ordering": [
+      "rest_differential",
+      "home_is_b2b",
+      "away_is_b2b",
+      "l10_xgf_pct_diff",
+      "l10_cf_pct_diff",
+      "l10_goal_diff_per_game",
+      "l20_xgf_pct_diff",
+      "home_venue_l10_win_pct",
+      "away_venue_l10_win_pct",
+      "h2h_home_win_pct",
+      "h2h_home_gd_avg"
+    ],
+    "feature_schema_version": "v1",
+    "candidate_fit_seasons": [
+      "20212022"
+    ],
+    "selection_season": "20222023",
+    "production_refit_seasons": [
+      "20212022",
+      "20222023"
+    ],
+    "training_seasons": [
+      "20212022",
+      "20222023"
+    ],
+    "calibration_season": "20232024",
+    "excluded_holdout_seasons": [
+      "20242025"
+    ],
+    "number_of_training_samples": 2624,
+    "number_of_calibration_samples": 1312,
+    "selected_hyperparameters": {
+      "max_iter": 100,
+      "max_depth": 4,
+      "min_samples_leaf": 20,
+      "random_state": 42
+    },
+    "model_selection_metric": "log_loss",
+    "calibration_method": "isotonic",
+    "git_commit_sha": "f38f7f90cec9774c05452bd53347bf8a06c05dc2",
+    "run_uuid": "57036064-badb-4fc9-aae7-93b8c5f36676"
+  },
+  "test_season_20242025_eval": {
+    "season": "20242025",
+    "game_count": 1312,
+    "calibrated_model": {
+      "log_loss": 0.6848,
+      "brier_score": 0.2431,
+      "accuracy": 57.55,
+      "ece": 0.0315
+    },
+    "elo_baseline": {
+      "log_loss": 0.6735,
+      "brier_score": 0.2403,
+      "accuracy": 58.16,
+      "ece": 0.041
+    },
+    "naive_50_50_log_loss": 0.6931,
+    "score_projection": {
+      "expected_total_goals_mae": 2.06,
+      "home_goals_mae": 1.56,
+      "away_goals_mae": 1.48,
+      "exact_scoreline_coverage_pct": 3.89,
+      "top5_scoreline_coverage_pct": 18.9
+    }
+  },
+  "elo_baseline_overall": {
+    "log_loss": 0.6641,
+    "brier_score": 0.2359,
+    "accuracy": 59.36,
+    "ece": 0.021
+  }
+}

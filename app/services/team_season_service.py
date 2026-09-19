@@ -19,7 +19,11 @@ class TeamSeasonService:
         """
         Calculates all canonical season metrics for a specific team and situation.
         """
-        all_teams_stats = cls.get_season_teams_summary(season=season, situation=situation)
+        all_teams_stats = cls.get_season_teams_summary(
+            season=season,
+            situation=situation,
+            team_ids=[team_id],
+        )
         for t_stats in all_teams_stats:
             if t_stats["team_id"] == team_id:
                 return t_stats
@@ -32,15 +36,26 @@ class TeamSeasonService:
         return cls._empty_team_stats(team, season, situation)
 
     @classmethod
-    def get_season_teams_summary(cls, season: str, situation: str = "all") -> List[Dict[str, Any]]:
+    def get_season_teams_summary(
+        cls,
+        season: str,
+        situation: str = "all",
+        team_ids: Optional[List[int]] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Aggregates team season metrics for all teams in a given season using grouped queries
         to eliminate N+1 performance bottlenecks.
         """
         situation = situation.lower()
 
-        # 1. Fetch all games for this season
-        games = Game.query.filter(Game.season == season).order_by(Game.game_date.asc()).all()
+        # 1. Fetch only the games required by the caller.
+        game_query = Game.query.filter(Game.season == season)
+        if team_ids:
+            scoped_ids = [int(tid) for tid in team_ids]
+            game_query = game_query.filter(
+                or_(Game.home_team_id.in_(scoped_ids), Game.away_team_id.in_(scoped_ids))
+            )
+        games = game_query.order_by(Game.game_date.asc(), Game.game_id.asc()).all()
         if not games:
             return []
 
@@ -64,6 +79,8 @@ class TeamSeasonService:
                 (g.home_team_id, g.home_score, g.away_score, True),
                 (g.away_team_id, g.away_score, g.home_score, False)
             ]:
+                if team_ids and tid not in team_ids:
+                    continue
                 if tid not in team_record:
                     team_record[tid] = {"w": 0, "l": 0, "otl": 0, "gp": 0}
                     team_games[tid] = []
@@ -180,108 +197,129 @@ class TeamSeasonService:
             if opp_tid in xga_map:
                 xga_map[opp_tid] += float(sum_xg)
 
-        # 3. Calculate actual situation TOI per team using shift timelines
-        # If reliable shift duration cannot be established, precision must not be fabricated (return None)
-        shifts = (
-            Shift.query.filter(
-                Shift.game_id.in_(game_ids),
-                Shift.is_anomaly == False,
-                Shift.duration > 0,
-                Shift.start_elapsed_seconds.isnot(None),
-                Shift.end_elapsed_seconds.isnot(None)
-            ).all()
-        )
-        shifts_by_game = defaultdict(list)
-        for s in shifts:
-            shifts_by_game[s.game_id].append(s)
-
-        shift_pids = list(set(s.player_id for s in shifts))
-        players_pos = dict(
-            db.session.query(Player.player_id, Player.position)
-            .filter(Player.player_id.in_(shift_pids))
-            .all()
-        )
-
-        game_toi: Dict[int, Optional[Dict[int, Dict[str, int]]]] = {}
-        for g in games:
-            gid = g.game_id
-            g_shifts = shifts_by_game.get(gid, [])
-            if not g_shifts:
-                # No shifts recorded for this game -> unreliable situation denominator
-                game_toi[gid] = None
-                continue
-
-            max_time = 3600
-            for s in g_shifts:
-                if s.end_elapsed_seconds is not None and s.end_elapsed_seconds > max_time:
-                    max_time = s.end_elapsed_seconds
-
-            home_players, away_players = OnIceService.build_active_players_timeline(
-                g_shifts, max_time, g.home_team_id
-            )
-
-            h_5v5 = a_5v5 = h_pp = a_pp = h_pk = a_pk = 0
-            for t in range(max_time):
-                hp = home_players[t]
-                ap = away_players[t]
-                h_skaters = sum(1 for p in hp if players_pos.get(p) != 'G')
-                a_skaters = sum(1 for p in ap if players_pos.get(p) != 'G')
-                h_g = sum(1 for p in hp if players_pos.get(p) == 'G')
-                a_g = sum(1 for p in ap if players_pos.get(p) == 'G')
-
-                # True 5v5: Exactly 5 skaters and 1 goalie on both sides
-                if h_skaters == 5 and a_skaters == 5 and h_g == 1 and a_g == 1:
-                    h_5v5 += 1
-                    a_5v5 += 1
-                elif h_g >= 1 and a_g >= 1:
-                    # Valid PP/PK requires both goalies on ice; goalie-pull/empty-net states (e.g. 6v5, 5v6) are excluded
-                    if h_skaters > a_skaters:
-                        h_pp += 1
-                        a_pk += 1
-                    elif a_skaters > h_skaters:
-                        a_pp += 1
-                        h_pk += 1
-
-            game_toi[gid] = {
-                g.home_team_id: {
-                    "5v5": h_5v5,
-                    "pp": h_pp,
-                    "pk": h_pk,
-                    "all": max_time
-                },
-                g.away_team_id: {
-                    "5v5": a_5v5,
-                    "pp": a_pp,
-                    "pk": a_pk,
-                    "all": max_time
-                }
-            }
-
+        # 3. Calculate situation TOI without reconstructing every game second.
         sit_key = (
             "5v5" if situation == "5v5"
             else ("pp" if situation in ["pp", "powerplay", "power_play"]
             else ("pk" if situation in ["sh", "shorthanded", "pk"] else "all"))
         )
 
+        game_toi: Dict[int, Optional[Dict[int, Dict[str, int]]]] = {}
+
+        if sit_key == "all":
+            # All-situation rates only need observed game duration. Use one grouped SQL
+            # query rather than loading every shift and building per-second timelines.
+            duration_rows = (
+                db.session.query(
+                    Shift.game_id,
+                    func.max(Shift.end_elapsed_seconds)
+                )
+                .filter(
+                    Shift.game_id.in_(game_ids),
+                    Shift.is_anomaly == False,
+                    Shift.end_elapsed_seconds.isnot(None)
+                )
+                .group_by(Shift.game_id)
+                .all()
+            )
+            duration_map = {
+                gid: max(3600, int(end_sec or 3600))
+                for gid, end_sec in duration_rows
+            }
+            for g in games:
+                max_time = duration_map.get(g.game_id, 3600)
+                game_toi[g.game_id] = {
+                    g.home_team_id: {"all": max_time},
+                    g.away_team_id: {"all": max_time},
+                }
+        else:
+            shifts = (
+                Shift.query.filter(
+                    Shift.game_id.in_(game_ids),
+                    Shift.is_anomaly == False,
+                    Shift.duration > 0,
+                    Shift.start_elapsed_seconds.isnot(None),
+                    Shift.end_elapsed_seconds.isnot(None)
+                ).all()
+            )
+            shifts_by_game = defaultdict(list)
+            for s in shifts:
+                shifts_by_game[s.game_id].append(s)
+
+            shift_pids = list({s.player_id for s in shifts})
+            players_pos = dict(
+                db.session.query(Player.player_id, Player.position)
+                .filter(Player.player_id.in_(shift_pids))
+                .all()
+            ) if shift_pids else {}
+
+            for g in games:
+                gid = g.game_id
+                g_shifts = shifts_by_game.get(gid, [])
+                if not g_shifts:
+                    game_toi[gid] = None
+                    continue
+
+                max_time = max(
+                    3600,
+                    max((s.end_elapsed_seconds or 0) for s in g_shifts)
+                )
+                intervals = OnIceService.build_active_player_intervals(
+                    g_shifts, max_time, g.home_team_id
+                )
+
+                h_5v5 = a_5v5 = h_pp = a_pp = h_pk = a_pk = 0
+                for interval in intervals:
+                    hp = interval["home_players"]
+                    ap = interval["away_players"]
+                    duration = interval["duration"]
+
+                    h_skaters = sum(1 for p in hp if players_pos.get(p) != "G")
+                    a_skaters = sum(1 for p in ap if players_pos.get(p) != "G")
+                    h_g = sum(1 for p in hp if players_pos.get(p) == "G")
+                    a_g = sum(1 for p in ap if players_pos.get(p) == "G")
+
+                    if h_skaters == 5 and a_skaters == 5 and h_g == 1 and a_g == 1:
+                        h_5v5 += duration
+                        a_5v5 += duration
+                    elif h_g >= 1 and a_g >= 1:
+                        if h_skaters > a_skaters:
+                            h_pp += duration
+                            a_pk += duration
+                        elif a_skaters > h_skaters:
+                            a_pp += duration
+                            h_pk += duration
+
+                game_toi[gid] = {
+                    g.home_team_id: {
+                        "5v5": h_5v5,
+                        "pp": h_pp,
+                        "pk": h_pk,
+                    },
+                    g.away_team_id: {
+                        "5v5": a_5v5,
+                        "pp": a_pp,
+                        "pk": a_pk,
+                    },
+                }
+
         team_toi: Dict[int, Optional[int]] = {}
         for tid, t_g_list in team_games.items():
-            # Check if any game for this team has missing/unreliable shifts
-            has_missing = False
             tot_sec = 0
+            reliable = True
             for g in t_g_list:
                 g_dict = game_toi.get(g.game_id)
-                if g_dict is None or tid not in g_dict:
-                    has_missing = True
+                if g_dict is None or tid not in g_dict or sit_key not in g_dict[tid]:
+                    reliable = False
                     break
                 tot_sec += g_dict[tid][sit_key]
 
-            if has_missing or (len(shifts) == 0):
-                if sit_key == "all":
-                    team_toi[tid] = len(t_g_list) * 3600
-                else:
-                    team_toi[tid] = None
-            else:
+            if reliable:
                 team_toi[tid] = tot_sec
+            elif sit_key == "all":
+                team_toi[tid] = len(t_g_list) * 3600
+            else:
+                team_toi[tid] = None
 
         # 4. Assemble final stats for each team
         teams_by_id = {t.team_id: t for t in Team.query.filter(Team.team_id.in_(team_record.keys())).all()}

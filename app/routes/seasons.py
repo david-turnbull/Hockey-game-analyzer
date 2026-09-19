@@ -69,7 +69,12 @@ def season_overview(season: str):
         selected_team_id = None
 
     # Analytical Leaders: calculate season summaries ONCE, then derive leaderboards in memory
-    all_skaters = PlayerSeasonService.get_season_skaters_summary(season=season, team_id=selected_team_id, min_gp=1)
+    all_skaters = PlayerSeasonService.get_season_skaters_summary(
+        season=season,
+        team_id=selected_team_id,
+        min_gp=1,
+        include_on_ice_5v5=False,
+    )
     all_goalies = GoalieSeasonService.get_season_goalies_summary(season=season, team_id=selected_team_id, min_gp=1)
 
     leaders = {

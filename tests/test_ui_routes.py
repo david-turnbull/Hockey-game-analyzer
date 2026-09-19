@@ -1,6 +1,10 @@
 import pytest
+from pathlib import Path
 from datetime import date
 from app.models import db as _db, Team, Player, Game, Event, Shot, Shift, GamePlayer
+from app.services.player_season_service import PlayerSeasonService
+from app.services.team_season_service import TeamSeasonService
+from app.services.on_ice_service import OnIceService
 
 @pytest.fixture
 def setup_ui_data(app, db):
@@ -88,3 +92,62 @@ def test_skater_goalie_cross_redirects(client, setup_ui_data):
     res = client.get('/goalie/10/season/20242025')
     assert res.status_code == 302
     assert '/player/10/season/20242025' in res.headers['Location']
+
+
+def test_season_overview_skips_expensive_player_on_ice_reconstruction(
+    client, setup_ui_data, monkeypatch
+):
+    """League overview leader cards must not rebuild all skater on-ice timelines."""
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("league overview must not compute season-wide 5v5 on-ice metrics")
+
+    monkeypatch.setattr(
+        PlayerSeasonService,
+        "_aggregate_season_5v5_on_ice",
+        fail_if_called,
+    )
+
+    res = client.get('/season/20242025')
+    assert res.status_code == 200
+
+
+def test_team_season_stats_do_not_use_per_second_timeline(
+    app, setup_ui_data, monkeypatch
+):
+    """Season team aggregation must use interval reconstruction, not per-second timelines."""
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("season analytics must not use build_active_players_timeline")
+
+    monkeypatch.setattr(
+        OnIceService,
+        "build_active_players_timeline",
+        fail_if_called,
+    )
+
+    all_stats = TeamSeasonService.get_team_season_stats(
+        team_id=1,
+        season='20242025',
+        situation='all',
+    )
+    assert all_stats is not None
+    assert all_stats["team_id"] == 1
+
+    five_stats = TeamSeasonService.get_team_season_stats(
+        team_id=1,
+        season='20242025',
+        situation='5v5',
+    )
+    assert five_stats is not None
+    assert five_stats["team_id"] == 1
+
+
+def test_shot_map_templates_are_null_safe():
+    """Line/player comparison maps must not call number methods directly on nullable API fields."""
+    line_template = Path("app/templates/line_detail.html").read_text(encoding="utf-8")
+    compare_template = Path("app/templates/player_compare.html").read_text(encoding="utf-8")
+
+    for template in (line_template, compare_template):
+        assert "s.xg.toFixed" not in template
+        assert "Math.round(s.distance)" not in template
+        assert "Math.round(s.angle)" not in template
+        assert "formatNumber" in template

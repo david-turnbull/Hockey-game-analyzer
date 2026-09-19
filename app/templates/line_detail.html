@@ -268,16 +268,29 @@
             const savesAgainst = SHOTS_DATA.filter(s => s.team_id !== UNIT_TEAM_ID && s.outcome === 'Saved');
             const otherAgainst = SHOTS_DATA.filter(s => s.team_id !== UNIT_TEAM_ID && s.outcome !== 'Goal' && s.outcome !== 'Saved');
 
+            const finiteOrNull = (value) => {
+                const n = Number(value);
+                return Number.isFinite(n) ? n : null;
+            };
+            const formatNumber = (value, digits = 0, suffix = '') => {
+                const n = finiteOrNull(value);
+                return n === null ? 'N/A' : `${n.toFixed(digits)}${suffix}`;
+            };
             const getCoords = (list) => {
                 return {
-                    x: list.map(s => normalize ? s.norm_x : s.raw_x),
-                    y: list.map(s => normalize ? s.norm_y : s.raw_y),
+                    x: list.map(s => finiteOrNull(normalize ? s.norm_x : s.raw_x)),
+                    y: list.map(s => finiteOrNull(normalize ? s.norm_y : s.raw_y)),
                     text: list.map(s => {
                         const isGoal = s.outcome === 'Goal' ? '<b>GOAL!</b><br>' : '';
-                        return `${isGoal}Shooter: ${s.shooter_name} (${s.team_abbrev})<br>` +
-                               `Goalie: ${s.goalie_name}<br>` +
-                               `Dist: ${Math.round(s.distance)} ft &nbsp; Angle: ${Math.round(s.angle)}°<br>` +
-                               `P${s.period} - ${s.period_time} &nbsp; xG: ${s.xg.toFixed(3)}`;
+                        const shooter = s.shooter_name || 'Unknown';
+                        const team = s.team_abbrev || 'UNK';
+                        const goalie = s.goalie_name || 'None';
+                        const period = s.period ?? '?';
+                        const periodTime = s.period_time || '--:--';
+                        return `${isGoal}Shooter: ${shooter} (${team})<br>` +
+                               `Goalie: ${goalie}<br>` +
+                               `Dist: ${formatNumber(s.distance, 0, " ft")} &nbsp; Angle: ${formatNumber(s.angle, 0, "°")}<br>` +
+                               `P${period} - ${periodTime} &nbsp; xG: ${formatNumber(s.xg, 3)}`;
                     })
                 };
             };

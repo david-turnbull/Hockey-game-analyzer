@@ -1,0 +1,4 @@
+# PuckLens v1.4.0 Authoritative Runtime Dependency Constraints
+# Win artifact runtime: Python 3.12.10, scikit-learn 1.9.0, numpy 2.5.2
+scikit-learn==1.9.0
+numpy==2.5.2

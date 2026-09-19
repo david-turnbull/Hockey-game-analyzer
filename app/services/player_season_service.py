@@ -1,4 +1,5 @@
 import logging
+from bisect import bisect_right
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
 from sqlalchemy import or_, and_, func, distinct
@@ -39,7 +40,8 @@ class PlayerSeasonService:
         team_id: Optional[int] = None,
         min_gp: int = 1,
         min_toi_seconds: int = 0,
-        min_unblocked_attempts: int = 0
+        min_unblocked_attempts: int = 0,
+        include_on_ice_5v5: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Aggregates season statistics for all skaters using grouped SQL queries to prevent N+1 overhead.
@@ -51,8 +53,12 @@ class PlayerSeasonService:
         game_query = (
             db.session.query(Game.game_id, Game.game_date)
             .filter(Game.season == season)
-            .order_by(Game.game_date.asc(), Game.game_id.asc())
         )
+        if team_id is not None:
+            game_query = game_query.filter(
+                or_(Game.home_team_id == team_id, Game.away_team_id == team_id)
+            )
+        game_query = game_query.order_by(Game.game_date.asc(), Game.game_id.asc())
         season_game_rows = game_query.all()
         if not season_game_rows:
             return []
@@ -252,8 +258,17 @@ class PlayerSeasonService:
         toi_rows = toi_query.group_by(Shift.player_id).all()
         toi_map = {pid: (int(tot_sec) if tot_sec else 0) for pid, tot_sec in toi_rows}
 
-        # 7. 5v5 On-Ice possession and xG metrics
-        on_ice_5v5 = cls._aggregate_season_5v5_on_ice(season_game_ids, relevant_pids, target_team_id=team_id)
+        # 7. 5v5 On-Ice possession and xG metrics.
+        # League overview leader cards do not use these fields, so callers can skip the
+        # expensive shift/event reconstruction entirely.
+        if include_on_ice_5v5:
+            on_ice_5v5 = cls._aggregate_season_5v5_on_ice(
+                season_game_ids,
+                relevant_pids,
+                target_team_id=team_id,
+            )
+        else:
+            on_ice_5v5 = {}
 
         # 8. Assemble skater records and apply filters
         results = []
@@ -460,7 +475,8 @@ class PlayerSeasonService:
         for event, xg in events_with_shots:
             events_by_game[event.game_id].append((event, xg))
 
-        # 4. In-memory processing by game
+        # 4. In-memory processing by game using shift-boundary intervals rather
+        # than per-second timelines or event x shift nested loops.
         for gid in season_game_ids:
             teams = game_teams_map.get(gid)
             if not teams:
@@ -470,61 +486,82 @@ class PlayerSeasonService:
             if not game_shifts:
                 continue
 
-            # Calculate 5v5 on-ice TOI from shift timelines
-            max_time = 3600
-            for s in game_shifts:
-                if s.end_elapsed_seconds is not None and s.end_elapsed_seconds > max_time:
-                    max_time = s.end_elapsed_seconds
-
-            home_players, away_players = OnIceService.build_active_players_timeline(
+            max_time = max(
+                3600,
+                max((s.end_elapsed_seconds or 0) for s in game_shifts)
+            )
+            intervals = OnIceService.build_active_player_intervals(
                 game_shifts, max_time, home_team_id
             )
+            if not intervals:
+                continue
 
-            for t in range(max_time):
-                hp = home_players[t]
-                ap = away_players[t]
-                if len(hp) != 6 or len(ap) != 6:
-                    continue
-                # Both goalies must be on ice
-                h_g = sum(1 for p in hp if players_pos.get(p) == 'G')
-                if h_g != 1:
-                    continue
-                a_g = sum(1 for p in ap if players_pos.get(p) == 'G')
-                if a_g != 1:
+            valid_5v5_intervals = []
+            for interval in intervals:
+                hp = interval["home_players"]
+                ap = interval["away_players"]
+                h_goalies = sum(1 for p in hp if players_pos.get(p) == "G")
+                a_goalies = sum(1 for p in ap if players_pos.get(p) == "G")
+                h_skaters = sum(1 for p in hp if players_pos.get(p) != "G")
+                a_skaters = sum(1 for p in ap if players_pos.get(p) != "G")
+                if h_skaters != 5 or a_skaters != 5 or h_goalies != 1 or a_goalies != 1:
                     continue
 
-                # Exactly 5 skaters and 1 goalie on both sides (True 5v5)
+                valid_5v5_intervals.append(interval)
+                duration = interval["duration"]
+
                 if target_team_id is None or home_team_id == target_team_id:
                     for p in hp:
-                        if p in skater_set and players_pos.get(p) != 'G':
-                            on_ice_res[p]["toi_seconds"] += 1
+                        if p in skater_set and players_pos.get(p) != "G":
+                            on_ice_res[p]["toi_seconds"] += duration
                 if target_team_id is None or away_team_id == target_team_id:
                     for p in ap:
-                        if p in skater_set and players_pos.get(p) != 'G':
-                            on_ice_res[p]["toi_seconds"] += 1
+                        if p in skater_set and players_pos.get(p) != "G":
+                            on_ice_res[p]["toi_seconds"] += duration
 
-            game_events = events_by_game.get(gid, [])
+            # Preserve the historical metric contract:
+            # - TOI is counted only when the reconstructed lineup is true 5v5.
+            # - Event attribution uses the event's authoritative 5v5 strength flag plus
+            #   the player's active shift, even if other shift records are incomplete.
+            starts = [interval["start"] for interval in intervals]
+            game_events = sorted(
+                events_by_game.get(gid, []),
+                key=lambda item: item[0].elapsed_game_seconds
+                if item[0].elapsed_game_seconds is not None else -1,
+            )
 
             for event, xg in game_events:
                 if not PossessionService.matches_strength(event, "5v5", home_team_id):
                     continue
 
-                shot_team_id = event.team_id
-                is_blocked = (event.event_type == 'blocked-shot')
-                shot_xg = float(xg) if (xg is not None) else 0.0
                 t = event.elapsed_game_seconds
+                if t is None:
+                    continue
 
-                for s in game_shifts:
-                    if s.start_elapsed_seconds <= t < s.end_elapsed_seconds:
-                        pid = s.player_id
-                        if pid not in skater_set:
-                            continue
-                        if players_pos.get(pid) == 'G':
-                            continue
-                        if target_team_id is not None and s.team_id != target_team_id:
+                idx = bisect_right(starts, t) - 1
+                if idx < 0:
+                    continue
+                interval = intervals[idx]
+                if not (interval["start"] <= t < interval["end"]):
+                    continue
+
+                shot_team_id = event.team_id
+                is_blocked = (event.event_type == "blocked-shot")
+                shot_xg = float(xg) if xg is not None else 0.0
+
+                for side_team_id, active_players in (
+                    (home_team_id, interval["home_players"]),
+                    (away_team_id, interval["away_players"]),
+                ):
+                    if target_team_id is not None and side_team_id != target_team_id:
+                        continue
+
+                    is_for = (side_team_id == shot_team_id)
+                    for pid in active_players:
+                        if pid not in skater_set or players_pos.get(pid) == "G":
                             continue
 
-                        if s.team_id == shot_team_id:
+                        if is_for:
                             on_ice_res[pid]["cf"] += 1
                             if not is_blocked:
                                 on_ice_res[pid]["ff"] += 1
