@@ -19,13 +19,21 @@ class PredictionGeneratorService:
     def generate_official_pregame_predictions(
         cls,
         season: Optional[str] = None,
-        lookahead_hours: int = 48,
+        lookahead_hours: Optional[int] = None,
         dry_run: bool = False
     ) -> Dict[str, Any]:
         """
         Scans upcoming regular-season games within lookahead_hours and generates official pregame predictions.
         Race-safe and idempotent: handles concurrent parallel workers via IntegrityError rollback.
         """
+        from flask import current_app
+
+        if lookahead_hours is None:
+            try:
+                lookahead_hours = current_app.config.get("FORECAST_DEFAULT_LOOKAHEAD_HOURS", 48)
+            except Exception:
+                lookahead_hours = 48
+
         now_utc = datetime.now(timezone.utc)
         max_start_utc = now_utc + timedelta(hours=lookahead_hours)
 
@@ -35,7 +43,7 @@ class PredictionGeneratorService:
         ).filter(
             Game.game_type == 'R',
             Game.data_source == 'nhl_api',
-            Game.start_time_utc >= now_utc - timedelta(hours=24),
+            Game.start_time_utc > now_utc,
             Game.start_time_utc <= max_start_utc
         )
 

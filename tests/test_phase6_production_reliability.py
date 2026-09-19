@@ -19,7 +19,7 @@ def app_fixture():
         t2 = Team(team_id=2, abbreviation='T2', name='Team 2')
         db.session.add_all([t1, t2])
 
-        future_dt = datetime.now(timezone.utc) + timedelta(days=2)
+        future_dt = datetime.now(timezone.utc) + timedelta(hours=36)
         g_fut = Game(
             game_id=2024020101,
             season='20242025',
@@ -128,10 +128,10 @@ def test_prediction_generator_service_idempotency_and_cutoff(app_fixture):
         db.session.add(g_past)
         db.session.commit()
 
-        # Run generator
+        # Run generator - past games excluded by SQL query filter (start_time_utc > now_utc)
         summary1 = PredictionGeneratorService.generate_official_pregame_predictions(lookahead_hours=72)
         assert summary1["generated_count"] == 1
-        assert summary1["rejected_cutoff_count"] == 1
+        assert summary1["total_games_scanned"] == 1
         assert summary1["skipped_existing_count"] == 0
 
         # Re-run generator (idempotent: skips existing prediction)
@@ -157,8 +157,10 @@ def test_sample_aware_operational_monitoring(app_fixture):
 
         # Coverage summary
         cov = OperationalMonitoringService.get_coverage_summary()
+        assert cov["lookahead_hours"] == 48
         assert cov["upcoming_games_total"] == 1
         assert cov["upcoming_games_predicted"] == 0
+        assert cov["remaining_season_games_total"] == 1
 
         # Create prediction and simulate outcome resolution
         ForecastService.create_prediction(2024020101, prediction_type='official_pregame')

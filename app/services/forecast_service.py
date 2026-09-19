@@ -3,7 +3,7 @@ import json
 import uuid
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
@@ -239,26 +239,45 @@ class ForecastService:
         }
 
     @classmethod
-    def get_upcoming_forecasts(cls, limit: int = 12) -> List[Dict[str, Any]]:
+    def get_upcoming_forecasts(
+        cls,
+        lookahead_hours: Optional[int] = None,
+        limit: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
-        Strictly READ-ONLY query for upcoming future games (start_time_utc > now_utc).
-        Exposes prediction_status ('available' or 'missing') and eager-loads relationships.
+        Strictly READ-ONLY query for upcoming future games (start_time_utc > now_utc AND <= now_utc + lookahead_hours).
+        Exposes prediction_status ('available' or 'missing'), returns API metadata dictionary, and eager-loads relationships.
         Never creates predictions on the fly.
         """
+        from flask import current_app
         from sqlalchemy.orm import joinedload
+
+        if lookahead_hours is None:
+            try:
+                lookahead_hours = current_app.config.get("FORECAST_DEFAULT_LOOKAHEAD_HOURS", 48)
+            except Exception:
+                lookahead_hours = 48
+
         now_utc = datetime.now(timezone.utc)
-        games = Game.query.options(
+        window_end_utc = now_utc + timedelta(hours=lookahead_hours)
+
+        query = Game.query.options(
             joinedload(Game.home_team),
             joinedload(Game.away_team)
         ).filter(
             Game.game_type == 'R',
             Game.data_source == 'nhl_api',
-            Game.start_time_utc > now_utc
+            Game.start_time_utc > now_utc,
+            Game.start_time_utc <= window_end_utc
         ).order_by(
             Game.start_time_utc.asc(),
             Game.game_id.asc()
-        ).limit(limit).all()
+        )
 
+        if limit is not None:
+            query = query.limit(limit)
+
+        games = query.all()
         game_ids = [g.game_id for g in games]
 
         # Batch query existing predictions in single query
@@ -305,17 +324,23 @@ class ForecastService:
                         "away_score": g.away_score if g else 0,
                         "nhl_game_state": g.nhl_game_state if g else "FUT"
                     },
-                    "win_probability": {
-                        "home_win_probability": 0.5,
-                        "away_win_probability": 0.5,
-                        "home_win_pct_display": "N/A",
-                        "away_win_pct_display": "N/A"
-                    },
-                    "score_projection": {},
+                    "win_probability": None,
+                    "score_projection": None,
                     "explanations": []
                 })
-            
-        return results
+
+        available_count = sum(1 for r in results if r["prediction_status"] == "available")
+        missing_count = sum(1 for r in results if r["prediction_status"] == "missing")
+
+        return {
+            "lookahead_hours": lookahead_hours,
+            "window_start_utc": now_utc.isoformat(),
+            "window_end_utc": window_end_utc.isoformat(),
+            "count": len(results),
+            "available_count": available_count,
+            "missing_count": missing_count,
+            "forecasts": results
+        }
 
     @classmethod
     def get_backtest_summary(cls) -> Dict[str, Any]:

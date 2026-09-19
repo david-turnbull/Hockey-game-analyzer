@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def main():
     parser = argparse.ArgumentParser(description="Generate official pregame predictions for upcoming NHL games.")
     parser.add_argument("--season", type=str, default=None, help="Target season (e.g., 20242025)")
-    parser.add_argument("--lookahead-hours", type=int, default=48, help="Lookahead window in hours (default: 48)")
+    parser.add_argument("--lookahead-hours", type=int, default=None, help="Lookahead window in hours (default: configured FORECAST_DEFAULT_LOOKAHEAD_HOURS)")
     parser.add_argument("--dry-run", action="store_true", help="Simulate prediction generation without writing to database")
 
     args = parser.parse_args()

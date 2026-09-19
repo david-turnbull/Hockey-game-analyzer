@@ -1,7 +1,7 @@
 import logging
 import math
 import numpy as np
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import joinedload
 
@@ -41,12 +41,21 @@ class OperationalMonitoringService:
             }
 
     @classmethod
-    def get_coverage_summary(cls) -> Dict[str, Any]:
+    def get_coverage_summary(cls, lookahead_hours: Optional[int] = None) -> Dict[str, Any]:
         """
-        Calculates official pregame prediction coverage, upcoming game prediction status,
-        and unresolved predictions strictly from persisted records.
+        Calculates official pregame prediction coverage over the configured lookahead horizon (default: 48h),
+        upcoming game prediction status, and unresolved predictions strictly from persisted records.
         """
+        from flask import current_app
+
+        if lookahead_hours is None:
+            try:
+                lookahead_hours = current_app.config.get("FORECAST_DEFAULT_LOOKAHEAD_HOURS", 48)
+            except Exception:
+                lookahead_hours = 48
+
         now_utc = datetime.now(timezone.utc)
+        window_end_utc = now_utc + timedelta(hours=lookahead_hours)
 
         # Query all official predictions
         official_preds = GamePrediction.query.filter_by(prediction_type='official_pregame').all()
@@ -63,28 +72,40 @@ class OperationalMonitoringService:
             for k, v in by_version.items()
         ]
 
-        # Query upcoming games
-        upcoming_games = Game.query.filter(
+        # Query upcoming games within 48-hour horizon
+        horizon_games = Game.query.filter(
+            Game.game_type == 'R',
+            Game.data_source == 'nhl_api',
+            Game.start_time_utc > now_utc,
+            Game.start_time_utc <= window_end_utc
+        ).all()
+
+        # Query all remaining season games
+        remaining_season_games = Game.query.filter(
             Game.game_type == 'R',
             Game.data_source == 'nhl_api',
             Game.start_time_utc > now_utc
         ).all()
 
-        upcoming_game_ids = {g.game_id for g in upcoming_games}
-        predicted_upcoming_ids = {p.game_id for p in official_preds if p.game_id in upcoming_game_ids}
-        missing_upcoming_ids = upcoming_game_ids - predicted_upcoming_ids
+        horizon_game_ids = {g.game_id for g in horizon_games}
+        predicted_horizon_ids = {p.game_id for p in official_preds if p.game_id in horizon_game_ids}
+        missing_horizon_ids = horizon_game_ids - predicted_horizon_ids
 
         # Unresolved games (games finished or in progress that have predictions)
         unresolved_preds = [p for p in official_preds if not p.is_outcome_resolved]
 
         return {
             "audited_at": now_utc.isoformat(),
+            "lookahead_hours": lookahead_hours,
+            "window_start_utc": now_utc.isoformat(),
+            "window_end_utc": window_end_utc.isoformat(),
             "total_official_predictions": total_official_preds,
             "version_breakdown": version_breakdown,
-            "upcoming_games_total": len(upcoming_games),
-            "upcoming_games_predicted": len(predicted_upcoming_ids),
-            "upcoming_games_missing_prediction": len(missing_upcoming_ids),
-            "missing_upcoming_game_ids": sorted(list(missing_upcoming_ids)),
+            "upcoming_games_total": len(horizon_games),
+            "upcoming_games_predicted": len(predicted_horizon_ids),
+            "upcoming_games_missing_prediction": len(missing_horizon_ids),
+            "missing_upcoming_game_ids": sorted(list(missing_horizon_ids)),
+            "remaining_season_games_total": len(remaining_season_games),
             "unresolved_official_predictions_count": len(unresolved_preds)
         }
 

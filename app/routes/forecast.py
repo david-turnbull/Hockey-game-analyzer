@@ -54,11 +54,12 @@ def generate_game_forecast_api(game_id: int):
 @forecast_bp.route('/api/v1/forecast/upcoming', methods=['GET'])
 def get_upcoming_forecasts_api():
     """
-    Returns upcoming future games with prediction status ('available' or 'missing') (Strictly READ-ONLY).
+    Returns upcoming future games within lookahead horizon with prediction status ('available' or 'missing') (Strictly READ-ONLY).
     """
-    limit = request.args.get('limit', 12, type=int)
-    forecasts = ForecastService.get_upcoming_forecasts(limit=limit)
-    return jsonify({"count": len(forecasts), "forecasts": forecasts}), 200
+    lookahead_hours = request.args.get('lookahead_hours', type=int)
+    limit = request.args.get('limit', type=int)
+    res = ForecastService.get_upcoming_forecasts(lookahead_hours=lookahead_hours, limit=limit)
+    return jsonify(res), 200
 
 @forecast_bp.route('/api/v1/forecast/backtest/summary', methods=['GET'])
 def get_backtest_summary_api():
@@ -73,11 +74,11 @@ def get_backtest_summary_api():
 @forecast_bp.route('/forecast', methods=['GET'])
 def forecast_dashboard_page():
     """
-    Renders main Forecast Dashboard.
+    Renders main Forecast Dashboard for the configured default lookahead horizon (48 hours).
     """
-    forecasts = ForecastService.get_upcoming_forecasts(limit=12)
+    res = ForecastService.get_upcoming_forecasts()
     backtest = ForecastService.get_backtest_summary()
-    return render_template('forecast.html', forecasts=forecasts, backtest=backtest)
+    return render_template('forecast.html', forecasts=res["forecasts"], meta=res, backtest=backtest)
 
 @forecast_bp.route('/forecast/game/<int:game_id>', methods=['GET'])
 def forecast_game_page(game_id: int):

@@ -27,6 +27,8 @@ class Config:
     )
     PREDICTION_GENERATION_TOKEN = os.getenv("PREDICTION_GENERATION_TOKEN", "dev-gen-token-secret")
 
+    FORECAST_DEFAULT_LOOKAHEAD_HOURS = int(os.getenv("FORECAST_DEFAULT_LOOKAHEAD_HOURS", "48"))
+
 
 class DevelopmentConfig(Config):
     """Development configuration."""
