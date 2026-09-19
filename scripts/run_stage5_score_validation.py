@@ -50,7 +50,8 @@ def load_frozen_candidate_params() -> Tuple[Dict[str, Dict[str, float]], Dict[st
     if not artifact_path.exists():
         raise FileNotFoundError(f"Frozen score candidate parameter artifact missing at {artifact_path}. Run scripts/fit_score_candidate_models.py first!")
     with open(artifact_path, "rb") as f:
-        file_bytes = f.read()
+        raw_bytes = f.read()
+        file_bytes = raw_bytes.replace(b"\r\n", b"\n")
         file_sha256 = hashlib.sha256(file_bytes).hexdigest()
         artifact = json.loads(file_bytes.decode("utf-8"))
         

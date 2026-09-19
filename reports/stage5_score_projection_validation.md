@@ -11,7 +11,7 @@
 - **Fitted At**: `2026-09-18T01:57:18.411642+00:00`
 - **Training Data Snapshot Hash (SHA-256)**: `768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3`
 - **Parameter Payload Hash (SHA-256)**: `c1587ea4d9e0fb6c586dd37c8d918cc8338b5488f03945ebbd40f89fa5c28c32`
-- **Parameter Artifact File Hash (SHA-256)**: `28d4f5b31d3f2fd39d77f26e630323b9f7a7f1df383d62bf9809122dfe983447`
+- **Parameter Artifact File Hash (SHA-256)**: `a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701`
 
 ## Frozen Candidate Parameter Estimation (2021-22 to 2023-24 Training Set)
 - Loaded from frozen artifact `models/forecasting/score_candidate_params_v1.4.0.json` (3936 training games).
