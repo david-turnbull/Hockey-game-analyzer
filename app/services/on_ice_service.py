@@ -96,6 +96,76 @@ class OnIceService:
         return home_players, away_players
 
     @staticmethod
+    def build_active_player_intervals(shifts: list, max_time: int, home_team_id: int) -> list:
+        """
+        Build half-open [start, end) intervals where the active-player sets are constant.
+
+        This is the season-analytics counterpart to build_active_players_timeline(): it
+        preserves the same shift validity and boundary semantics without allocating or
+        iterating one set per game-second. Overlapping duplicate shifts are handled with
+        per-player reference counts so one ending record cannot prematurely remove a
+        player who still has another active interval.
+        """
+        from collections import defaultdict
+
+        if max_time is None or max_time <= 0:
+            return []
+
+        starts = defaultdict(list)
+        ends = defaultdict(list)
+        boundaries = {0, int(max_time)}
+
+        for s in shifts:
+            if not OnIceService.is_valid_shift(s):
+                continue
+
+            start = max(0, int(s.start_elapsed_seconds))
+            end = min(int(max_time), int(s.end_elapsed_seconds))
+            if end <= start:
+                continue
+
+            side = "home" if s.team_id == home_team_id else "away"
+            starts[start].append((side, s.player_id))
+            ends[end].append((side, s.player_id))
+            boundaries.add(start)
+            boundaries.add(end)
+
+        ordered = sorted(boundaries)
+        home_counts = defaultdict(int)
+        away_counts = defaultdict(int)
+        intervals = []
+
+        def _counts(side):
+            return home_counts if side == "home" else away_counts
+
+        for idx, boundary in enumerate(ordered[:-1]):
+            # Half-open semantics: shifts ending at t are inactive for [t, next),
+            # while shifts starting at t are active.
+            for side, player_id in ends.get(boundary, []):
+                counts = _counts(side)
+                if counts[player_id] > 1:
+                    counts[player_id] -= 1
+                else:
+                    counts.pop(player_id, None)
+
+            for side, player_id in starts.get(boundary, []):
+                _counts(side)[player_id] += 1
+
+            next_boundary = ordered[idx + 1]
+            if next_boundary <= boundary:
+                continue
+
+            intervals.append({
+                "start": boundary,
+                "end": next_boundary,
+                "duration": next_boundary - boundary,
+                "home_players": frozenset(home_counts.keys()),
+                "away_players": frozenset(away_counts.keys()),
+            })
+
+        return intervals
+
+    @staticmethod
     def get_skaters_on_ice(game_id: int, elapsed_seconds: int, team_id: int = None) -> list:
         """Helper to retrieve active skaters on the ice (excluding goalies)."""
         players = OnIceService.get_players_on_ice(game_id, elapsed_seconds, team_id)
