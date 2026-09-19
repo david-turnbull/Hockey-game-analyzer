@@ -14,7 +14,7 @@
 * **CI Qualification Runtime:** `Python 3.12.10` (Pinned in `.github/workflows/tests.yml`)
 * **Flask Version:** `3.1.2`
 * **SQLAlchemy Version:** `2.0.38`
-* **Dependency Lock Files:** [`constraints.txt`](constraints.txt), [`requirements-release.txt`](requirements-release.txt)
+* **Dependency Lock Files:** [`constraints.txt`](../constraints.txt), [`requirements-release.txt`](../requirements-release.txt)
 * **InconsistentVersionWarning Status:** VERIFIED ZERO (All model artifacts load under authoritative runtime without version mismatch warnings)
 
 ---
@@ -23,15 +23,15 @@
 
 | Artifact Description | File Path | Expected SHA-256 | Verified Status |
 | :--- | :--- | :--- | :---: |
-| **Win Probability Classifier** | [`models/forecasting/pucklens-win-v1.4.0.pkl`](models/forecasting/pucklens-win-v1.4.0.pkl) | `63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9` | **MATCH** |
-| **Win Probability Manifest** | [`models/forecasting/pucklens-win-v1.4.0.json`](models/forecasting/pucklens-win-v1.4.0.json) | Manifest metadata & schema version `v1` | **MATCH** |
-| **Score Candidate Parameters** | [`models/forecasting/score_candidate_params_v1.4.0.json`](models/forecasting/score_candidate_params_v1.4.0.json) | `a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701` | **MATCH** |
+| **Win Probability Classifier** | [`models/forecasting/pucklens-win-v1.4.0.pkl`](../models/forecasting/pucklens-win-v1.4.0.pkl) | `63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9` | **MATCH** |
+| **Win Probability Manifest** | [`models/forecasting/pucklens-win-v1.4.0.json`](../models/forecasting/pucklens-win-v1.4.0.json) | Manifest metadata & schema version `v1` | **MATCH** |
+| **Score Candidate Parameters** | [`models/forecasting/score_candidate_params_v1.4.0.json`](../models/forecasting/score_candidate_params_v1.4.0.json) | `a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701` | **MATCH** |
 
 ---
 
 ## 3. Database Schema & Index Verification
 
-Migration script [`app/utils/db_migrator.py`](app/utils/db_migrator.py) executes automatically on startup. Schema and index integrity verified:
+Migration script [`app/utils/db_migrator.py`](../app/utils/db_migrator.py) executes automatically on startup. Schema and index integrity verified:
 
 - [x] Table `game_prediction` contains required columns: `prediction_type`, `model_sha256`, `feature_schema_version`, `run_id`, `input_cutoff_time_utc`, `scheduled_start_time_utc`, `feature_payload_json`, `feature_payload_sha256`.
 - [x] Partial unique index `_game_official_pregame_uc` verified on `game_prediction (game_id) WHERE prediction_type = 'official_pregame'`.
@@ -74,7 +74,7 @@ Migration script [`app/utils/db_migrator.py`](app/utils/db_migrator.py) executes
 * **Prediction Generation Default:** `ALLOW_PREDICTION_GENERATION=False` in `ProductionConfig`.
 * **Prediction Generation API Route:** `POST /api/v1/forecast/game/<game_id>/generate` (Requires `ALLOW_PREDICTION_GENERATION=True` and `X-Generation-Token` / `Bearer` token).
 * **Prediction Token:** `PREDICTION_GENERATION_TOKEN` driven exclusively by environment variable.
-* **Production Secret Key:** `SECRET_KEY` enforced at startup (`create_app`) and readiness probe (`/api/v1/ready`); missing key causes immediate fail-closed startup error (`ValueError`) and 503 readiness status.
+* **Production Secret Key:** `SECRET_KEY` is enforced at startup by `create_app`; a missing key causes an immediate fail-closed `ValueError`, so the production application does not start. When the application is running, `/api/v1/ready` also validates production-secret state as part of readiness.
 
 ---
 
@@ -99,6 +99,6 @@ Migration script [`app/utils/db_migrator.py`](app/utils/db_migrator.py) executes
 - [x] Schedule parity verified across 5 seasons (6,560 total games).
 - [x] Full test suite (199 tests) passing cleanly under Python 3.12.10.
 - [x] Production fail-closed security safeguards active.
-- [x] Documentation ([`README.md`](README.md), [`docs/release_notes_v1.4.0.md`](docs/release_notes_v1.4.0.md)) fully updated for `v1.4.0`.
+- [x] Documentation ([`README.md`](../README.md), [`docs/release_notes_v1.4.0.md`](../docs/release_notes_v1.4.0.md)) fully updated for `v1.4.0`.
 
 **PuckLens v1.4.0 is certified RELEASE QUALIFIED and ready for production deployment.**

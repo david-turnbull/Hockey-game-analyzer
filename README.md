@@ -177,7 +177,7 @@ In production configuration (`ProductionConfig` / `FLASK_ENV=production`):
 * `ALLOW_PUBLIC_INGESTION = False` (Disabled by default)
 * `ALLOW_PREDICTION_GENERATION = False` (Disabled by default)
 * `PREDICTION_GENERATION_TOKEN` driven exclusively by environment variable.
-* Missing required secrets (`SECRET_KEY`) cause immediate fail-closed startup errors (`ValueError`) and 503 readiness status.
+* Missing required `SECRET_KEY` causes an immediate fail-closed startup error (`ValueError`), so the production application does not start. When the application is running, `/api/v1/ready` also validates production-secret state as part of readiness.
 
 ---
 

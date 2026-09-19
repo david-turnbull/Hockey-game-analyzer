@@ -37,7 +37,7 @@ PuckLens v1.4.0 marks the transition of PuckLens into an end-to-end, production-
 ### Stage 5 — Score Projection Validation
 * Evaluated four candidate score distribution frameworks: Independent Poisson, Negative Binomial, Bivariate Poisson, and Dixon-Coles.
 * Confirmed Negative Binomial collapses to Poisson (`alpha = 0.0`) and Bivariate Poisson collapses to Poisson (`lambda3 = 0.0`).
-* Dixon-Coles tie adjustment (`gamma = 0.0543`) yielded microscopic pre-shootout Brier score improvement (0.00002) that did not justify replacing the simpler Independent Poisson baseline.
+* Dixon-Coles tie adjustment (`gamma = 0.0543`) produced statistically detectable but extremely small pre-shootout 3-class Brier improvements versus Independent Poisson: mean difference `-0.00074` in 2024–25 (95% CI `[-0.00085, -0.00061]`) and `-0.00027` in 2025–26 (95% CI `[-0.00039, -0.00015]`). The gains were too small and not broad enough across the wider distributional metrics to justify replacing the simpler Independent Poisson baseline.
 
 ### Stage 6 — Production Automation, Monitoring & Operational Reliability
 * Built race-safe, idempotent CLI pregame prediction generator (`scripts/generate_official_predictions.py`).
