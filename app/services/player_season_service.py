@@ -39,7 +39,8 @@ class PlayerSeasonService:
         team_id: Optional[int] = None,
         min_gp: int = 1,
         min_toi_seconds: int = 0,
-        min_unblocked_attempts: int = 0
+        min_unblocked_attempts: int = 0,
+        include_on_ice_5v5: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Aggregates season statistics for all skaters using grouped SQL queries to prevent N+1 overhead.
@@ -51,8 +52,12 @@ class PlayerSeasonService:
         game_query = (
             db.session.query(Game.game_id, Game.game_date)
             .filter(Game.season == season)
-            .order_by(Game.game_date.asc(), Game.game_id.asc())
         )
+        if team_id is not None:
+            game_query = game_query.filter(
+                or_(Game.home_team_id == team_id, Game.away_team_id == team_id)
+            )
+        game_query = game_query.order_by(Game.game_date.asc(), Game.game_id.asc())
         season_game_rows = game_query.all()
         if not season_game_rows:
             return []
@@ -252,8 +257,17 @@ class PlayerSeasonService:
         toi_rows = toi_query.group_by(Shift.player_id).all()
         toi_map = {pid: (int(tot_sec) if tot_sec else 0) for pid, tot_sec in toi_rows}
 
-        # 7. 5v5 On-Ice possession and xG metrics
-        on_ice_5v5 = cls._aggregate_season_5v5_on_ice(season_game_ids, relevant_pids, target_team_id=team_id)
+        # 7. 5v5 On-Ice possession and xG metrics.
+        # League overview leader cards do not use these fields, so callers can skip the
+        # expensive shift/event reconstruction entirely.
+        if include_on_ice_5v5:
+            on_ice_5v5 = cls._aggregate_season_5v5_on_ice(
+                season_game_ids,
+                relevant_pids,
+                target_team_id=team_id,
+            )
+        else:
+            on_ice_5v5 = {}
 
         # 8. Assemble skater records and apply filters
         results = []
