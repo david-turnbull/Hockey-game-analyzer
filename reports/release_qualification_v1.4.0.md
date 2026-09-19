@@ -9,7 +9,7 @@
 
 ## 1. System & Environment Runtime Verification
 
-* **Final Release Git SHA:** `407b7a6bb57c9c4f0b09e0cd35ebd732db91eced`
+* **Final Release Git SHA:** `2afde4ca8a19768e4377bb1dfd870076fa5defcd`
 * **Python Runtime:** `Python 3.12.10`
 * **scikit-learn Version:** `1.9.0`
 * **numpy Version:** `2.5.2`
