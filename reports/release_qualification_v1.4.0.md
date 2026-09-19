@@ -9,7 +9,7 @@
 
 ## 1. System & Environment Runtime Verification
 
-* **Qualification Implementation Commit SHA:** `2afde4ca8a19768e4377bb1dfd870076fa5defcd` *(Note: The final immutable release Git SHA and tag will be established externally upon tagging `v1.4.0`)*
+* **Final Pre-Merge Release Candidate SHA:** `141a8c33863988911268e49c5c28f890231f7b92` *(The final immutable release Git SHA will be the merged commit tagged `v1.4.0`.)*
 * **Authoritative Model-Training Runtime:** `Python 3.12.10` | `scikit-learn 1.9.0` | `numpy 2.5.2`
 * **CI Qualification Runtime:** `Python 3.12.10` (Pinned in `.github/workflows/tests.yml`)
 * **Flask Version:** `3.1.2`
@@ -81,13 +81,10 @@ Migration script [`app/utils/db_migrator.py`](../app/utils/db_migrator.py) execu
 ## 7. Automated Test Suite Qualification Environments
 
 * **Pinned Release Test Framework:** `pytest 8.3.4` (Lock file `requirements-release.txt`)
-* **Local Qualification Run:**
+* **Final GitHub Actions CI Qualification Run (#111):**
   - **Runtime:** Python `3.12.10` | pytest `8.3.4`
-  - **Result:** **199 PASSED, 0 FAILED, 3 WARNINGS** (~34.0s)
-  - **Non-Blocking Warnings:** SQLite date adapter deprecation (1) & SQLAlchemy legacy `Query.get()` (2).
-* **GitHub Actions CI Qualification Run:**
-  - **Runtime:** Python `3.12.10` | pytest `8.3.4`
-  - **Result:** **199 PASSED, 0 FAILED, 24 WARNINGS**
+  - **Result:** **202 PASSED, 0 FAILED, 24 WARNINGS** in `14.66s`
+  - **Release Candidate SHA:** `141a8c33863988911268e49c5c28f890231f7b92`
   - **Non-Blocking Warnings:** Deprecation and feature warnings under CI test runner environment.
 
 ---
@@ -97,7 +94,7 @@ Migration script [`app/utils/db_migrator.py`](../app/utils/db_migrator.py) execu
 - [x] All 7 implementation stages completed and verified against roadmap requirements.
 - [x] Frozen model artifacts verified with exact SHA-256 hashes.
 - [x] Schedule parity verified across 5 seasons (6,560 total games).
-- [x] Full test suite (199 tests) passing cleanly under Python 3.12.10.
+- [x] Full test suite (202 tests) passing cleanly under Python 3.12.10.
 - [x] Production fail-closed security safeguards active.
 - [x] Documentation ([`README.md`](../README.md), [`docs/release_notes_v1.4.0.md`](../docs/release_notes_v1.4.0.md)) fully updated for `v1.4.0`.
 
