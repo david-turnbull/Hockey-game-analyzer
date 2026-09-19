@@ -87,6 +87,8 @@ class XGExplainer:
             desc = cls._format_factor_description(feat_name, contrib, raw_dict)
             factors_list.append({
                 "factor": feat_name,
+                "feature_name": feat_name,
+                "raw_value": raw_dict.get(feat_name),
                 "contribution": round(contrib, 4),
                 "impact": "danger_increase" if contrib > 0 else "danger_decrease",
                 "description": desc
@@ -99,14 +101,23 @@ class XGExplainer:
         reducing = [f for f in factors_list if f["contribution"] < 0]
         reducing.sort(key=lambda x: x["contribution"])
 
+        baseline_probability = float(1.0 / (1.0 + np.exp(-intercept)))
+        odds_multiplier = float(np.exp(total_logit - intercept))
+
         return {
             "xg": predicted_xg,
             "model_name": getattr(model, 'name', ModelRegistry.get_active_name()),
             "model_version": getattr(model, 'version', ModelRegistry.get_active_version()),
             "intercept": round(intercept, 4),
             "reconstructed_logit": round(total_logit, 4),
+            # Stable API aliases used by the game-dashboard modal.
+            "logit": round(total_logit, 4),
+            "baseline_probability": round(baseline_probability, 4),
+            "odds_multiplier": round(odds_multiplier, 4),
             "factors_increasing_danger": increasing,
             "factors_reducing_danger": reducing,
+            "positive_factors": increasing,
+            "negative_factors": reducing,
             "all_factors": increasing + reducing
         }
 
@@ -156,7 +167,18 @@ class XGExplainer:
         }
 
         explanation = cls.explain_shot(features)
-        explanation["shot_id"] = shot_id
+        explanation.update({
+            "shot_id": shot_id,
+            "shooter_name": shot.shooter.full_name if shot.shooter else "Unknown",
+            "team_abbrev": event.team.abbreviation if event.team else "UNK",
+            "period": event.period,
+            "period_time": event.period_time,
+            "shot_type": shot.shot_type or "Shot",
+            "outcome": shot.outcome,
+            "distance": shot.distance,
+            "angle": shot.angle,
+            "strength_state": shot.strength_state or event.strength_state or "EV",
+        })
         if shot.xg is not None:
             explanation["recorded_db_xg"] = round(shot.xg, 4)
         return explanation

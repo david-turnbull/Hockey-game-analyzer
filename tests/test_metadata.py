@@ -112,7 +112,7 @@ def test_metadata_correctness(app, db, monkeypatch):
     monkeypatch.setattr(
         orchestrator.api_client,
         "get_season_roster",
-        lambda abbr, season: frozen_roster_cgy if abbr == "CGY" else {"forwards": [], "defensemen": [], "goalies": []}
+        lambda abbr, season, force_refresh=False: frozen_roster_cgy if abbr == "CGY" else {"forwards": [], "defensemen": [], "goalies": []}
     )
 
     success, summary = orchestrator.ingest_game(2023020007)

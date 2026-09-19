@@ -1,0 +1,1069 @@
+{
+  "audited_at": "2026-09-18T00:58:33.650303+00:00",
+  "target_seasons": [
+    "20212022",
+    "20222023",
+    "20232024",
+    "20242025",
+    "20252026"
+  ],
+  "schedule_parity_gate_passed": true,
+  "gate_reasons": [],
+  "seasons": {
+    "20212022": {
+      "season": "20212022",
+      "official_schedule_games": 1312,
+      "database_games": 1312,
+      "missing_games_count": 0,
+      "unexpected_games_count": 0,
+      "duplicate_db_games_count": 0,
+      "non_nhl_api_games_count": 0,
+      "date_mismatches_count": 0,
+      "home_team_mismatches_count": 0,
+      "away_team_mismatches_count": 0,
+      "incomplete_teams_count": 0,
+      "status": "PASSED",
+      "gate_reasons": [],
+      "team_breakdown": {
+        "ANA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "ARI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "BOS": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "BUF": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CAR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CBJ": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CGY": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CHI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "COL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "DAL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "DET": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "EDM": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "FLA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "LAK": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "MIN": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "MTL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NJD": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NSH": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NYI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NYR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "OTT": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "PHI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "PIT": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "SEA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "SJS": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "STL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "TBL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "TOR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "VAN": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "VGK": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "WPG": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "WSH": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        }
+      },
+      "missing_game_ids": [],
+      "unexpected_game_ids": []
+    },
+    "20222023": {
+      "season": "20222023",
+      "official_schedule_games": 1312,
+      "database_games": 1312,
+      "missing_games_count": 0,
+      "unexpected_games_count": 0,
+      "duplicate_db_games_count": 0,
+      "non_nhl_api_games_count": 0,
+      "date_mismatches_count": 0,
+      "home_team_mismatches_count": 0,
+      "away_team_mismatches_count": 0,
+      "incomplete_teams_count": 0,
+      "status": "PASSED",
+      "gate_reasons": [],
+      "team_breakdown": {
+        "ANA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "ARI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "BOS": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "BUF": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CAR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CBJ": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CGY": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CHI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "COL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "DAL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "DET": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "EDM": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "FLA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "LAK": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "MIN": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "MTL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NJD": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NSH": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NYI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NYR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "OTT": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "PHI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "PIT": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "SEA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "SJS": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "STL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "TBL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "TOR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "VAN": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "VGK": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "WPG": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "WSH": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        }
+      },
+      "missing_game_ids": [],
+      "unexpected_game_ids": []
+    },
+    "20232024": {
+      "season": "20232024",
+      "official_schedule_games": 1312,
+      "database_games": 1312,
+      "missing_games_count": 0,
+      "unexpected_games_count": 0,
+      "duplicate_db_games_count": 0,
+      "non_nhl_api_games_count": 0,
+      "date_mismatches_count": 0,
+      "home_team_mismatches_count": 0,
+      "away_team_mismatches_count": 0,
+      "incomplete_teams_count": 0,
+      "status": "PASSED",
+      "gate_reasons": [],
+      "team_breakdown": {
+        "ANA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "ARI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "BOS": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "BUF": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CAR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CBJ": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CGY": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CHI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "COL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "DAL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "DET": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "EDM": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "FLA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "LAK": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "MIN": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "MTL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NJD": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NSH": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NYI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NYR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "OTT": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "PHI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "PIT": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "SEA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "SJS": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "STL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "TBL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "TOR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "VAN": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "VGK": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "WPG": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "WSH": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        }
+      },
+      "missing_game_ids": [],
+      "unexpected_game_ids": []
+    },
+    "20242025": {
+      "season": "20242025",
+      "official_schedule_games": 1312,
+      "database_games": 1312,
+      "missing_games_count": 0,
+      "unexpected_games_count": 0,
+      "duplicate_db_games_count": 0,
+      "non_nhl_api_games_count": 0,
+      "date_mismatches_count": 0,
+      "home_team_mismatches_count": 0,
+      "away_team_mismatches_count": 0,
+      "incomplete_teams_count": 0,
+      "status": "PASSED",
+      "gate_reasons": [],
+      "team_breakdown": {
+        "ANA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "BOS": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "BUF": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CAR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CBJ": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CGY": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CHI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "COL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "DAL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "DET": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "EDM": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "FLA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "LAK": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "MIN": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "MTL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NJD": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NSH": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NYI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NYR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "OTT": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "PHI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "PIT": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "SEA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "SJS": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "STL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "TBL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "TOR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "UTA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "VAN": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "VGK": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "WPG": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "WSH": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        }
+      },
+      "missing_game_ids": [],
+      "unexpected_game_ids": []
+    },
+    "20252026": {
+      "season": "20252026",
+      "official_schedule_games": 1312,
+      "database_games": 1312,
+      "missing_games_count": 0,
+      "unexpected_games_count": 0,
+      "duplicate_db_games_count": 0,
+      "non_nhl_api_games_count": 0,
+      "date_mismatches_count": 0,
+      "home_team_mismatches_count": 0,
+      "away_team_mismatches_count": 0,
+      "incomplete_teams_count": 0,
+      "status": "PASSED",
+      "gate_reasons": [],
+      "team_breakdown": {
+        "ANA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "BOS": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "BUF": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CAR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CBJ": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CGY": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "CHI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "COL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "DAL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "DET": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "EDM": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "FLA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "LAK": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "MIN": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "MTL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NJD": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NSH": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NYI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "NYR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "OTT": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "PHI": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "PIT": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "SEA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "SJS": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "STL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "TBL": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "TOR": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "UTA": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "VAN": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "VGK": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "WPG": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        },
+        "WSH": {
+          "official_games": 82,
+          "database_games": 82,
+          "missing_games": 0,
+          "complete": true
+        }
+      },
+      "missing_game_ids": [],
+      "unexpected_game_ids": []
+    }
+  }
+}

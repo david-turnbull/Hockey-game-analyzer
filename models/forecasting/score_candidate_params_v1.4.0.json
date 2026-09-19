@@ -1,0 +1,41 @@
+{
+  "model_version": "v1.4.0",
+  "artifact_type": "score_candidate_frozen_parameters",
+  "fitting_git_sha": "e1a492e8d703b1ac85f59d90e79f42c95e5aad6d",
+  "fitted_at": "2026-09-18T01:57:18.411642+00:00",
+  "training_data_snapshot_hash": "768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3",
+  "parameter_payload_sha256": "c1587ea4d9e0fb6c586dd37c8d918cc8338b5488f03945ebbd40f89fa5c28c32",
+  "training_seasons": [
+    "20212022",
+    "20222023",
+    "20232024"
+  ],
+  "sample_count": 3936,
+  "filters": {
+    "game_type": "R",
+    "data_source": "nhl_api",
+    "game_state": [
+      "OFF",
+      "FINAL",
+      "OVER"
+    ]
+  },
+  "fitting_methodology": {
+    "poisson": "Baseline expected goals (lh, la) from PregameFeatureService",
+    "neg_binomial": "Method of moments over-dispersion ratio alpha = max(0.0, (Var - Mean) / Mean^2)",
+    "bivariate_poisson": "Residual goal covariance lambda3 = max(0.0, Cov(e_h, e_a))",
+    "dixon_coles": "Maximum likelihood estimation minimizing NLL for low-score tie multiplier tau(h, a; gamma)"
+  },
+  "candidate_parameters": {
+    "poisson": {},
+    "neg_binomial": {
+      "alpha": 0.0
+    },
+    "bivariate_poisson": {
+      "lambda3": 0.0
+    },
+    "dixon_coles": {
+      "gamma": 0.0543
+    }
+  }
+}

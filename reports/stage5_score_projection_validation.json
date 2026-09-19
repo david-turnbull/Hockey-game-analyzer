@@ -1,0 +1,737 @@
+{
+  "stage": 5,
+  "win_model_version": "v1.4.0",
+  "win_model_sha256": "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9",
+  "provenance": {
+    "evaluation_git_sha": "8f14543d41d457c44006440441a0d66a3e108a9b",
+    "fitting_git_sha": "e1a492e8d703b1ac85f59d90e79f42c95e5aad6d",
+    "fitted_at": "2026-09-18T01:57:18.411642+00:00",
+    "training_data_snapshot_hash": "768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3",
+    "parameter_payload_sha256": "c1587ea4d9e0fb6c586dd37c8d918cc8338b5488f03945ebbd40f89fa5c28c32",
+    "parameter_artifact_file_sha256": "a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701"
+  },
+  "candidate_frozen_parameters": {
+    "poisson": {},
+    "neg_binomial": {
+      "alpha": 0.0
+    },
+    "bivariate_poisson": {
+      "lambda3": 0.0
+    },
+    "dixon_coles": {
+      "gamma": 0.0543
+    }
+  },
+  "matrix_support": "Adaptive support N x N (tail mass criteria < 1e-8) with matrix cell normalization to 1.0",
+  "production_recommendation": {
+    "selected_score_model": "poisson",
+    "rationale": "Independent Poisson remains the production score model. Non-negative boundary parameter fitting yields alpha = 0.0 and lambda3 = 0.0, collapsing Negative Binomial and Bivariate Poisson to Independent Poisson. Dixon-Coles (gamma = 0.0543) shows a statistically detectable but very small pre-shootout Brier improvement on both seasons (2024-25 pre-shootout Brier \u0394 CI: [-0.00085, -0.00061], 2025-26 pre-shootout Brier \u0394 CI: [-0.00039, -0.00015]), while joint NLL improvement is not consistent across both seasons. Independent Poisson is retained as the production model because the effect size is microscopic and not broad enough across distributional metrics to justify extra complexity."
+  },
+  "candidate_model_decisions": [
+    {
+      "candidate": "neg_binomial",
+      "parameters": {
+        "alpha": 0.0
+      },
+      "ci95_nll_diff_20242025": [
+        0.0,
+        0.0
+      ],
+      "ci95_nll_diff_20252026": [
+        0.0,
+        0.0
+      ],
+      "status": "Fitted alpha=0.0 collapses Negative Binomial exactly to the Independent Poisson baseline."
+    },
+    {
+      "candidate": "bivariate_poisson",
+      "parameters": {
+        "lambda3": 0.0
+      },
+      "ci95_nll_diff_20242025": [
+        -0.0,
+        0.0
+      ],
+      "ci95_nll_diff_20252026": [
+        -0.0,
+        0.0
+      ],
+      "status": "Fitted lambda3=0.0 collapses Bivariate Poisson exactly to the Independent Poisson baseline."
+    },
+    {
+      "candidate": "dixon_coles",
+      "parameters": {
+        "gamma": 0.0543
+      },
+      "ci95_nll_diff_20242025": [
+        -0.00269,
+        0.00208
+      ],
+      "ci95_nll_diff_20252026": [
+        -0.00221,
+        -5e-05
+      ],
+      "status": "Dixon-Coles (gamma=0.0543) shows a statistically detectable but very small pre-shootout Brier improvement on both seasons (2024-25 pre-shootout Brier \u0394 CI: [-0.00085, -0.00061], 2025-26 pre-shootout Brier \u0394 CI: [-0.00039, -0.00015]), while joint NLL improvement is not consistent across both seasons."
+    }
+  ],
+  "eval_20242025": {
+    "game_count": 1312,
+    "shootout_count": 77,
+    "shootout_anomaly_count": 0,
+    "models": {
+      "poisson": {
+        "reg_ot_goals": {
+          "mae_home": 1.558,
+          "mae_away": 1.4798,
+          "mae_total": 2.0659,
+          "residual_bias_total": -0.2446,
+          "residual_std_total": 2.5807,
+          "residual_skew_total": 0.2031,
+          "residual_dispersion_total": 1.1059,
+          "exact_top1_coverage": 0.0442,
+          "exact_top5_coverage": 0.1951,
+          "joint_nll": 4.0658,
+          "reg_3class_log_loss": 0.9608,
+          "reg_3class_brier": 0.5867,
+          "totals_6_accuracy": 0.5123,
+          "totals_6_brier": 0.2822,
+          "totals_6_log_loss": 0.7757,
+          "totals_6_push_count": 178,
+          "totals_6_push_pct": 0.1357
+        },
+        "official_boxscore": {
+          "mae_home": 1.5584,
+          "mae_away": 1.4844,
+          "mae_total": 2.0595,
+          "residual_bias_total": -0.1859,
+          "residual_std_total": 2.5797,
+          "residual_skew_total": 0.215,
+          "residual_dispersion_total": 1.0944,
+          "exact_top1_coverage": 0.0389,
+          "exact_top5_coverage": 0.1898,
+          "joint_nll": 4.0777,
+          "reg_3class_log_loss": 0.9608,
+          "reg_3class_brier": 0.5867,
+          "totals_6_accuracy": 0.5129,
+          "totals_6_brier": 0.2819,
+          "totals_6_log_loss": 0.7753,
+          "totals_6_push_count": 150,
+          "totals_6_push_pct": 0.1143
+        }
+      },
+      "neg_binomial": {
+        "reg_ot_goals": {
+          "mae_home": 1.558,
+          "mae_away": 1.4798,
+          "mae_total": 2.0659,
+          "residual_bias_total": -0.2446,
+          "residual_std_total": 2.5807,
+          "residual_skew_total": 0.2031,
+          "residual_dispersion_total": 1.1059,
+          "exact_top1_coverage": 0.0442,
+          "exact_top5_coverage": 0.1951,
+          "joint_nll": 4.0658,
+          "reg_3class_log_loss": 0.9608,
+          "reg_3class_brier": 0.5867,
+          "totals_6_accuracy": 0.5123,
+          "totals_6_brier": 0.2822,
+          "totals_6_log_loss": 0.7757,
+          "totals_6_push_count": 178,
+          "totals_6_push_pct": 0.1357
+        },
+        "official_boxscore": {
+          "mae_home": 1.5584,
+          "mae_away": 1.4844,
+          "mae_total": 2.0595,
+          "residual_bias_total": -0.1859,
+          "residual_std_total": 2.5797,
+          "residual_skew_total": 0.215,
+          "residual_dispersion_total": 1.0944,
+          "exact_top1_coverage": 0.0389,
+          "exact_top5_coverage": 0.1898,
+          "joint_nll": 4.0777,
+          "reg_3class_log_loss": 0.9608,
+          "reg_3class_brier": 0.5867,
+          "totals_6_accuracy": 0.5129,
+          "totals_6_brier": 0.2819,
+          "totals_6_log_loss": 0.7753,
+          "totals_6_push_count": 150,
+          "totals_6_push_pct": 0.1143
+        }
+      },
+      "bivariate_poisson": {
+        "reg_ot_goals": {
+          "mae_home": 1.558,
+          "mae_away": 1.4798,
+          "mae_total": 2.0659,
+          "residual_bias_total": -0.2446,
+          "residual_std_total": 2.5807,
+          "residual_skew_total": 0.2031,
+          "residual_dispersion_total": 1.1059,
+          "exact_top1_coverage": 0.0442,
+          "exact_top5_coverage": 0.1951,
+          "joint_nll": 4.0658,
+          "reg_3class_log_loss": 0.9608,
+          "reg_3class_brier": 0.5867,
+          "totals_6_accuracy": 0.5123,
+          "totals_6_brier": 0.2822,
+          "totals_6_log_loss": 0.7757,
+          "totals_6_push_count": 178,
+          "totals_6_push_pct": 0.1357
+        },
+        "official_boxscore": {
+          "mae_home": 1.5584,
+          "mae_away": 1.4844,
+          "mae_total": 2.0595,
+          "residual_bias_total": -0.1859,
+          "residual_std_total": 2.5797,
+          "residual_skew_total": 0.215,
+          "residual_dispersion_total": 1.0944,
+          "exact_top1_coverage": 0.0389,
+          "exact_top5_coverage": 0.1898,
+          "joint_nll": 4.0777,
+          "reg_3class_log_loss": 0.9608,
+          "reg_3class_brier": 0.5867,
+          "totals_6_accuracy": 0.5129,
+          "totals_6_brier": 0.2819,
+          "totals_6_log_loss": 0.7753,
+          "totals_6_push_count": 150,
+          "totals_6_push_pct": 0.1143
+        }
+      },
+      "dixon_coles": {
+        "reg_ot_goals": {
+          "mae_home": 1.558,
+          "mae_away": 1.4798,
+          "mae_total": 2.0659,
+          "residual_bias_total": -0.2446,
+          "residual_std_total": 2.5807,
+          "residual_skew_total": 0.2031,
+          "residual_dispersion_total": 1.1059,
+          "exact_top1_coverage": 0.0442,
+          "exact_top5_coverage": 0.1966,
+          "joint_nll": 4.0651,
+          "reg_3class_log_loss": 0.9585,
+          "reg_3class_brier": 0.586,
+          "totals_6_accuracy": 0.5123,
+          "totals_6_brier": 0.2822,
+          "totals_6_log_loss": 0.7757,
+          "totals_6_push_count": 178,
+          "totals_6_push_pct": 0.1357
+        },
+        "official_boxscore": {
+          "mae_home": 1.5584,
+          "mae_away": 1.4844,
+          "mae_total": 2.0595,
+          "residual_bias_total": -0.1859,
+          "residual_std_total": 2.5797,
+          "residual_skew_total": 0.215,
+          "residual_dispersion_total": 1.0944,
+          "exact_top1_coverage": 0.0389,
+          "exact_top5_coverage": 0.1913,
+          "joint_nll": 4.0753,
+          "reg_3class_log_loss": 0.9585,
+          "reg_3class_brier": 0.586,
+          "totals_6_accuracy": 0.5129,
+          "totals_6_brier": 0.2819,
+          "totals_6_log_loss": 0.7753,
+          "totals_6_push_count": 150,
+          "totals_6_push_pct": 0.1143
+        }
+      }
+    },
+    "paired_bootstrap_vs_poisson": {
+      "neg_binomial": {
+        "nll_diff_mean": 0.0,
+        "nll_diff_ci95": [
+          0.0,
+          0.0
+        ],
+        "brier_3c_diff_mean": 0.0,
+        "brier_3c_diff_ci95": [
+          0.0,
+          0.0
+        ],
+        "mae_tot_diff_mean": 0.0,
+        "mae_tot_diff_ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "bivariate_poisson": {
+        "nll_diff_mean": 0.0,
+        "nll_diff_ci95": [
+          -0.0,
+          0.0
+        ],
+        "brier_3c_diff_mean": -0.0,
+        "brier_3c_diff_ci95": [
+          -0.0,
+          0.0
+        ],
+        "mae_tot_diff_mean": 0.0,
+        "mae_tot_diff_ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "dixon_coles": {
+        "nll_diff_mean": -0.00073,
+        "nll_diff_ci95": [
+          -0.00269,
+          0.00208
+        ],
+        "brier_3c_diff_mean": -0.00074,
+        "brier_3c_diff_ci95": [
+          -0.00085,
+          -0.00061
+        ],
+        "mae_tot_diff_mean": 0.0,
+        "mae_tot_diff_ci95": [
+          0.0,
+          0.0
+        ]
+      }
+    }
+  },
+  "eval_20252026": {
+    "game_count": 1312,
+    "shootout_count": 119,
+    "shootout_anomaly_count": 0,
+    "models": {
+      "poisson": {
+        "reg_ot_goals": {
+          "mae_home": 1.5636,
+          "mae_away": 1.4677,
+          "mae_total": 2.0587,
+          "residual_bias_total": -0.48,
+          "residual_std_total": 2.5299,
+          "residual_skew_total": 0.2291,
+          "residual_dispersion_total": 1.0385,
+          "exact_top1_coverage": 0.0373,
+          "exact_top5_coverage": 0.1791,
+          "joint_nll": 4.0343,
+          "reg_3class_log_loss": 1.0035,
+          "reg_3class_brier": 0.6169,
+          "totals_6_accuracy": 0.5327,
+          "totals_6_brier": 0.2781,
+          "totals_6_log_loss": 0.7646,
+          "totals_6_push_count": 182,
+          "totals_6_push_pct": 0.1387
+        },
+        "official_boxscore": {
+          "mae_home": 1.5738,
+          "mae_away": 1.4771,
+          "mae_total": 2.0519,
+          "residual_bias_total": -0.3893,
+          "residual_std_total": 2.5321,
+          "residual_skew_total": 0.2257,
+          "residual_dispersion_total": 1.0252,
+          "exact_top1_coverage": 0.0335,
+          "exact_top5_coverage": 0.1738,
+          "joint_nll": 4.054,
+          "reg_3class_log_loss": 1.0035,
+          "reg_3class_brier": 0.6169,
+          "totals_6_accuracy": 0.5311,
+          "totals_6_brier": 0.2782,
+          "totals_6_log_loss": 0.7646,
+          "totals_6_push_count": 137,
+          "totals_6_push_pct": 0.1044
+        }
+      },
+      "neg_binomial": {
+        "reg_ot_goals": {
+          "mae_home": 1.5636,
+          "mae_away": 1.4677,
+          "mae_total": 2.0587,
+          "residual_bias_total": -0.48,
+          "residual_std_total": 2.5299,
+          "residual_skew_total": 0.2291,
+          "residual_dispersion_total": 1.0385,
+          "exact_top1_coverage": 0.0373,
+          "exact_top5_coverage": 0.1791,
+          "joint_nll": 4.0343,
+          "reg_3class_log_loss": 1.0035,
+          "reg_3class_brier": 0.6169,
+          "totals_6_accuracy": 0.5327,
+          "totals_6_brier": 0.2781,
+          "totals_6_log_loss": 0.7646,
+          "totals_6_push_count": 182,
+          "totals_6_push_pct": 0.1387
+        },
+        "official_boxscore": {
+          "mae_home": 1.5738,
+          "mae_away": 1.4771,
+          "mae_total": 2.0519,
+          "residual_bias_total": -0.3893,
+          "residual_std_total": 2.5321,
+          "residual_skew_total": 0.2257,
+          "residual_dispersion_total": 1.0252,
+          "exact_top1_coverage": 0.0335,
+          "exact_top5_coverage": 0.1738,
+          "joint_nll": 4.054,
+          "reg_3class_log_loss": 1.0035,
+          "reg_3class_brier": 0.6169,
+          "totals_6_accuracy": 0.5311,
+          "totals_6_brier": 0.2782,
+          "totals_6_log_loss": 0.7646,
+          "totals_6_push_count": 137,
+          "totals_6_push_pct": 0.1044
+        }
+      },
+      "bivariate_poisson": {
+        "reg_ot_goals": {
+          "mae_home": 1.5636,
+          "mae_away": 1.4677,
+          "mae_total": 2.0587,
+          "residual_bias_total": -0.48,
+          "residual_std_total": 2.5299,
+          "residual_skew_total": 0.2291,
+          "residual_dispersion_total": 1.0385,
+          "exact_top1_coverage": 0.0373,
+          "exact_top5_coverage": 0.1791,
+          "joint_nll": 4.0343,
+          "reg_3class_log_loss": 1.0035,
+          "reg_3class_brier": 0.6169,
+          "totals_6_accuracy": 0.5327,
+          "totals_6_brier": 0.2781,
+          "totals_6_log_loss": 0.7646,
+          "totals_6_push_count": 182,
+          "totals_6_push_pct": 0.1387
+        },
+        "official_boxscore": {
+          "mae_home": 1.5738,
+          "mae_away": 1.4771,
+          "mae_total": 2.0519,
+          "residual_bias_total": -0.3893,
+          "residual_std_total": 2.5321,
+          "residual_skew_total": 0.2257,
+          "residual_dispersion_total": 1.0252,
+          "exact_top1_coverage": 0.0335,
+          "exact_top5_coverage": 0.1738,
+          "joint_nll": 4.054,
+          "reg_3class_log_loss": 1.0035,
+          "reg_3class_brier": 0.6169,
+          "totals_6_accuracy": 0.5311,
+          "totals_6_brier": 0.2782,
+          "totals_6_log_loss": 0.7646,
+          "totals_6_push_count": 137,
+          "totals_6_push_pct": 0.1044
+        }
+      },
+      "dixon_coles": {
+        "reg_ot_goals": {
+          "mae_home": 1.5636,
+          "mae_away": 1.4677,
+          "mae_total": 2.0587,
+          "residual_bias_total": -0.48,
+          "residual_std_total": 2.5299,
+          "residual_skew_total": 0.2291,
+          "residual_dispersion_total": 1.0385,
+          "exact_top1_coverage": 0.0373,
+          "exact_top5_coverage": 0.1791,
+          "joint_nll": 4.0332,
+          "reg_3class_log_loss": 1.0024,
+          "reg_3class_brier": 0.6167,
+          "totals_6_accuracy": 0.5327,
+          "totals_6_brier": 0.2781,
+          "totals_6_log_loss": 0.7646,
+          "totals_6_push_count": 182,
+          "totals_6_push_pct": 0.1387
+        },
+        "official_boxscore": {
+          "mae_home": 1.5738,
+          "mae_away": 1.4771,
+          "mae_total": 2.0519,
+          "residual_bias_total": -0.3893,
+          "residual_std_total": 2.5321,
+          "residual_skew_total": 0.2257,
+          "residual_dispersion_total": 1.0252,
+          "exact_top1_coverage": 0.0335,
+          "exact_top5_coverage": 0.1738,
+          "joint_nll": 4.052,
+          "reg_3class_log_loss": 1.0024,
+          "reg_3class_brier": 0.6167,
+          "totals_6_accuracy": 0.5311,
+          "totals_6_brier": 0.2782,
+          "totals_6_log_loss": 0.7646,
+          "totals_6_push_count": 137,
+          "totals_6_push_pct": 0.1044
+        }
+      }
+    },
+    "paired_bootstrap_vs_poisson": {
+      "neg_binomial": {
+        "nll_diff_mean": 0.0,
+        "nll_diff_ci95": [
+          0.0,
+          0.0
+        ],
+        "brier_3c_diff_mean": 0.0,
+        "brier_3c_diff_ci95": [
+          0.0,
+          0.0
+        ],
+        "mae_tot_diff_mean": 0.0,
+        "mae_tot_diff_ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "bivariate_poisson": {
+        "nll_diff_mean": -0.0,
+        "nll_diff_ci95": [
+          -0.0,
+          0.0
+        ],
+        "brier_3c_diff_mean": -0.0,
+        "brier_3c_diff_ci95": [
+          -0.0,
+          0.0
+        ],
+        "mae_tot_diff_mean": 0.0,
+        "mae_tot_diff_ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "dixon_coles": {
+        "nll_diff_mean": -0.00111,
+        "nll_diff_ci95": [
+          -0.00221,
+          -5e-05
+        ],
+        "brier_3c_diff_mean": -0.00027,
+        "brier_3c_diff_ci95": [
+          -0.00039,
+          -0.00015
+        ],
+        "mae_tot_diff_mean": 0.0,
+        "mae_tot_diff_ci95": [
+          0.0,
+          0.0
+        ]
+      }
+    }
+  },
+  "eval_pooled": {
+    "game_count": 2624,
+    "shootout_count": 196,
+    "shootout_anomaly_count": 0,
+    "models": {
+      "poisson": {
+        "reg_ot_goals": {
+          "mae_home": 1.5608,
+          "mae_away": 1.4738,
+          "mae_total": 2.0623,
+          "residual_bias_total": -0.3623,
+          "residual_std_total": 2.5582,
+          "residual_skew_total": 0.2178,
+          "residual_dispersion_total": 1.0741,
+          "exact_top1_coverage": 0.0408,
+          "exact_top5_coverage": 0.1871,
+          "joint_nll": 4.0501,
+          "reg_3class_log_loss": 0.9822,
+          "reg_3class_brier": 0.6018,
+          "totals_6_accuracy": 0.5225,
+          "totals_6_brier": 0.2802,
+          "totals_6_log_loss": 0.7702,
+          "totals_6_push_count": 360,
+          "totals_6_push_pct": 0.1372
+        },
+        "official_boxscore": {
+          "mae_home": 1.5661,
+          "mae_away": 1.4807,
+          "mae_total": 2.0557,
+          "residual_bias_total": -0.2876,
+          "residual_std_total": 2.558,
+          "residual_skew_total": 0.2219,
+          "residual_dispersion_total": 1.061,
+          "exact_top1_coverage": 0.0362,
+          "exact_top5_coverage": 0.1818,
+          "joint_nll": 4.0659,
+          "reg_3class_log_loss": 0.9822,
+          "reg_3class_brier": 0.6018,
+          "totals_6_accuracy": 0.522,
+          "totals_6_brier": 0.28,
+          "totals_6_log_loss": 0.7699,
+          "totals_6_push_count": 287,
+          "totals_6_push_pct": 0.1094
+        }
+      },
+      "neg_binomial": {
+        "reg_ot_goals": {
+          "mae_home": 1.5608,
+          "mae_away": 1.4738,
+          "mae_total": 2.0623,
+          "residual_bias_total": -0.3623,
+          "residual_std_total": 2.5582,
+          "residual_skew_total": 0.2178,
+          "residual_dispersion_total": 1.0741,
+          "exact_top1_coverage": 0.0408,
+          "exact_top5_coverage": 0.1871,
+          "joint_nll": 4.0501,
+          "reg_3class_log_loss": 0.9822,
+          "reg_3class_brier": 0.6018,
+          "totals_6_accuracy": 0.5225,
+          "totals_6_brier": 0.2802,
+          "totals_6_log_loss": 0.7702,
+          "totals_6_push_count": 360,
+          "totals_6_push_pct": 0.1372
+        },
+        "official_boxscore": {
+          "mae_home": 1.5661,
+          "mae_away": 1.4807,
+          "mae_total": 2.0557,
+          "residual_bias_total": -0.2876,
+          "residual_std_total": 2.558,
+          "residual_skew_total": 0.2219,
+          "residual_dispersion_total": 1.061,
+          "exact_top1_coverage": 0.0362,
+          "exact_top5_coverage": 0.1818,
+          "joint_nll": 4.0659,
+          "reg_3class_log_loss": 0.9822,
+          "reg_3class_brier": 0.6018,
+          "totals_6_accuracy": 0.522,
+          "totals_6_brier": 0.28,
+          "totals_6_log_loss": 0.7699,
+          "totals_6_push_count": 287,
+          "totals_6_push_pct": 0.1094
+        }
+      },
+      "bivariate_poisson": {
+        "reg_ot_goals": {
+          "mae_home": 1.5608,
+          "mae_away": 1.4738,
+          "mae_total": 2.0623,
+          "residual_bias_total": -0.3623,
+          "residual_std_total": 2.5582,
+          "residual_skew_total": 0.2178,
+          "residual_dispersion_total": 1.0741,
+          "exact_top1_coverage": 0.0408,
+          "exact_top5_coverage": 0.1871,
+          "joint_nll": 4.0501,
+          "reg_3class_log_loss": 0.9822,
+          "reg_3class_brier": 0.6018,
+          "totals_6_accuracy": 0.5225,
+          "totals_6_brier": 0.2802,
+          "totals_6_log_loss": 0.7702,
+          "totals_6_push_count": 360,
+          "totals_6_push_pct": 0.1372
+        },
+        "official_boxscore": {
+          "mae_home": 1.5661,
+          "mae_away": 1.4807,
+          "mae_total": 2.0557,
+          "residual_bias_total": -0.2876,
+          "residual_std_total": 2.558,
+          "residual_skew_total": 0.2219,
+          "residual_dispersion_total": 1.061,
+          "exact_top1_coverage": 0.0362,
+          "exact_top5_coverage": 0.1818,
+          "joint_nll": 4.0659,
+          "reg_3class_log_loss": 0.9822,
+          "reg_3class_brier": 0.6018,
+          "totals_6_accuracy": 0.522,
+          "totals_6_brier": 0.28,
+          "totals_6_log_loss": 0.7699,
+          "totals_6_push_count": 287,
+          "totals_6_push_pct": 0.1094
+        }
+      },
+      "dixon_coles": {
+        "reg_ot_goals": {
+          "mae_home": 1.5608,
+          "mae_away": 1.4738,
+          "mae_total": 2.0623,
+          "residual_bias_total": -0.3623,
+          "residual_std_total": 2.5582,
+          "residual_skew_total": 0.2178,
+          "residual_dispersion_total": 1.0741,
+          "exact_top1_coverage": 0.0408,
+          "exact_top5_coverage": 0.1879,
+          "joint_nll": 4.0492,
+          "reg_3class_log_loss": 0.9804,
+          "reg_3class_brier": 0.6013,
+          "totals_6_accuracy": 0.5225,
+          "totals_6_brier": 0.2802,
+          "totals_6_log_loss": 0.7702,
+          "totals_6_push_count": 360,
+          "totals_6_push_pct": 0.1372
+        },
+        "official_boxscore": {
+          "mae_home": 1.5661,
+          "mae_away": 1.4807,
+          "mae_total": 2.0557,
+          "residual_bias_total": -0.2876,
+          "residual_std_total": 2.558,
+          "residual_skew_total": 0.2219,
+          "residual_dispersion_total": 1.061,
+          "exact_top1_coverage": 0.0362,
+          "exact_top5_coverage": 0.1825,
+          "joint_nll": 4.0636,
+          "reg_3class_log_loss": 0.9804,
+          "reg_3class_brier": 0.6013,
+          "totals_6_accuracy": 0.522,
+          "totals_6_brier": 0.28,
+          "totals_6_log_loss": 0.7699,
+          "totals_6_push_count": 287,
+          "totals_6_push_pct": 0.1094
+        }
+      }
+    },
+    "paired_bootstrap_vs_poisson": {
+      "neg_binomial": {
+        "nll_diff_mean": 0.0,
+        "nll_diff_ci95": [
+          0.0,
+          0.0
+        ],
+        "brier_3c_diff_mean": 0.0,
+        "brier_3c_diff_ci95": [
+          0.0,
+          0.0
+        ],
+        "mae_tot_diff_mean": 0.0,
+        "mae_tot_diff_ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "bivariate_poisson": {
+        "nll_diff_mean": 0.0,
+        "nll_diff_ci95": [
+          -0.0,
+          0.0
+        ],
+        "brier_3c_diff_mean": -0.0,
+        "brier_3c_diff_ci95": [
+          -0.0,
+          0.0
+        ],
+        "mae_tot_diff_mean": 0.0,
+        "mae_tot_diff_ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "dixon_coles": {
+        "nll_diff_mean": -0.00092,
+        "nll_diff_ci95": [
+          -0.00205,
+          0.00057
+        ],
+        "brier_3c_diff_mean": -0.0005,
+        "brier_3c_diff_ci95": [
+          -0.00059,
+          -0.00041
+        ],
+        "mae_tot_diff_mean": 0.0,
+        "mae_tot_diff_ci95": [
+          0.0,
+          0.0
+        ]
+      }
+    }
+  }
+}

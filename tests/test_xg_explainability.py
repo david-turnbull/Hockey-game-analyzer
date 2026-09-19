@@ -101,6 +101,23 @@ def test_xg_explanation_api_endpoint(app, client, db):
     assert "all_factors" in data
     assert len(data["all_factors"]) > 0
 
+    # Frontend modal contract: metadata + stable aliases must always be present.
+    assert data["shooter_name"] == "Mikael Backlund"
+    assert data["team_abbrev"] == "CGY"
+    assert data["period"] == 1
+    assert data["period_time"] == "10:00"
+    assert data["outcome"] == "Saved"
+    assert data["distance"] == 15.0
+    assert data["angle"] == 10.0
+    assert "logit" in data
+    assert "baseline_probability" in data
+    assert "odds_multiplier" in data
+    assert isinstance(data["positive_factors"], list)
+    assert isinstance(data["negative_factors"], list)
+    for factor in data["positive_factors"] + data["negative_factors"]:
+        assert "feature_name" in factor
+        assert "contribution" in factor
+
     # 404 for nonexistent shot
     res404 = client.get('/api/shots/nonexistent_shot_id/xg-explanation')
     assert res404.status_code == 404

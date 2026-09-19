@@ -51,13 +51,18 @@ def configure_logging(app):
 def create_app(config_name=None):
     """Application factory method to create and configure the Flask app."""
     app = Flask(__name__)
-    
+
     # Determine configuration type
     if not config_name:
         config_name = os.environ.get('FLASK_ENV', 'development')
-        
+
     app.config.from_object(config_by_name.get(config_name, config_by_name['default']))
-    
+
+    # Validate production configuration secrets
+    if config_name == 'production' or os.environ.get('FLASK_ENV') == 'production':
+        if not app.config.get('SECRET_KEY'):
+            raise ValueError("CRITICAL: SECRET_KEY environment variable must be set in production mode.")
+
     # Configure logging
     configure_logging(app)
     
@@ -75,11 +80,13 @@ def create_app(config_name=None):
     from app.routes.api import api_bp
     from app.routes.games import games_bp
     from app.routes.seasons import seasons_bp
+    from app.routes.forecast import forecast_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(games_bp)
     app.register_blueprint(seasons_bp)
+    app.register_blueprint(forecast_bp)
     
     # Global error handlers
     @app.errorhandler(404)

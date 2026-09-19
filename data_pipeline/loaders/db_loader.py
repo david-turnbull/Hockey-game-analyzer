@@ -20,20 +20,36 @@ class DatabaseLoader:
         """
         logger.info(f"Loading game data to database for Game ID: {game.game_id}")
         try:
-            # 1. Upsert Teams (avoid duplicates)
+            # 1. Upsert Teams (avoid duplicate abbreviation constraint failures across seasons)
+            team_id_map = {}
             for team in teams:
                 existing_team = self.session.get(Team, team.team_id)
                 if existing_team:
                     existing_team.abbreviation = team.abbreviation
                     existing_team.name = team.name
                 else:
-                    self.session.add(team)
+                    existing_by_abbrev = self.session.query(Team).filter_by(abbreviation=team.abbreviation).first()
+                    if existing_by_abbrev:
+                        existing_by_abbrev.name = team.name
+                        team_id_map[team.team_id] = existing_by_abbrev.team_id
+                    else:
+                        self.session.add(team)
+
+            # Map game team references if aliased
+            if game.home_team_id in team_id_map:
+                game.home_team_id = team_id_map[game.home_team_id]
+            if game.away_team_id in team_id_map:
+                game.away_team_id = team_id_map[game.away_team_id]
+
             
             # Flush teams so players can reference them
             self.session.flush()
 
-            # 2. Upsert Players (avoid duplicates)
+            # 2. Upsert Players (avoid duplicates and handle team aliasing)
             for player in players:
+                if player.current_team_id in team_id_map:
+                    player.current_team_id = team_id_map[player.current_team_id]
+
                 existing_player = self.session.get(Player, player.player_id)
                 if existing_player:
                     existing_player.first_name = player.first_name
@@ -79,32 +95,40 @@ class DatabaseLoader:
             if existing_game:
                 existing_game.season = game.season
                 existing_game.game_date = game.game_date
+                existing_game.start_time_utc = game.start_time_utc
                 existing_game.game_type = game.game_type
                 existing_game.home_team_id = game.home_team_id
                 existing_game.away_team_id = game.away_team_id
                 existing_game.home_score = game.home_score
                 existing_game.away_score = game.away_score
                 existing_game.nhl_game_state = game.nhl_game_state
+                existing_game.data_source = getattr(game, 'data_source', 'nhl_api') or 'nhl_api'
             else:
                 self.session.add(game)
                 
             self.session.flush()
 
             for event in events:
+                if event.team_id in team_id_map:
+                    event.team_id = team_id_map[event.team_id]
                 self.session.add(event)
-            self.session.flush()
 
             for shot in shots:
+                if shot.team_id in team_id_map:
+                    shot.team_id = team_id_map[shot.team_id]
                 self.session.add(shot)
-            self.session.flush()
 
             for shift in shifts:
+                if shift.team_id in team_id_map:
+                    shift.team_id = team_id_map[shift.team_id]
                 self.session.add(shift)
-            self.session.flush()
 
             if game_players:
                 for gp in game_players:
+                    if gp.team_id in team_id_map:
+                        gp.team_id = team_id_map[gp.team_id]
                     self.session.add(gp)
+
 
             # 5. Commit all changes
             self.session.commit()

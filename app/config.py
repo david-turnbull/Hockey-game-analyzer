@@ -19,6 +19,17 @@ class Config:
     )
 
 
+    ALLOW_PUBLIC_INGESTION = (
+        os.getenv("ALLOW_PUBLIC_INGESTION", "true").lower() == "true"
+    )
+    ALLOW_PREDICTION_GENERATION = (
+        os.getenv("ALLOW_PREDICTION_GENERATION", "false").lower() == "true"
+    )
+    PREDICTION_GENERATION_TOKEN = os.getenv("PREDICTION_GENERATION_TOKEN", "dev-gen-token-secret")
+
+    FORECAST_DEFAULT_LOOKAHEAD_HOURS = int(os.getenv("FORECAST_DEFAULT_LOOKAHEAD_HOURS", "48"))
+
+
 class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
@@ -28,14 +39,25 @@ class TestingConfig(Config):
     """Testing configuration."""
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    ALLOW_PREDICTION_GENERATION = True
+    PREDICTION_GENERATION_TOKEN = 'test-gen-token'
 
 
 class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
 
-    # In production, we require a stronger secret key
+    # In production, require environment-driven secret key
     SECRET_KEY = os.environ.get('SECRET_KEY')
+
+    # Fail closed in production by default
+    ALLOW_PUBLIC_INGESTION = (
+        os.getenv("ALLOW_PUBLIC_INGESTION", "false").lower() == "true"
+    )
+    ALLOW_PREDICTION_GENERATION = (
+        os.getenv("ALLOW_PREDICTION_GENERATION", "false").lower() == "true"
+    )
+    PREDICTION_GENERATION_TOKEN = os.environ.get("PREDICTION_GENERATION_TOKEN")
 
 config_by_name = {
     'development': DevelopmentConfig,
