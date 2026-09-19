@@ -519,10 +519,11 @@ class PlayerSeasonService:
                         if p in skater_set and players_pos.get(p) != "G":
                             on_ice_res[p]["toi_seconds"] += duration
 
-            if not valid_5v5_intervals:
-                continue
-
-            starts = [interval["start"] for interval in valid_5v5_intervals]
+            # Preserve the historical metric contract:
+            # - TOI is counted only when the reconstructed lineup is true 5v5.
+            # - Event attribution uses the event's authoritative 5v5 strength flag plus
+            #   the player's active shift, even if other shift records are incomplete.
+            starts = [interval["start"] for interval in intervals]
             game_events = sorted(
                 events_by_game.get(gid, []),
                 key=lambda item: item[0].elapsed_game_seconds
@@ -540,7 +541,7 @@ class PlayerSeasonService:
                 idx = bisect_right(starts, t) - 1
                 if idx < 0:
                     continue
-                interval = valid_5v5_intervals[idx]
+                interval = intervals[idx]
                 if not (interval["start"] <= t < interval["end"]):
                     continue
 
