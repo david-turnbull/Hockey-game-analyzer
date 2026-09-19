@@ -191,3 +191,4 @@ def run_migrations(db):
     except Exception as e:
         db.session.rollback()
         logger.exception("Failed to run database migrations")
+        raise

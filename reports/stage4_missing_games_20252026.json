@@ -1,4 +1,6 @@
 {
+  "status": "SUPERSEDED_NON_AUTHORITATIVE",
+  "note": "This diagnostic artifact represents an initial schedule gap prior to Stage 4 schedule repair. Authoritative 2025-26 parity is 1,312/1,312 regular-season games.",
   "audited_at": "2026-09-18T00:23:04.107882+00:00",
   "season": "20252026",
   "official_schedule_regular_season_games": 1312,

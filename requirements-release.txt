@@ -1,0 +1,11 @@
+# PuckLens v1.4.0 Production & Release Dependency Lock
+# Authoritative runtime: Python 3.12.10, scikit-learn 1.9.0, numpy 2.5.2
+Flask==3.1.2
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.38
+scikit-learn==1.9.0
+numpy==2.5.2
+joblib==1.4.2
+pandas==2.2.3
+pytest==8.3.4
+pytest-cov==6.0.0

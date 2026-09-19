@@ -1,4 +1,10 @@
-# Stage 4: 2025-26 Missing Games Diagnostic Report
+# Stage 4: 2025-26 Missing Games Diagnostic Report [SUPERSEDED / NON-AUTHORITATIVE]
+
+> [!WARNING]
+> **SUPERSEDED / NON-AUTHORITATIVE DIAGNOSTIC REPORT**  
+> This diagnostic report was generated during Stage 4 initial schedule auditing when 82 Utah HC games were un-ingested.  
+> Following schedule repair in Stage 4, all 1,312/1,312 regular-season games for 2025-26 (including Utah HC) were fully ingested and validated.  
+> Refer to `reports/stage4_external_validation.md` and `reports/release_qualification_v1.4.0.md` for authoritative production schedule parity.
 
 **Audited At:** `2026-09-18T00:23:04.107882+00:00`  
 **Official Schedule Games:** `1312`  

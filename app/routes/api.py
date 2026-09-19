@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, jsonify, request, current_app
 from app.services.game_service import GameService
 from app.models import db, Shot, Event, Player, Team, Game, Shift
@@ -600,6 +601,15 @@ def get_readiness_probe():
     except Exception as e:
         checks["active_model"] = f"FAILED: {e}"
         is_ready = False
+
+    # 5. Production Secrets Verification
+    flask_env = current_app.config.get('ENV') or os.environ.get('FLASK_ENV')
+    is_prod = (flask_env == 'production') or (not current_app.debug and not current_app.testing and flask_env != 'development')
+    if is_prod and not current_app.config.get("SECRET_KEY"):
+        checks["production_secret_key"] = "MISSING_REQUIRED_SECRET"
+        is_ready = False
+    else:
+        checks["production_secret_key"] = "VERIFIED_OK"
 
     status_code = 200 if is_ready else 503
     return jsonify({

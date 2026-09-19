@@ -51,13 +51,18 @@ def configure_logging(app):
 def create_app(config_name=None):
     """Application factory method to create and configure the Flask app."""
     app = Flask(__name__)
-    
+
     # Determine configuration type
     if not config_name:
         config_name = os.environ.get('FLASK_ENV', 'development')
-        
+
     app.config.from_object(config_by_name.get(config_name, config_by_name['default']))
-    
+
+    # Validate production configuration secrets
+    if config_name == 'production' or os.environ.get('FLASK_ENV') == 'production':
+        if not app.config.get('SECRET_KEY'):
+            raise ValueError("CRITICAL: SECRET_KEY environment variable must be set in production mode.")
+
     # Configure logging
     configure_logging(app)
     
