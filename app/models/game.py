@@ -53,7 +53,7 @@ class GamePrediction(db.Model):
 
     prediction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     game_id = db.Column(db.Integer, db.ForeignKey('game.game_id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     home_win_probability = db.Column(db.Float, nullable=False)
     away_win_probability = db.Column(db.Float, nullable=False)
@@ -65,6 +65,7 @@ class GamePrediction(db.Model):
     feature_schema_version = db.Column(db.String(20), default='v1', nullable=False)
     run_id = db.Column(db.String(36), nullable=True)
     input_cutoff_time_utc = db.Column(db.DateTime, nullable=True)
+    scheduled_start_time_utc = db.Column(db.DateTime, nullable=True)
     feature_payload_json = db.Column(db.Text, nullable=True)
     feature_payload_sha256 = db.Column(db.String(64), nullable=True)
 

@@ -511,3 +511,113 @@ def get_season_leaders(season: str):
         },
         "leaders": leaders
     })
+
+# ==========================================
+# Phase 6 Health, Readiness & Operational Monitoring
+# ==========================================
+
+@api_bp.route('/v1/health')
+def get_liveness_health():
+    """Liveness probe returning 200 OK if application process is running."""
+    from datetime import datetime, timezone
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }), 200
+
+@api_bp.route('/v1/ready')
+def get_readiness_probe():
+    """
+    Readiness probe verifying DB connectivity, SQLite foreign keys, index integrity,
+    active model availability, and artifact SHA256 checksums.
+    """
+    from datetime import datetime, timezone
+    from sqlalchemy import text
+    import hashlib
+    from pathlib import Path
+    from app.analytics.forecasting.model_registry import ForecastModelRegistry, ModelUnavailableError
+
+    checks = {}
+    is_ready = True
+
+    # 1. Database connectivity using text("SELECT 1")
+    try:
+        db.session.execute(text("SELECT 1"))
+        checks["database_connection"] = "OK"
+    except Exception as e:
+        checks["database_connection"] = f"FAILED: {e}"
+        is_ready = False
+
+    # 2. Foreign keys PRAGMA
+    try:
+        fk_status = db.session.execute(text("PRAGMA foreign_keys")).scalar()
+        checks["sqlite_foreign_keys"] = "ENABLED" if fk_status == 1 else "DISABLED"
+        if fk_status != 1:
+            is_ready = False
+    except Exception as e:
+        checks["sqlite_foreign_keys"] = f"FAILED: {e}"
+        is_ready = False
+
+    # 3. Unique Index Check
+    try:
+        idx_check = db.session.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name='_game_official_pregame_uc'"
+        )).first()
+        checks["official_pregame_index"] = "OK" if idx_check else "MISSING"
+        if not idx_check:
+            is_ready = False
+    except Exception as e:
+        checks["official_pregame_index"] = f"FAILED: {e}"
+        is_ready = False
+
+    # 4. Model Loading & SHA Verification
+    try:
+        model_inst, manifest = ForecastModelRegistry.load_active_model(force_reload=True)
+        checks["active_model_version"] = manifest.get("model_version")
+        manifest_sha = manifest.get("artifact_sha256")
+        
+        # Verify artifact file SHA on disk
+        artifact_rel_path = manifest.get("artifact_path", "models/forecasting/pucklens-win-v1.4.0.pkl")
+        root_dir = current_app.config.get("BASE_DIR", "")
+        full_artifact_path = Path(root_dir) / artifact_rel_path
+        
+        if not full_artifact_path.exists():
+            checks["model_artifact_file"] = f"MISSING at {artifact_rel_path}"
+            is_ready = False
+        else:
+            with open(full_artifact_path, "rb") as f:
+                actual_file_sha = hashlib.sha256(f.read()).hexdigest()
+            
+            EXPECTED_V140_SHA = "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9"
+            if actual_file_sha == manifest_sha and actual_file_sha == EXPECTED_V140_SHA:
+                checks["model_artifact_sha256"] = "VERIFIED_OK"
+            else:
+                checks["model_artifact_sha256"] = f"MISMATCH: file={actual_file_sha}, manifest={manifest_sha}"
+                is_ready = False
+    except ModelUnavailableError as e:
+        checks["active_model"] = f"UNAVAILABLE: {e}"
+        is_ready = False
+    except Exception as e:
+        checks["active_model"] = f"FAILED: {e}"
+        is_ready = False
+
+    status_code = 200 if is_ready else 503
+    return jsonify({
+        "status": "READY" if is_ready else "NOT_READY",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "checks": checks
+    }), status_code
+
+@api_bp.route('/v1/monitoring/summary')
+def get_monitoring_summary():
+    """Returns official pregame prediction coverage and unresolved counts."""
+    from app.services.operational_monitoring_service import OperationalMonitoringService
+    return jsonify(OperationalMonitoringService.get_coverage_summary()), 200
+
+@api_bp.route('/v1/monitoring/calibration')
+def get_monitoring_calibration():
+    """Returns sample-aware calibration and accuracy metrics grouped by model version."""
+    from app.services.operational_monitoring_service import OperationalMonitoringService
+    min_thresh = request.args.get('min_sample_threshold', 30, type=int)
+    return jsonify(OperationalMonitoringService.get_calibration_and_performance(min_sample_threshold=min_thresh)), 200
+

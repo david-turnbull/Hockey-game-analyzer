@@ -135,6 +135,7 @@ def run_migrations(db):
                 ("feature_schema_version", "VARCHAR(20) DEFAULT 'v1'"),
                 ("run_id", "VARCHAR(36)"),
                 ("input_cutoff_time_utc", "DATETIME"),
+                ("scheduled_start_time_utc", "DATETIME"),
                 ("feature_payload_json", "TEXT"),
                 ("feature_payload_sha256", "VARCHAR(64)")
             ]

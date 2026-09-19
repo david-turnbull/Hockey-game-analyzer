@@ -39,16 +39,39 @@ class ForecastService:
     """
 
     @classmethod
-    def get_or_create_prediction(
+    def get_official_prediction(cls, game_id: int) -> Dict[str, Any]:
+        """
+        Strictly READ-ONLY query for existing official_pregame prediction snapshot.
+        Never generates or mutates state.
+        """
+        from sqlalchemy.orm import joinedload
+        pred = GamePrediction.query.options(
+            joinedload(GamePrediction.game).joinedload(Game.home_team),
+            joinedload(GamePrediction.game).joinedload(Game.away_team)
+        ).filter_by(
+            game_id=game_id,
+            prediction_type='official_pregame'
+        ).first()
+
+        if pred:
+            return cls.format_prediction_dict(pred)
+
+        game = db.session.get(Game, game_id)
+        if not game:
+            return make_error_response("GAME_NOT_FOUND", f"Game {game_id} not found.", 404)
+
+        return make_error_response("PREDICTION_NOT_FOUND", f"No official pregame prediction found for game {game_id}.", 404)
+
+    @classmethod
+    def create_prediction(
         cls,
         game_id: int,
         prediction_type: str = 'official_pregame',
         run_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Retrieves existing GamePrediction snapshot or generates a new immutable prediction snapshot.
-        For official_pregame, returns any existing official snapshot for the game_id regardless of model version.
-        If no official snapshot exists, strictly enforces pre-puck-drop cutoff without exception.
+        Generates and persists a new immutable prediction snapshot.
+        Invoked exclusively by automated generators/CLI or authorized POST write operations.
         """
         game = db.session.get(Game, game_id)
         if not game:
@@ -57,7 +80,7 @@ class ForecastService:
         if game.data_source != 'nhl_api':
             return make_error_response("SYNTHETIC_DATA_BLOCKED", f"Predictions blocked on non-production data source '{game.data_source}'", 400)
 
-        # 1. Official Pregame Invariant: Always check for existing official snapshot BEFORE model resolution
+        # 1. Official Pregame Invariant: Check for existing official snapshot BEFORE model resolution
         if prediction_type == 'official_pregame':
             existing_official = GamePrediction.query.filter_by(
                 game_id=game_id,
@@ -118,13 +141,14 @@ class ForecastService:
 
         feature_payload_json = json.dumps(pregame_feats, sort_keys=True)
         feature_payload_sha256 = hashlib.sha256(feature_payload_json.encode('utf-8')).hexdigest()
-        cutoff_time = game.start_time_utc
+        
+        now_gen_utc = datetime.now(timezone.utc)
         active_run_id = run_id or ('official' if prediction_type == 'official_pregame' else str(uuid.uuid4()))
 
         # Build immutable snapshot
         prediction = GamePrediction(
             game_id=game_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=now_gen_utc,
             home_win_probability=win_res["home_win_probability"],
             away_win_probability=win_res["away_win_probability"],
             expected_home_goals=score_res["expected_home_goals"],
@@ -133,7 +157,8 @@ class ForecastService:
             model_sha256=model_sha256,
             feature_schema_version=feature_schema_version,
             run_id=active_run_id,
-            input_cutoff_time_utc=cutoff_time,
+            input_cutoff_time_utc=now_gen_utc,
+            scheduled_start_time_utc=game.start_time_utc,
             feature_payload_json=feature_payload_json,
             feature_payload_sha256=feature_payload_sha256,
             score_matrix_json=json.dumps(score_res),
@@ -157,6 +182,9 @@ class ForecastService:
 
         return cls.format_prediction_dict(prediction)
 
+    # Alias for backward compatibility in internal code where get_or_create_prediction was referenced
+    get_or_create_prediction = create_prediction
+
     @classmethod
     def format_prediction_dict(cls, pred: GamePrediction) -> Dict[str, Any]:
         """
@@ -166,8 +194,10 @@ class ForecastService:
         score_data = json.loads(pred.score_matrix_json) if pred.score_matrix_json else {}
         explanations = json.loads(pred.feature_importance_json) if pred.feature_importance_json else []
 
-        home_team = db.session.get(Team, g.home_team_id) if g else None
-        away_team = db.session.get(Team, g.away_team_id) if g else None
+        home_team = g.home_team if (g and hasattr(g, 'home_team') and g.home_team) else (db.session.get(Team, g.home_team_id) if g else None)
+        away_team = g.away_team if (g and hasattr(g, 'away_team') and g.away_team) else (db.session.get(Team, g.away_team_id) if g else None)
+
+        sched_start = pred.scheduled_start_time_utc or (g.start_time_utc if g else None)
 
         return {
             "prediction_id": pred.prediction_id,
@@ -179,6 +209,7 @@ class ForecastService:
             "feature_schema_version": pred.feature_schema_version,
             "run_id": pred.run_id,
             "input_cutoff_time_utc": pred.input_cutoff_time_utc.isoformat() if pred.input_cutoff_time_utc else None,
+            "scheduled_start_time_utc": sched_start.isoformat() if sched_start else None,
             "feature_payload_sha256": pred.feature_payload_sha256,
             "is_official": pred.is_official,
             "is_outcome_resolved": pred.is_outcome_resolved,
@@ -210,10 +241,16 @@ class ForecastService:
     @classmethod
     def get_upcoming_forecasts(cls, limit: int = 12) -> List[Dict[str, Any]]:
         """
-        Fetches predictions for upcoming future games (start_time_utc > now_utc).
+        Strictly READ-ONLY query for upcoming future games (start_time_utc > now_utc).
+        Exposes prediction_status ('available' or 'missing') and eager-loads relationships.
+        Never creates predictions on the fly.
         """
-        now_utc = datetime.utcnow()
-        games = Game.query.filter(
+        from sqlalchemy.orm import joinedload
+        now_utc = datetime.now(timezone.utc)
+        games = Game.query.options(
+            joinedload(Game.home_team),
+            joinedload(Game.away_team)
+        ).filter(
             Game.game_type == 'R',
             Game.data_source == 'nhl_api',
             Game.start_time_utc > now_utc
@@ -222,11 +259,62 @@ class ForecastService:
             Game.game_id.asc()
         ).limit(limit).all()
 
+        game_ids = [g.game_id for g in games]
+
+        # Batch query existing predictions in single query
+        official_preds = GamePrediction.query.options(
+            joinedload(GamePrediction.game).joinedload(Game.home_team),
+            joinedload(GamePrediction.game).joinedload(Game.away_team)
+        ).filter(
+            GamePrediction.prediction_type == 'official_pregame',
+            GamePrediction.game_id.in_(game_ids)
+        ).all() if game_ids else []
+
+        preds_by_game_id = {p.game_id: p for p in official_preds}
+
         results = []
         for g in games:
-            pred_dict = cls.get_or_create_prediction(g.game_id)
-            if "error" not in pred_dict:
+            official_pred = preds_by_game_id.get(g.game_id)
+            home_team = g.home_team
+            away_team = g.away_team
+            
+            if official_pred:
+                pred_dict = cls.format_prediction_dict(official_pred)
+                pred_dict["prediction_status"] = "available"
                 results.append(pred_dict)
+            else:
+                results.append({
+                    "prediction_id": None,
+                    "game_id": g.game_id,
+                    "prediction_status": "missing",
+                    "prediction": None,
+                    "is_official": False,
+                    "is_outcome_resolved": False,
+                    "actual_winner": None,
+                    "game": {
+                        "season": g.season,
+                        "game_date": g.game_date.strftime("%Y-%m-%d") if g.game_date else None,
+                        "start_time_utc": g.start_time_utc.isoformat() if g.start_time_utc else None,
+                        "home_team_id": g.home_team_id,
+                        "away_team_id": g.away_team_id,
+                        "home_team_abbrev": home_team.abbreviation if home_team else "HOME",
+                        "away_team_abbrev": away_team.abbreviation if away_team else "AWAY",
+                        "home_team_name": home_team.name if home_team else "Home Team",
+                        "away_team_name": away_team.name if away_team else "Away Team",
+                        "home_score": g.home_score if g else 0,
+                        "away_score": g.away_score if g else 0,
+                        "nhl_game_state": g.nhl_game_state if g else "FUT"
+                    },
+                    "win_probability": {
+                        "home_win_probability": 0.5,
+                        "away_win_probability": 0.5,
+                        "home_win_pct_display": "N/A",
+                        "away_win_pct_display": "N/A"
+                    },
+                    "score_projection": {},
+                    "explanations": []
+                })
+            
         return results
 
     @classmethod

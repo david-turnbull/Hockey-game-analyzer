@@ -134,15 +134,19 @@ def test_valid_model_loading_and_deterministic_predictions(app, db, tmp_path, mo
         
         json_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-        # Load through registry
-        loaded_model, loaded_manifest = ForecastModelRegistry.load_active_model(model_version="v1.4.0", force_reload=True)
-        assert loaded_model is not None
-        assert loaded_manifest["artifact_sha256"] == sha256
+        try:
+            # Load through registry
+            loaded_model, loaded_manifest = ForecastModelRegistry.load_active_model(model_version="v1.4.0", force_reload=True)
+            assert loaded_model is not None
+            assert loaded_manifest["artifact_sha256"] == sha256
 
-        # Deterministic predictions test
-        dummy_feats = {fname: 1.0 for fname in FEATURE_NAMES}
-        pred1 = loaded_model.predict_game_probability(dummy_feats)
-        pred2 = loaded_model.predict_game_probability(dummy_feats)
+            # Deterministic predictions test
+            dummy_feats = {fname: 1.0 for fname in FEATURE_NAMES}
+            pred1 = loaded_model.predict_game_probability(dummy_feats)
+            pred2 = loaded_model.predict_game_probability(dummy_feats)
 
-        assert pred1["home_win_probability"] == pred2["home_win_probability"]
-        assert pred1["model_type"] == pred2["model_type"]
+            assert pred1["home_win_probability"] == pred2["home_win_probability"]
+            assert pred1["model_type"] == pred2["model_type"]
+        finally:
+            ForecastModelRegistry._cached_model = None
+            ForecastModelRegistry._cached_manifest = None

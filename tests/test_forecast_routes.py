@@ -37,7 +37,19 @@ def app():
 def client(app):
     return app.test_client()
 
-def test_forecast_api_game_prediction(client):
+from app.services.forecast_service import ForecastService
+
+def test_forecast_api_game_prediction(app, client):
+    # 1. Read-only GET returns 404 when no prediction has been generated yet
+    res_404 = client.get('/api/v1/forecast/game/2024020001')
+    assert res_404.status_code == 404
+    assert res_404.get_json()["error"] == "PREDICTION_NOT_FOUND"
+
+    # 2. Create prediction explicitly via service
+    with app.app_context():
+        ForecastService.create_prediction(2024020001, prediction_type='official_pregame')
+
+    # 3. Read-only GET returns 200 OK after prediction has been generated
     res = client.get('/api/v1/forecast/game/2024020001')
     assert res.status_code == 200
     data = res.get_json()
@@ -52,9 +64,18 @@ def test_forecast_api_upcoming(client):
     data = res.get_json()
     assert "forecasts" in data
 
-def test_forecast_ui_routes(client):
+def test_forecast_ui_routes(app, client):
     res = client.get('/forecast')
     assert res.status_code == 200
 
+    # Before prediction creation -> 404
+    res_game_404 = client.get('/forecast/game/2024020001')
+    assert res_game_404.status_code == 404
+
+    # Create prediction explicitly
+    with app.app_context():
+        ForecastService.create_prediction(2024020001, prediction_type='official_pregame')
+
+    # After prediction creation -> 200
     res_game = client.get('/forecast/game/2024020001')
     assert res_game.status_code == 200
