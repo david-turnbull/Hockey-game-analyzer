@@ -26,7 +26,7 @@ PuckLens is an independent, production-grade hockey-operations analytics and pre
 - **Chronological Rolling Form & Trends** — 5, 10, and 20-game rolling trends for teams, skaters, and goalies with zero lookahead leakage.
 - **Mathematical xG Explainability** — Logit factor contribution decomposition exposing danger-increasing and danger-reducing features and baseline odds multipliers.
 - **RESTful API Suite** — Complete JSON API suite covering forecasts, health/readiness probes, monitoring, team analytics, player/goalie profiles, and shot explanations.
-- **Automated Regression Test Suite** — 199 comprehensive tests in `pytest` verifying statistical invariants, predictive models, database migrations, lifecycle constraints, and pipeline reproducibility.
+- **Automated Regression Test Suite** — 202 comprehensive tests in `pytest` verifying statistical invariants, predictive models, database migrations, lifecycle constraints, and pipeline reproducibility.
 
 ---
 
@@ -84,7 +84,7 @@ PuckLens v1.4.0 introduces an end-to-end predictive forecasting pipeline evaluat
 
 ### 7. Stage 7 — Release Qualification
 * Environment locked in `requirements-release.txt` and `constraints.txt` (Python 3.12.10, scikit-learn 1.9.0, numpy 2.5.2).
-* All 199 automated unit, integration, and performance tests passing cleanly.
+* All 202 automated unit, integration, and performance tests passing cleanly.
 
 ---
 
@@ -146,8 +146,7 @@ pytest
 ```
 
 **Verified Qualification Results:**
-- **Local Qualification Run:** `199 passed, 0 failed, 3 warnings` in ~34.0s (Python 3.12.10, pytest 8.3.4).
-- **GitHub Actions CI Qualification Run:** `199 passed, 0 failed, 24 warnings` (Python 3.12.10, pytest 8.3.4).
+- **Final GitHub Actions CI Qualification Run:** `202 passed, 0 failed, 24 warnings` in 14.66s (Python 3.12.10, pytest 8.3.4; workflow run #111).
 
 ### Health & Readiness API Endpoints
 
