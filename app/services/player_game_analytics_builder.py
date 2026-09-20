@@ -160,7 +160,7 @@ class PlayerGameAnalyticsBuilder:
                 pts = g + a
                 sog = sog_map[pid]
                 unblocked = unblocked_map[pid]
-                ind_xg = round(xg_map[pid], 4)
+                ind_xg = float(xg_map[pid])
                 toi_sec = toi_all_map[pid]
 
                 oi5v5 = on_ice_5v5.get(pid, {
@@ -188,8 +188,8 @@ class PlayerGameAnalyticsBuilder:
                     ca_5v5=oi5v5["ca"],
                     ff_5v5=oi5v5["ff"],
                     fa_5v5=oi5v5["fa"],
-                    xgf_5v5=round(oi5v5["xgf"], 4),
-                    xga_5v5=round(oi5v5["xga"], 4),
+                    xgf_5v5=float(oi5v5["xgf"]),
+                    xga_5v5=float(oi5v5["xga"]),
                     created_at=now,
                     updated_at=now
                 )

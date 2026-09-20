@@ -112,33 +112,16 @@ class PlayerGameAnalyticsAuditService:
     @classmethod
     def is_derived_coverage_complete(cls, season: str) -> bool:
         """
-        Fast check to verify whether derived coverage is 100% complete across all ingested games in a season:
-        - Compares distinct ingested game count in GamePlayer vs distinct game count in PlayerGameAnalytics.
+        Verifies whether derived coverage is 100% complete across all ingested games in a season.
+        Reuses audit_game_analytics to enforce per-game row count equality:
+        actual PlayerGameAnalytics rows == expected non-goalie GamePlayer rows.
+        Catches missing games, underpopulated games, and overpopulated/stale games.
         """
-        has_pga = (
-            db.session.query(PlayerGameAnalytics.game_id)
-            .filter(PlayerGameAnalytics.season == season)
-            .first() is not None
-        )
-        if not has_pga:
+        res = cls.audit_game_analytics(season=season)
+        ingested = res["ingested_games"]
+        if ingested == 0:
             return False
-
-        subq = db.session.query(Game.game_id).filter(Game.season == season)
-        gp_games_cnt = (
-            db.session.query(func.count(func.distinct(GamePlayer.game_id)))
-            .filter(GamePlayer.game_id.in_(subq))
-            .scalar() or 0
-        )
-        if gp_games_cnt == 0:
-            return False
-
-        pga_games_cnt = (
-            db.session.query(func.count(func.distinct(PlayerGameAnalytics.game_id)))
-            .filter(PlayerGameAnalytics.season == season)
-            .scalar() or 0
-        )
-
-        return gp_games_cnt == pga_games_cnt
+        return len(res["complete"]) == ingested and len(res["incomplete"]) == 0 and len(res["missing"]) == 0
 
     @classmethod
     def is_season_complete(cls, season: str) -> bool:

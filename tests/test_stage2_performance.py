@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch
-from app.models import db, PlayerGameAnalytics
+from app.models import db, Player, PlayerGameAnalytics
 from app.services.player_season_service import PlayerSeasonService
 from app.services.player_game_analytics_builder import PlayerGameAnalyticsBuilder
 from app.services.player_game_analytics_audit import PlayerGameAnalyticsAuditService
@@ -129,21 +129,87 @@ def test_leaderboard_threshold_and_team_filtering(app, db, stage1_test_dataset):
     for item in min_gp2_board:
         assert item["gp"] >= 2
 
-def test_partial_season_fallback_isolation(app, db, stage1_test_dataset):
+def test_partial_game_missing_player_row_fallback(app, db, stage1_test_dataset):
     """
-    Verifies that when derived coverage is partial (only 1 of 2 games built),
-    public calls to get_skater_season_stats and get_skater_leaderboards cleanly fall back
-    to legacy calculation, ensuring partial data is NEVER returned.
+    Verifies derived coverage safety when both game IDs exist in PlayerGameAnalytics
+    but one game is missing one player row (actual < expected).
+    Asserts is_derived_coverage_complete returns False and public calls fall back to legacy.
     """
-    # Build Game 1 only
-    PlayerGameAnalyticsBuilder.build_game_analytics(2023020001)
-    assert not PlayerGameAnalyticsAuditService.is_derived_coverage_complete('20232024')
+    run_backfill(season='20232024', force=True)
+    assert PlayerGameAnalyticsAuditService.is_derived_coverage_complete('20232024') is True
 
-    # Single player fallback
-    p101_stats = PlayerSeasonService.get_skater_season_stats(101, '20232024')
-    assert p101_stats["gp"] == 2  # Returns 2 games from legacy, not 1 from partial derived
+    # Delete 1 player row from Game 2023020001 (Game 1 has PGA rows, but is now incomplete)
+    row_to_delete = PlayerGameAnalytics.query.filter_by(game_id=2023020001, player_id=101).first()
+    assert row_to_delete is not None
+    db.session.delete(row_to_delete)
+    db.session.commit()
 
-    # Leaderboard fallback
-    board = PlayerSeasonService.get_skater_leaderboards('20232024', limit=50)
-    p101_board = next(s for s in board if s["player_id"] == 101)
-    assert p101_board["gp"] == 2
+    # Verify coverage safety check returns False
+    assert PlayerGameAnalyticsAuditService.is_derived_coverage_complete('20232024') is False
+
+    # Verify public season, single-player, and leaderboard calls fall back safely to legacy
+    with patch.object(PlayerSeasonService, '_get_season_skaters_summary_legacy', wraps=PlayerSeasonService._get_season_skaters_summary_legacy) as mock_legacy:
+        stats = PlayerSeasonService.get_skater_season_stats(101, '20232024')
+        assert stats is not None
+        assert stats["gp"] == 2  # Returns 2 games from legacy, not 1 from partial PGA
+        mock_legacy.assert_called()
+
+    with patch.object(PlayerSeasonService, '_get_season_skaters_summary_legacy', wraps=PlayerSeasonService._get_season_skaters_summary_legacy) as mock_legacy:
+        summary = PlayerSeasonService.get_season_skaters_summary('20232024')
+        assert len(summary) > 0
+        mock_legacy.assert_called()
+
+    with patch.object(PlayerSeasonService, '_get_season_skaters_summary_legacy', wraps=PlayerSeasonService._get_season_skaters_summary_legacy) as mock_legacy:
+        board = PlayerSeasonService.get_skater_leaderboards('20232024')
+        assert len(board) > 0
+        mock_legacy.assert_called()
+
+def test_overpopulated_stale_game_fallback(app, db, stage1_test_dataset):
+    """
+    Verifies derived coverage safety when a game has extra/stale PGA rows (actual > expected).
+    Asserts is_derived_coverage_complete returns False and public calls fall back to legacy.
+    """
+    run_backfill(season='20232024', force=True)
+    assert PlayerGameAnalyticsAuditService.is_derived_coverage_complete('20232024') is True
+
+    # Add dummy player record to satisfy foreign key constraint
+    dummy_player = Player(player_id=99999, first_name="Dummy", last_name="Player", position="D")
+    db.session.add(dummy_player)
+    db.session.flush()
+
+    # Insert an extra/stale row for game 2023020001
+    stale_row = PlayerGameAnalytics(
+        game_id=2023020001,
+        player_id=99999,
+        team_id=1,
+        season='20232024',
+        position='D',
+        toi_seconds=100
+    )
+    db.session.add(stale_row)
+    db.session.commit()
+
+    assert PlayerGameAnalyticsAuditService.is_derived_coverage_complete('20232024') is False
+
+def test_leaderboard_near_tie_rounding_equivalence(app, db, stage1_test_dataset):
+    """
+    Verifies leaderboard ordering equivalence for near-tie values where 2-decimal rounding
+    and deterministic tie-breakers (points, goals, player_id) govern rank ordering.
+    """
+    run_backfill(season='20232024', force=True)
+
+    derived_board = PlayerSeasonService.get_skater_leaderboards(season='20232024', sort_by="xg_per_60", limit=50)
+    legacy_skaters = PlayerSeasonService._get_season_skaters_summary_legacy(season='20232024')
+
+    def get_sort_key(s):
+        val = s.get("xg_per_60", 0.0) or 0.0
+        return (val, s.get("points", 0), s.get("goals", 0), -s["player_id"])
+
+    legacy_skaters.sort(key=get_sort_key, reverse=True)
+    for i, s in enumerate(legacy_skaters, 1):
+        s["rank"] = i
+
+    for d_item, l_item in zip(derived_board, legacy_skaters[:len(derived_board)]):
+        assert d_item["player_id"] == l_item["player_id"]
+        assert d_item["rank"] == l_item["rank"]
+
