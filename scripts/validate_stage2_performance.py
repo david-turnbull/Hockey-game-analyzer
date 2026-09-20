@@ -185,7 +185,7 @@ def run_performance_qualification(season: str = "20212022") -> int:
         print(f"  Evaluated Skaters:             {evaluated_count}")
         print(f"  Analytical Mismatches:         {mismatch_count}")
         if equivalence_confirmed:
-            print("  Equivalence Status:            100% PERFECT EQUIVALENCE CONFIRMED")
+            print("  Equivalence Status:            EQUIVALENCE CONFIRMED WITHIN DOCUMENTED TOLERANCE")
         else:
             print(f"  Equivalence Status:            FAILED ({mismatch_count} mismatches)")
             for m in mismatches[:5]:
@@ -254,7 +254,11 @@ def run_performance_qualification(season: str = "20212022") -> int:
                 "is_derived_coverage_safe": is_complete
             },
             "stage0_frozen_baseline_ms": STAGE0_FROZEN_BASELINE,
-            "current_legacy_rerun_ms": round(legacy_ms, 2),
+            "current_legacy_rerun_ms": {
+                "full_summary_ms": round(legacy_ms, 2),
+                "single_player_ms": "not re-run",
+                "top50_board_ms": "not re-run"
+            },
             "latencies_ms": {
                 "derived_full_summary_ms": round(summary_ms, 2),
                 "derived_single_player_ms": round(single_ms, 2),
@@ -274,7 +278,13 @@ def run_performance_qualification(season: str = "20212022") -> int:
             "equivalence_audit": {
                 "evaluated_skaters": evaluated_count,
                 "mismatch_count": mismatch_count,
-                "status": "100% PERFECT EQUIVALENCE CONFIRMED" if equivalence_confirmed else "FAILED"
+                "status": "EQUIVALENCE CONFIRMED WITHIN DOCUMENTED TOLERANCE" if equivalence_confirmed else "FAILED",
+                "documented_tolerances": {
+                    "counting_stats": 0,
+                    "individual_xg_and_rates": 0.05,
+                    "on_ice_5v5_xg_values": 0.05,
+                    "on_ice_5v5_percentages": 0.30
+                }
             },
             "explain_query_plans": {
                 "single_player": sp_plan_rows,
@@ -313,9 +323,9 @@ def run_performance_qualification(season: str = "20212022") -> int:
 
 | Metric / Endpoint | Contract Threshold | Stage 0 Frozen Baseline | Current Legacy Re-run | Stage 2 Derived | Queries | Peak Memory | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Single-Player Stats** | `< 50 ms` | `{STAGE0_FROZEN_BASELINE['single_player_ms']:.2f} ms` (`48.71 s`) | `{legacy_ms:.2f} ms` | **`{single_ms:.2f} ms`** | `{single_queries}` | `{peak_single_mem / (1024*1024):.2f} MB` | `{'PASSED' if targets_met['single_player_latency'] else 'FAILED'}` |
+| **Single-Player Stats** | `< 50 ms` | `{STAGE0_FROZEN_BASELINE['single_player_ms']:.2f} ms` (`48.71 s`) | `not re-run` | **`{single_ms:.2f} ms`** | `{single_queries}` | `{peak_single_mem / (1024*1024):.2f} MB` | `{'PASSED' if targets_met['single_player_latency'] else 'FAILED'}` |
 | **Full-Season Summary** | `< 200 ms` | `{STAGE0_FROZEN_BASELINE['full_summary_ms']:.2f} ms` (`45.59 s`) | `{legacy_ms:.2f} ms` | **`{summary_ms:.2f} ms`** | `{summary_queries}` | `{peak_summary_mem / (1024*1024):.2f} MB` | `{'PASSED' if targets_met['full_summary_latency'] else 'FAILED'}` |
-| **Top-50 Leaderboard** | `< 50 ms` | `{STAGE0_FROZEN_BASELINE['top50_board_ms']:.2f} ms` (`47.21 s`) | `{legacy_ms:.2f} ms` | **`{board_ms:.2f} ms`** | `{board_queries}` | `{peak_board_mem / (1024*1024):.2f} MB` | `{'PASSED' if targets_met['top50_board_latency'] else 'FAILED'}` |
+| **Top-50 Leaderboard** | `< 50 ms` | `{STAGE0_FROZEN_BASELINE['top50_board_ms']:.2f} ms` (`47.21 s`) | `not re-run` | **`{board_ms:.2f} ms`** | `{board_queries}` | `{peak_board_mem / (1024*1024):.2f} MB` | `{'PASSED' if targets_met['top50_board_latency'] else 'FAILED'}` |
 
 * **Full Summary Speedup vs Stage 0 Frozen Baseline:** **`{speedup_vs_stage0:.1f}x Faster`**
 * **Peak Memory Allocation:** **`{max(peak_summary_mem, peak_single_mem, peak_board_mem) / (1024*1024):.2f} MB`** (Threshold `< 15.0 MB`, Stage 0 Baseline `~464 MB`).
@@ -343,7 +353,12 @@ def run_performance_qualification(season: str = "20212022") -> int:
 ## 4. Production Analytical Equivalence Audit
 * **Evaluated Skaters:** `{evaluated_count}`
 * **Mismatches Detected:** `{mismatch_count}`
-* **Equivalence Determination:** `{'100% PERFECT EQUIVALENCE CONFIRMED' if equivalence_confirmed else 'FAILED'}`
+* **Equivalence Determination:** `{'EQUIVALENCE CONFIRMED WITHIN DOCUMENTED TOLERANCE' if equivalence_confirmed else 'FAILED'}`
+* **Documented Tolerances:**
+  * Counting Stats (GP, G, A, P, shots, unblocked attempts, TOI, CF, CA, FF, FA, 5v5 TOI): `0` (Exact match)
+  * Individual xG & Rate Metrics (`xg`, `goals_above_expected`, `goals_per_60`, `xg_per_60`, `shooting_pct`, `expected_conversion_pct`, `shooting_vs_expected_diff`): `0.05`
+  * 5v5 On-Ice xG Values (`on_ice_xgf`, `on_ice_xga`): `0.05`
+  * 5v5 On-Ice Percentages (`cf_pct`, `ff_pct`, `on_ice_xg_pct`): `0.30%`
 """
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(md_content)

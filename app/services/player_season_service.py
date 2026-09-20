@@ -857,14 +857,18 @@ class PlayerSeasonService:
         sum_xgf = func.sum(PlayerGameAnalytics.xgf_5v5)
         sum_xga = func.sum(PlayerGameAnalytics.xga_5v5)
 
+        round_sum_xg = func.round(sum_xg, 2)
+        round_sum_xgf = func.round(sum_xgf, 2)
+        round_sum_xga = func.round(sum_xga, 2)
+
         if sort_by == 'goals':
             sort_expr = sum_goals
         elif sort_by == 'assists':
             sort_expr = sum_assists
         elif sort_by == 'xg':
-            sort_expr = func.round(sum_xg, 2)
+            sort_expr = round_sum_xg
         elif sort_by in ['goals_above_expected', 'goals_minus_xg', 'g_minus_xg']:
-            sort_expr = func.round(sum_goals - sum_xg, 2)
+            sort_expr = func.round(sum_goals - round_sum_xg, 2)
         elif sort_by in ['shots', 'shots_on_goal']:
             sort_expr = sum_shots
         elif sort_by == 'unblocked_attempts':
@@ -874,17 +878,17 @@ class PlayerSeasonService:
         elif sort_by == 'goals_per_60':
             sort_expr = func.round(func.coalesce(sum_goals * 3600.0 / func.nullif(sum_toi, 0), 0.0), 2)
         elif sort_by == 'xg_per_60':
-            sort_expr = func.round(func.coalesce(sum_xg * 3600.0 / func.nullif(sum_toi, 0), 0.0), 2)
+            sort_expr = func.round(func.coalesce(round_sum_xg * 3600.0 / func.nullif(sum_toi, 0), 0.0), 2)
         elif sort_by == 'shooting_pct':
             sort_expr = func.round(func.coalesce(sum_goals * 100.0 / func.nullif(sum_shots, 0), 0.0), 2)
         elif sort_by in ['expected_conversion_pct', 'exp_conv_pct']:
-            sort_expr = func.round(func.coalesce(sum_xg * 100.0 / func.nullif(sum_unblocked, 0), 0.0), 2)
+            sort_expr = func.round(func.coalesce(round_sum_xg * 100.0 / func.nullif(sum_unblocked, 0), 0.0), 2)
         elif sort_by == 'cf_pct':
             sort_expr = func.round(func.coalesce(sum_cf * 100.0 / func.nullif(sum_cf + sum_ca, 0), 50.0), 2)
         elif sort_by == 'ff_pct':
             sort_expr = func.round(func.coalesce(sum_ff * 100.0 / func.nullif(sum_ff + sum_fa, 0), 50.0), 2)
         elif sort_by in ['on_ice_xg_pct', 'xg_pct']:
-            sort_expr = func.round(func.coalesce(sum_xgf * 100.0 / func.nullif(sum_xgf + sum_xga, 0), 50.0), 2)
+            sort_expr = func.round(func.coalesce(round_sum_xgf * 100.0 / func.nullif(round_sum_xgf + round_sum_xga, 0), 50.0), 2)
         else:
             sort_expr = sum_points
 

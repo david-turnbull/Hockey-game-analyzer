@@ -1,6 +1,6 @@
 {
   "season": "20212022",
-  "timestamp_utc": "2026-09-20T21:40:01.030666+00:00",
+  "timestamp_utc": "2026-09-20T21:50:26.765723+00:00",
   "coverage_audit": {
     "total_game_schedule_rows": 1312,
     "ingested_roster_games": 271,
@@ -16,12 +16,16 @@
     "top50_board_ms": 47210.0,
     "peak_memory_mb": 464.0
   },
-  "current_legacy_rerun_ms": 25460.79,
+  "current_legacy_rerun_ms": {
+    "full_summary_ms": 25392.75,
+    "single_player_ms": "not re-run",
+    "top50_board_ms": "not re-run"
+  },
   "latencies_ms": {
-    "derived_full_summary_ms": 90.13,
-    "derived_single_player_ms": 20.83,
-    "derived_top50_board_ms": 33.64,
-    "speedup_vs_stage0_baseline": 505.8
+    "derived_full_summary_ms": 110.2,
+    "derived_single_player_ms": 33.27,
+    "derived_top50_board_ms": 47.55,
+    "speedup_vs_stage0_baseline": 413.7
   },
   "query_counts": {
     "derived_full_summary_queries": 8,
@@ -36,7 +40,13 @@
   "equivalence_audit": {
     "evaluated_skaters": 782,
     "mismatch_count": 0,
-    "status": "100% PERFECT EQUIVALENCE CONFIRMED"
+    "status": "EQUIVALENCE CONFIRMED WITHIN DOCUMENTED TOLERANCE",
+    "documented_tolerances": {
+      "counting_stats": 0,
+      "individual_xg_and_rates": 0.05,
+      "on_ice_5v5_xg_values": 0.05,
+      "on_ice_5v5_percentages": 0.3
+    }
   },
   "explain_query_plans": {
     "single_player": [

@@ -1,6 +1,6 @@
 # Stage 2 Qualification Report: Performance & Equivalence
 
-> **Generated:** `2026-09-20T21:40:01.030666+00:00`  
+> **Generated:** `2026-09-20T21:50:26.765723+00:00`  
 > **Target Season:** `20212022`  
 > **Qualification Status:** `QUALIFIED (STAGE 2 COMPLETE)`
 
@@ -16,11 +16,11 @@
 
 | Metric / Endpoint | Contract Threshold | Stage 0 Frozen Baseline | Current Legacy Re-run | Stage 2 Derived | Queries | Peak Memory | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Single-Player Stats** | `< 50 ms` | `48710.00 ms` (`48.71 s`) | `25460.79 ms` | **`20.83 ms`** | `7` | `0.12 MB` | `PASSED` |
-| **Full-Season Summary** | `< 200 ms` | `45590.00 ms` (`45.59 s`) | `25460.79 ms` | **`90.13 ms`** | `8` | `3.92 MB` | `PASSED` |
-| **Top-50 Leaderboard** | `< 50 ms` | `47210.00 ms` (`47.21 s`) | `25460.79 ms` | **`33.64 ms`** | `8` | `0.24 MB` | `PASSED` |
+| **Single-Player Stats** | `< 50 ms` | `48710.00 ms` (`48.71 s`) | `not re-run` | **`33.27 ms`** | `7` | `0.12 MB` | `PASSED` |
+| **Full-Season Summary** | `< 200 ms` | `45590.00 ms` (`45.59 s`) | `25392.75 ms` | **`110.20 ms`** | `8` | `3.92 MB` | `PASSED` |
+| **Top-50 Leaderboard** | `< 50 ms` | `47210.00 ms` (`47.21 s`) | `not re-run` | **`47.55 ms`** | `8` | `0.24 MB` | `PASSED` |
 
-* **Full Summary Speedup vs Stage 0 Frozen Baseline:** **`505.8x Faster`**
+* **Full Summary Speedup vs Stage 0 Frozen Baseline:** **`413.7x Faster`**
 * **Peak Memory Allocation:** **`3.92 MB`** (Threshold `< 15.0 MB`, Stage 0 Baseline `~464 MB`).
 
 ## 3. Query Plan & Indexing Audit (SQLite EXPLAIN QUERY PLAN)
@@ -48,4 +48,9 @@
 ## 4. Production Analytical Equivalence Audit
 * **Evaluated Skaters:** `782`
 * **Mismatches Detected:** `0`
-* **Equivalence Determination:** `100% PERFECT EQUIVALENCE CONFIRMED`
+* **Equivalence Determination:** `EQUIVALENCE CONFIRMED WITHIN DOCUMENTED TOLERANCE`
+* **Documented Tolerances:**
+  * Counting Stats (GP, G, A, P, shots, unblocked attempts, TOI, CF, CA, FF, FA, 5v5 TOI): `0` (Exact match)
+  * Individual xG & Rate Metrics (`xg`, `goals_above_expected`, `goals_per_60`, `xg_per_60`, `shooting_pct`, `expected_conversion_pct`, `shooting_vs_expected_diff`): `0.05`
+  * 5v5 On-Ice xG Values (`on_ice_xgf`, `on_ice_xga`): `0.05`
+  * 5v5 On-Ice Percentages (`cf_pct`, `ff_pct`, `on_ice_xg_pct`): `0.30%`

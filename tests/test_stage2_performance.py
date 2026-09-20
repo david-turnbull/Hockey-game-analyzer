@@ -213,3 +213,51 @@ def test_leaderboard_near_tie_rounding_equivalence(app, db, stage1_test_dataset)
         assert d_item["player_id"] == l_item["player_id"]
         assert d_item["rank"] == l_item["rank"]
 
+def test_synthetic_near_tie_rounding_sequence(app, db, stage1_test_dataset):
+    """
+    Verifies that SQL sort expressions for ratio and xG-derived fields follow the exact
+    same rounding sequence as legacy calculations, maintaining exact rank equivalence
+    where unrounded intermediate math would alter sort ordering.
+    """
+    db.session.query(PlayerGameAnalytics).filter_by(season='20992000').delete()
+    db.session.commit()
+
+    # Synthetic near-boundary values using valid game 2023020001 and players 101, 102, 103 from stage1_test_dataset
+    # P101: xg=1.444, toi=3590. Legacy xg=1.44, xg_per_60 = round(1.44*3600/3590, 2) = 1.44.
+    # P102: xg=1.440, toi=3600. Legacy xg=1.44, xg_per_60 = round(1.44*3600/3600, 2) = 1.44.
+    # P103: xg=1.446, toi=3600. Legacy xg=1.45, xg_per_60 = round(1.45*3600/3600, 2) = 1.45.
+    pga1 = PlayerGameAnalytics(game_id=2023020001, player_id=101, team_id=1, season='20992000', position='F', individual_xg=1.444, toi_seconds=3590, goals=5, shots_on_goal=10, unblocked_attempts=10, xgf_5v5=10.444, xga_5v5=10.000, points=5)
+    pga2 = PlayerGameAnalytics(game_id=2023020001, player_id=102, team_id=1, season='20992000', position='F', individual_xg=1.440, toi_seconds=3600, goals=5, shots_on_goal=10, unblocked_attempts=10, xgf_5v5=10.440, xga_5v5=10.000, points=5)
+    pga3 = PlayerGameAnalytics(game_id=2023020001, player_id=103, team_id=2, season='20992000', position='F', individual_xg=1.446, toi_seconds=3600, goals=5, shots_on_goal=10, unblocked_attempts=10, xgf_5v5=10.446, xga_5v5=10.000, points=5)
+    db.session.add_all([pga1, pga2, pga3])
+    db.session.commit()
+
+    items = [
+        {'pid': 101, 'xg_raw': 1.444, 'toi': 3590, 'g': 5, 'sog': 10, 'unb': 10, 'xgf_raw': 10.444, 'xga_raw': 10.000, 'pts': 5},
+        {'pid': 102, 'xg_raw': 1.440, 'toi': 3600, 'g': 5, 'sog': 10, 'unb': 10, 'xgf_raw': 10.440, 'xga_raw': 10.000, 'pts': 5},
+        {'pid': 103, 'xg_raw': 1.446, 'toi': 3600, 'g': 5, 'sog': 10, 'unb': 10, 'xgf_raw': 10.446, 'xga_raw': 10.000, 'pts': 5},
+    ]
+
+    for item in items:
+        xg = round(item['xg_raw'], 2)
+        xgf = round(item['xgf_raw'], 2)
+        xga = round(item['xga_raw'], 2)
+        item['xg'] = xg
+        item['xg_per_60'] = round(xg * 3600.0 / item['toi'], 2)
+        item['goals_above_expected'] = round(item['g'] - xg, 2)
+        item['expected_conversion_pct'] = round(xg * 100.0 / item['unb'], 2)
+        item['on_ice_xg_pct'] = round(xgf * 100.0 / (xgf + xga), 2)
+
+    for sort_field in ['xg', 'xg_per_60', 'goals_above_expected', 'expected_conversion_pct', 'on_ice_xg_pct']:
+        derived_board = PlayerSeasonService._get_skater_leaderboards_derived(season='20992000', sort_by=sort_field)
+        derived_pids = [r['player_id'] for r in derived_board]
+        sorted_items = sorted(items, key=lambda x: (x[sort_field], x['pts'], x['g'], -x['pid']), reverse=True)
+        expected_pids = [x['pid'] for x in sorted_items]
+
+        assert derived_pids == expected_pids, f"Mismatch for field {sort_field}: Derived={derived_pids}, Expected={expected_pids}"
+
+    # Clean up
+    db.session.query(PlayerGameAnalytics).filter_by(season='20992000').delete()
+    db.session.commit()
+
+
