@@ -25,9 +25,9 @@ def audit_game_analytics(season: str = None) -> Dict[str, Any]:
 
     Returns:
         Dict with keys:
-            'complete': List[int] (game_ids where actual >= expected > 0)
-            'incomplete': List[int] (game_ids where 0 < actual < expected)
-            'missing': List[int] (game_ids where actual == 0)
+            'complete': List[int] (game_ids where expected_count > 0 and actual_count == expected_count)
+            'incomplete': List[int] (game_ids where actual_count > 0 and actual_count != expected_count)
+            'missing': List[int] (game_ids where actual_count == 0)
             'expected_counts': Dict[int, int]
             'actual_counts': Dict[int, int]
     """
@@ -87,10 +87,10 @@ def audit_game_analytics(season: str = None) -> Dict[str, Any]:
 
             if act == 0:
                 missing.append(gid)
-            elif act < exp:
-                incomplete.append(gid)
-            else:
+            elif exp > 0 and act == exp:
                 complete.append(gid)
+            else:
+                incomplete.append(gid)
 
         return {
             "complete": complete,

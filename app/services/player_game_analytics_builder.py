@@ -17,6 +17,8 @@ class PlayerGameAnalyticsBuilder:
     Enforces idempotency and incremental regeneration when games are re-ingested.
     """
 
+    _test_post_flush_hook = None
+
     @classmethod
     def build_game_analytics(cls, game_id: int) -> List[PlayerGameAnalytics]:
         """
@@ -142,6 +144,9 @@ class PlayerGameAnalyticsBuilder:
             # 6. Delete pre-existing records for game_id to guarantee idempotency in single transaction
             db.session.query(PlayerGameAnalytics).filter_by(game_id=game_id).delete(synchronize_session='fetch')
             db.session.flush()
+
+            if getattr(cls, "_test_post_flush_hook", None):
+                cls._test_post_flush_hook()
 
             # 7. Construct new PlayerGameAnalytics records
             now = datetime.now(timezone.utc)

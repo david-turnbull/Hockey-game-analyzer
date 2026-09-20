@@ -150,9 +150,41 @@ def test_atomic_rebuild_transaction_on_failure(app, db, stage1_test_dataset, mon
     after_error_count = PlayerGameAnalytics.query.filter_by(game_id=2023020001).count()
     assert after_error_count == 10, "Atomic rollback must preserve original analytics rows when rebuild fails"
 
+def test_atomic_rollback_after_delete_and_flush(app, db, stage1_test_dataset, monkeypatch):
+    """
+    Strengthened Atomic Rollback Test:
+    Forces a failure AFTER existing rows have been deleted and flushed in the transaction,
+    but before commit. Verifies that rollback restores the original rows and exact field values.
+    """
+    # 1. Build initial valid analytics for Game 1
+    PlayerGameAnalyticsBuilder.build_game_analytics(2023020001)
+    orig_rows = PlayerGameAnalytics.query.filter_by(game_id=2023020001).all()
+    assert len(orig_rows) == 10
+    orig_goals_map = {r.player_id: r.goals for r in orig_rows}
+    orig_toi_map = {r.player_id: r.toi_seconds for r in orig_rows}
+
+    # 2. Set test hook to fail AFTER delete + flush
+    def mock_fail_post_flush():
+        raise RuntimeError("Forced error after delete and flush execution")
+
+    monkeypatch.setattr(PlayerGameAnalyticsBuilder, "_test_post_flush_hook", mock_fail_post_flush)
+
+    # 3. Attempt rebuild, expecting the post-flush exception
+    with pytest.raises(RuntimeError, match="Forced error after delete and flush execution"):
+        PlayerGameAnalyticsBuilder.build_game_analytics(2023020001)
+
+    # 4. Verify transaction was rolled back cleanly, restoring original rows and values exactly
+    restored_rows = PlayerGameAnalytics.query.filter_by(game_id=2023020001).all()
+    assert len(restored_rows) == 10
+    restored_goals_map = {r.player_id: r.goals for r in restored_rows}
+    restored_toi_map = {r.player_id: r.toi_seconds for r in restored_rows}
+
+    assert restored_goals_map == orig_goals_map
+    assert restored_toi_map == orig_toi_map
+
 def test_partial_analytics_repair_with_force_false(app, db, stage1_test_dataset):
     """
-    Tests completeness detection and automatic repair of intentionally partial games:
+    Tests completeness detection and automatic repair of intentionally partial games (actual < expected):
     - Game 1 is modified to be partial (delete 2 skater rows out of 10).
     - Game 2 remains complete (10 rows).
     - Running backfill with force=False skips Game 2, detects Game 1 as incomplete, and repairs Game 1.
@@ -184,6 +216,48 @@ def test_partial_analytics_repair_with_force_false(app, db, stage1_test_dataset)
     assert summary["skipped"] == 1
     assert PlayerGameAnalytics.query.filter_by(game_id=2023020001).count() == 10
     assert PlayerGameAnalytics.query.filter_by(season='20232024').count() == 20
+
+def test_overpopulated_stale_analytics_repair_with_force_false(app, db, stage1_test_dataset):
+    """
+    Regression Test: Overpopulated / Stale Game Completeness & Repair (actual > expected):
+    - Game 1 is modified by inserting an extra/stale row (11 rows vs 10 expected).
+    - Game 2 remains complete (10 rows).
+    - Audit detects Game 1 as incomplete (actual != expected).
+    - Running backfill with force=False rebuilds Game 1, purging stale row and restoring 10 valid rows.
+    """
+    # 1. Populate valid analytics (10 rows per game)
+    run_backfill(season='20232024', force=True)
+    assert PlayerGameAnalytics.query.filter_by(game_id=2023020001).count() == 10
+
+    # 2. Add an overpopulated / stale row to Game 1 (creating player 999 first to satisfy FK constraint)
+    db.session.add(Player(player_id=999, first_name='Stale', last_name='Player', position='C'))
+    db.session.flush()
+
+    stale_rec = PlayerGameAnalytics(
+        game_id=2023020001,
+        player_id=999,  # Stale/extra player
+        team_id=1,
+        season='20232024',
+        position='C',
+        goals=99
+    )
+    db.session.add(stale_rec)
+    db.session.commit()
+
+    assert PlayerGameAnalytics.query.filter_by(game_id=2023020001).count() == 11
+
+    # 3. Audit check verifies Game 1 is detected as incomplete due to row count mismatch
+    audit_res = audit_game_analytics(season='20232024')
+    assert 2023020001 in audit_res["incomplete"]
+    assert 2023020002 in audit_res["complete"]
+
+    # 4. Run backfill with force=False
+    summary = run_backfill(season='20232024', force=False)
+
+    # 5. Verify Game 1 was repaired, stale row removed, and row count restored to exactly 10
+    assert summary["repaired"] == 1
+    assert PlayerGameAnalytics.query.filter_by(game_id=2023020001).count() == 10
+    assert PlayerGameAnalytics.query.filter_by(game_id=2023020001, player_id=999).first() is None
 
 def test_analytical_equivalence_v14_vs_derived_layer(app, db, stage1_test_dataset):
     """

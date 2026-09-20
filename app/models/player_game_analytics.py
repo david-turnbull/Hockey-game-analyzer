@@ -8,10 +8,11 @@ class PlayerGameAnalytics(db.Model):
 
     Primary Key Rationale:
     The primary key is defined as (game_id, player_id, team_id).
-    While a skater represents a single team per game in standard NHL games, incorporating team_id into the PK:
-    1. Explicitly scopes a player's derived analytics to their specific team stint for that game.
-    2. Supports rare multi-team game stints (e.g., mid-game trades or stint-specific tracking) without PK collisions.
-    3. Cleanly mirrors GamePlayer associations and enables fast stint-scoped SQL aggregations (GROUP BY team_id).
+    Retaining team_id in the primary key:
+    1. Cleanly mirrors GamePlayer schema conventions where roster entries are scoped by game, player, and team.
+    2. Enables fast, index-backed team-level filtering and direct SQL aggregations (e.g., GROUP BY team_id) without requiring additional joins.
+    3. Explicitly ties each analytics row to the player's recorded team for that game.
+    Note: The current PlayerGameAnalyticsBuilder assumes one team record per player per game (skater_meta is keyed by player_id).
     """
     __tablename__ = 'player_game_analytics'
 
