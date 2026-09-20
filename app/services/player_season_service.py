@@ -3,7 +3,7 @@ from bisect import bisect_right
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
 from sqlalchemy import or_, and_, func, distinct
-from app.models import db, Game, Player, Event, Shot, Shift, GamePlayer, Team
+from app.models import db, Game, Player, Event, Shot, Shift, GamePlayer, Team, PlayerGameAnalytics
 from app.utils.time_helpers import format_toi
 from app.services.possession_service import PossessionService
 from app.services.on_ice_service import OnIceService
@@ -35,6 +35,216 @@ class PlayerSeasonService:
 
     @classmethod
     def get_season_skaters_summary(
+        cls,
+        season: str,
+        team_id: Optional[int] = None,
+        min_gp: int = 1,
+        min_toi_seconds: int = 0,
+        min_unblocked_attempts: int = 0,
+        include_on_ice_5v5: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        Aggregates season statistics for all skaters.
+        Uses high-performance derived table (PlayerGameAnalytics) when available,
+        falling back to legacy multi-table join calculation if derived data is not present.
+        """
+        has_derived = (
+            db.session.query(PlayerGameAnalytics.game_id)
+            .filter(PlayerGameAnalytics.season == season)
+            .first() is not None
+        )
+        if not has_derived:
+            return cls._get_season_skaters_summary_legacy(
+                season=season,
+                team_id=team_id,
+                min_gp=min_gp,
+                min_toi_seconds=min_toi_seconds,
+                min_unblocked_attempts=min_unblocked_attempts,
+                include_on_ice_5v5=include_on_ice_5v5
+            )
+
+        # Fast Derived SQL Aggregation Path
+        stint_query = (
+            db.session.query(
+                PlayerGameAnalytics.player_id,
+                PlayerGameAnalytics.team_id,
+                Team.abbreviation,
+                Team.name
+            )
+            .join(Team, PlayerGameAnalytics.team_id == Team.team_id)
+            .join(Game, PlayerGameAnalytics.game_id == Game.game_id)
+            .filter(PlayerGameAnalytics.season == season)
+            .order_by(Game.game_date.asc(), Game.game_id.asc())
+        )
+        if team_id is not None:
+            stint_query = stint_query.filter(PlayerGameAnalytics.team_id == team_id)
+
+        stint_rows = stint_query.all()
+        if not stint_rows:
+            return []
+
+        player_stints = defaultdict(list)
+        for pid, tid, abbrev, name in stint_rows:
+            stints = player_stints[pid]
+            if not stints or stints[-1]["team_id"] != tid:
+                stints.append({"team_id": tid, "abbrev": abbrev, "name": name})
+
+        agg_query = (
+            db.session.query(
+                PlayerGameAnalytics.player_id,
+                Player.first_name,
+                Player.last_name,
+                Player.position,
+                func.count(PlayerGameAnalytics.game_id).label("gp"),
+                func.sum(PlayerGameAnalytics.goals).label("goals"),
+                func.sum(PlayerGameAnalytics.assists).label("assists"),
+                func.sum(PlayerGameAnalytics.points).label("points"),
+                func.sum(PlayerGameAnalytics.shots_on_goal).label("shots"),
+                func.sum(PlayerGameAnalytics.unblocked_attempts).label("unblocked"),
+                func.sum(PlayerGameAnalytics.individual_xg).label("xg"),
+                func.sum(PlayerGameAnalytics.toi_seconds).label("toi_seconds"),
+                func.sum(PlayerGameAnalytics.toi_5v5_seconds).label("toi_5v5_seconds"),
+                func.sum(PlayerGameAnalytics.cf_5v5).label("cf"),
+                func.sum(PlayerGameAnalytics.ca_5v5).label("ca"),
+                func.sum(PlayerGameAnalytics.ff_5v5).label("ff"),
+                func.sum(PlayerGameAnalytics.fa_5v5).label("fa"),
+                func.sum(PlayerGameAnalytics.xgf_5v5).label("xgf"),
+                func.sum(PlayerGameAnalytics.xga_5v5).label("xga")
+            )
+            .join(Player, PlayerGameAnalytics.player_id == Player.player_id)
+            .filter(PlayerGameAnalytics.season == season)
+        )
+        if team_id is not None:
+            agg_query = agg_query.filter(PlayerGameAnalytics.team_id == team_id)
+
+        agg_rows = agg_query.group_by(PlayerGameAnalytics.player_id).all()
+
+        results = []
+        for r in agg_rows:
+            pid = r.player_id
+            stints = player_stints.get(pid, [])
+            if not stints:
+                continue
+
+            if team_id is not None:
+                rep_team_id = team_id
+                rep_team_abbrev = stints[0]["abbrev"]
+                rep_team_name = stints[0]["name"]
+                stints_list = [rep_team_abbrev]
+            else:
+                rep_team_abbrev = "/".join(s["abbrev"] for s in stints)
+                rep_team_name = " / ".join(s["name"] for s in stints) if len(stints) > 1 else stints[0]["name"]
+                rep_team_id = stints[-1]["team_id"]
+                stints_list = [s["abbrev"] for s in stints]
+
+            gp = r.gp
+            g = r.goals or 0
+            a = r.assists or 0
+            p = g + a
+            sog = r.shots or 0
+            unblocked = r.unblocked or 0
+            xg = round(float(r.xg or 0.0), 2)
+            toi_sec = r.toi_seconds or 0
+
+            # Check minimum sample thresholds
+            if gp < min_gp or toi_sec < min_toi_seconds or unblocked < min_unblocked_attempts:
+                continue
+
+            # Rates and differentials
+            toi_hours = toi_sec / 3600.0 if toi_sec > 0 else 0.0
+            goals_per_60 = round(g / toi_hours, 2) if toi_hours > 0 else 0.0
+            xg_per_60 = round(xg / toi_hours, 2) if toi_hours > 0 else 0.0
+            g_minus_xg = round(g - xg, 2)
+
+            shooting_pct = round((g / sog * 100), 2) if sog > 0 else 0.0
+            exp_conv_pct = round((xg / unblocked * 100), 2) if unblocked > 0 else 0.0
+            sh_diff = round(shooting_pct - exp_conv_pct, 2)
+
+            if include_on_ice_5v5:
+                cf = r.cf or 0
+                ca = r.ca or 0
+                ff = r.ff or 0
+                fa = r.fa or 0
+                xgf = round(float(r.xgf or 0.0), 2)
+                xga = round(float(r.xga or 0.0), 2)
+                toi_5v5 = r.toi_5v5_seconds or 0
+
+                tot_c = cf + ca
+                cf_pct = round((cf / tot_c * 100), 2) if tot_c > 0 else 50.0
+
+                tot_f = ff + fa
+                ff_pct = round((ff / tot_f * 100), 2) if tot_f > 0 else 50.0
+
+                tot_xg = xgf + xga
+                on_ice_xg_pct = round((xgf / tot_xg * 100), 2) if tot_xg > 0 else 50.0
+
+                on_ice_5v5_dict = {
+                    "cf": cf,
+                    "ca": ca,
+                    "cf_pct": cf_pct,
+                    "ff": ff,
+                    "fa": fa,
+                    "ff_pct": ff_pct,
+                    "on_ice_xgf": xgf,
+                    "on_ice_xga": xga,
+                    "on_ice_xg_pct": on_ice_xg_pct,
+                    "xgf": xgf,
+                    "xga": xga,
+                    "xg_pct": on_ice_xg_pct,
+                    "toi_seconds": toi_5v5,
+                    "toi_formatted": format_toi(toi_5v5)
+                }
+            else:
+                on_ice_5v5_dict = {
+                    "cf": 0, "ca": 0, "cf_pct": 50.0,
+                    "ff": 0, "fa": 0, "ff_pct": 50.0,
+                    "on_ice_xgf": 0.0, "on_ice_xga": 0.0, "on_ice_xg_pct": 50.0,
+                    "xgf": 0.0, "xga": 0.0, "xg_pct": 50.0,
+                    "toi_seconds": 0, "toi_formatted": "00:00"
+                }
+
+            full_name = f"{r.first_name} {r.last_name}"
+
+            results.append({
+                "player_id": pid,
+                "name": full_name,
+                "position": r.position,
+                "team_id": rep_team_id,
+                "team_abbrev": rep_team_abbrev,
+                "team": rep_team_abbrev,
+                "team_name": rep_team_name,
+                "teams": rep_team_abbrev,
+                "stints": stints_list,
+                "season": season,
+                # Individual Counting Stats
+                "gp": gp,
+                "goals": g,
+                "assists": a,
+                "points": p,
+                "shots": sog,
+                "shots_on_goal": sog,
+                "unblocked_attempts": unblocked,
+                "xg": xg,
+                "goals_above_expected": g_minus_xg,
+                "goals_minus_xg": g_minus_xg,
+                "g_minus_xg": g_minus_xg,
+                # Individual Rates
+                "goals_per_60": goals_per_60,
+                "xg_per_60": xg_per_60,
+                "shooting_pct": shooting_pct,
+                "expected_conversion_pct": exp_conv_pct,
+                "shooting_vs_expected_diff": sh_diff,
+                "toi_seconds": toi_sec,
+                "toi_formatted": format_toi(toi_sec),
+                # 5v5 On-Ice Metrics
+                "on_ice_5v5": on_ice_5v5_dict
+            })
+
+        results.sort(key=lambda x: -x["points"])
+        return results
+
+    @classmethod
+    def _get_season_skaters_summary_legacy(
         cls,
         season: str,
         team_id: Optional[int] = None,
