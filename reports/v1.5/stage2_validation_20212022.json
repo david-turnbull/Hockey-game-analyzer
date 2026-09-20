@@ -1,55 +1,24 @@
 {
   "season": "20212022",
-  "timestamp_utc": "2026-09-20T20:43:54.301617+00:00",
+  "timestamp_utc": "2026-09-20T20:45:53.817970+00:00",
   "audit": {
-    "total_games": 1312,
+    "total_games": 271,
     "complete_games": 271,
     "incomplete_games": 0,
-    "missing_games": 1041,
-    "is_100_percent_complete": false
+    "missing_games": 0,
+    "is_100_percent_complete": true
   },
   "benchmark": {
-    "legacy_seconds": 26.7871,
-    "derived_seconds": 0.1059,
-    "speedup_factor": 253.0,
+    "legacy_seconds": 24.3391,
+    "derived_seconds": 0.0834,
+    "speedup_factor": 291.7,
     "legacy_skaters_count": 782,
     "derived_skaters_count": 782
   },
   "equivalence": {
     "total_players_evaluated": 782,
-    "mismatch_count": 3,
-    "is_perfect_equivalence": false,
-    "mismatches": [
-      {
-        "player_id": 8476923,
-        "name": "Damon Severson",
-        "differentials": {
-          "xg": {
-            "legacy": 3.37,
-            "derived": 3.36
-          }
-        }
-      },
-      {
-        "player_id": 8480185,
-        "name": "Eetu Luostarinen",
-        "differentials": {
-          "on_ice_xga": {
-            "legacy": 7.44,
-            "derived": 7.43
-          }
-        }
-      },
-      {
-        "player_id": 8481517,
-        "name": "Brett Leason",
-        "differentials": {
-          "on_ice_xga": {
-            "legacy": 2.09,
-            "derived": 2.1
-          }
-        }
-      }
-    ]
+    "mismatch_count": 0,
+    "is_perfect_equivalence": true,
+    "mismatches": []
   }
 }

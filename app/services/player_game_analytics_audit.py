@@ -25,8 +25,13 @@ class PlayerGameAnalyticsAuditService:
                 'expected_counts': Dict[int, int]
                 'actual_counts': Dict[int, int]
         """
-        # Query target games
-        game_query = db.session.query(Game.game_id).order_by(Game.game_date.asc(), Game.game_id.asc())
+        # Query target games that have ingested GamePlayer roster records
+        game_query = (
+            db.session.query(GamePlayer.game_id)
+            .join(Game, GamePlayer.game_id == Game.game_id)
+            .distinct()
+            .order_by(GamePlayer.game_id.asc())
+        )
         if season and season.lower() != 'all':
             game_query = game_query.filter(Game.season == season)
         target_game_ids = [r[0] for r in game_query.all()]

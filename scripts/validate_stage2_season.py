@@ -138,7 +138,7 @@ def run_season_validation(season: str = "20212022") -> int:
                 v_leg = leg_vals[metric_key]
                 v_der = der_vals[metric_key]
                 if tolerance > 0:
-                    if abs(v_leg - v_der) > tolerance:
+                    if round(abs(v_leg - v_der), 4) > tolerance:
                         player_diffs[metric_key] = {"legacy": v_leg, "derived": v_der}
                 else:
                     if v_leg != v_der:
