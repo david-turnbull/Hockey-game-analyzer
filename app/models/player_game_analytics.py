@@ -1,10 +1,17 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.base import db
 
 class PlayerGameAnalytics(db.Model):
     """
     Canonical derived analytical data layer storing per-game player statistics
     and additive 5v5 primitives.
+
+    Primary Key Rationale:
+    The primary key is defined as (game_id, player_id, team_id).
+    While a skater represents a single team per game in standard NHL games, incorporating team_id into the PK:
+    1. Explicitly scopes a player's derived analytics to their specific team stint for that game.
+    2. Supports rare multi-team game stints (e.g., mid-game trades or stint-specific tracking) without PK collisions.
+    3. Cleanly mirrors GamePlayer associations and enables fast stint-scoped SQL aggregations (GROUP BY team_id).
     """
     __tablename__ = 'player_game_analytics'
 
@@ -36,8 +43,8 @@ class PlayerGameAnalytics(db.Model):
     xga_5v5 = db.Column(db.Float, default=0.0, nullable=False)
 
     # Metadata & Auditing
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
         db.Index('idx_pga_season_player', 'season', 'player_id'),

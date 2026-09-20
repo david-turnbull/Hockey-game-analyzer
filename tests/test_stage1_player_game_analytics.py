@@ -5,7 +5,7 @@ from sqlalchemy import func
 from app.models import db, Team, Player, Game, Event, Shot, Shift, GamePlayer, PlayerGameAnalytics
 from app.services.player_game_analytics_builder import PlayerGameAnalyticsBuilder
 from app.services.player_season_service import PlayerSeasonService
-from scripts.backfill_player_game_analytics import run_backfill
+from scripts.backfill_player_game_analytics import run_backfill, audit_game_analytics
 
 @pytest.fixture
 def stage1_test_dataset(db):
@@ -125,21 +125,65 @@ def test_builder_idempotency_and_incremental_rebuild(app, db, stage1_test_datase
     cnt2 = PlayerGameAnalytics.query.filter_by(game_id=2023020001).count()
     assert cnt2 == 10, "Idempotent rebuild must replace rows without duplication"
 
-def test_backfill_historical_seasons(app, db, stage1_test_dataset):
+def test_atomic_rebuild_transaction_on_failure(app, db, stage1_test_dataset, monkeypatch):
     """
-    Tests historical backfill script execution, progress handling, and skip logic.
+    Verifies atomic rebuild behavior:
+    If building analytics raises an exception during calculation or persistence,
+    the transaction is rolled back so pre-existing analytics rows remain intact.
     """
-    # Run backfill for season 20232024
-    run_backfill(season='20232024', force=False)
-    
-    # 2 games x 10 skaters = 20 total records
-    total_records = PlayerGameAnalytics.query.filter_by(season='20232024').count()
-    assert total_records == 20
+    # 1. Build initial valid analytics for Game 1 (10 rows)
+    PlayerGameAnalyticsBuilder.build_game_analytics(2023020001)
+    initial_count = PlayerGameAnalytics.query.filter_by(game_id=2023020001).count()
+    assert initial_count == 10
 
-    # Running backfill a second time with force=False should skip all games
-    run_backfill(season='20232024', force=False)
-    total_records_after = PlayerGameAnalytics.query.filter_by(season='20232024').count()
-    assert total_records_after == 20
+    # 2. Monkeypatch _compute_game_5v5_on_ice to simulate a calculation error mid-process
+    def mock_failing_compute(*args, **kwargs):
+        raise RuntimeError("Simulated mid-build calculation error")
+
+    monkeypatch.setattr(PlayerGameAnalyticsBuilder, "_compute_game_5v5_on_ice", mock_failing_compute)
+
+    # 3. Attempt rebuild and assert exception is raised
+    with pytest.raises(RuntimeError, match="Simulated mid-build calculation error"):
+        PlayerGameAnalyticsBuilder.build_game_analytics(2023020001)
+
+    # 4. Assert transaction was rolled back and original 10 rows remain untouched
+    after_error_count = PlayerGameAnalytics.query.filter_by(game_id=2023020001).count()
+    assert after_error_count == 10, "Atomic rollback must preserve original analytics rows when rebuild fails"
+
+def test_partial_analytics_repair_with_force_false(app, db, stage1_test_dataset):
+    """
+    Tests completeness detection and automatic repair of intentionally partial games:
+    - Game 1 is modified to be partial (delete 2 skater rows out of 10).
+    - Game 2 remains complete (10 rows).
+    - Running backfill with force=False skips Game 2, detects Game 1 as incomplete, and repairs Game 1.
+    """
+    # 1. Build full analytics for both games (20 rows total)
+    run_backfill(season='20232024', force=True)
+    assert PlayerGameAnalytics.query.filter_by(season='20232024').count() == 20
+
+    # 2. Intentionally delete 2 rows from Game 1 (leaving 8 out of 10 expected)
+    PlayerGameAnalytics.query.filter_by(game_id=2023020001, player_id=101).delete()
+    PlayerGameAnalytics.query.filter_by(game_id=2023020001, player_id=102).delete()
+    db.session.commit()
+
+    assert PlayerGameAnalytics.query.filter_by(game_id=2023020001).count() == 8
+    assert PlayerGameAnalytics.query.filter_by(game_id=2023020002).count() == 10
+
+    # 3. Audit check verifies Game 1 is incomplete and Game 2 is complete
+    audit_res = audit_game_analytics(season='20232024')
+    assert 2023020001 in audit_res["incomplete"]
+    assert 2023020002 in audit_res["complete"]
+
+    # 4. Run backfill with force=False
+    summary = run_backfill(season='20232024', force=False)
+
+    # 5. Verify Game 2 was skipped (complete_initial = 1), Game 1 was repaired (repaired = 1), and full 20 rows are restored
+    assert summary["complete_initial"] == 1
+    assert summary["incomplete_initial"] == 1
+    assert summary["repaired"] == 1
+    assert summary["skipped"] == 1
+    assert PlayerGameAnalytics.query.filter_by(game_id=2023020001).count() == 10
+    assert PlayerGameAnalytics.query.filter_by(season='20232024').count() == 20
 
 def test_analytical_equivalence_v14_vs_derived_layer(app, db, stage1_test_dataset):
     """
