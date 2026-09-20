@@ -259,81 +259,87 @@ def test_overpopulated_stale_analytics_repair_with_force_false(app, db, stage1_t
     assert PlayerGameAnalytics.query.filter_by(game_id=2023020001).count() == 10
     assert PlayerGameAnalytics.query.filter_by(game_id=2023020001, player_id=999).first() is None
 
-def test_analytical_equivalence_v14_vs_derived_layer(app, db, stage1_test_dataset):
+def test_analytical_equivalence_legacy_vs_derived_explicit(app, db, stage1_test_dataset):
     """
-    Crucial Stage 1 Equivalence Validation:
-    Aggregates player_game_analytics additive primitives in SQL across the season
-    and compares results against trusted v1.4 PlayerSeasonService outputs.
+    Strengthened Equivalence Validation:
+    Compares PlayerSeasonService._get_season_skaters_summary_legacy directly against
+    PlayerSeasonService._get_season_skaters_summary_derived across all players and metrics.
     """
-    # 1. Populate derived analytics for all games
+    # 1. Populate derived analytics for all games in season
     run_backfill(season='20232024', force=True)
 
-    # 2. Get trusted v1.4 skater summary
-    trusted_skaters = PlayerSeasonService.get_season_skaters_summary(season='20232024', include_on_ice_5v5=True)
-    assert len(trusted_skaters) == 10
+    # 2. Call explicit legacy method directly
+    legacy_skaters = PlayerSeasonService._get_season_skaters_summary_legacy(season='20232024', include_on_ice_5v5=True)
+    assert len(legacy_skaters) == 10
 
-    # 3. Aggregate derived layer using SQL SUM() grouped by player_id
-    derived_rows = (
-        db.session.query(
-            PlayerGameAnalytics.player_id,
-            func.count(PlayerGameAnalytics.game_id).label("gp"),
-            func.sum(PlayerGameAnalytics.goals).label("goals"),
-            func.sum(PlayerGameAnalytics.assists).label("assists"),
-            func.sum(PlayerGameAnalytics.points).label("points"),
-            func.sum(PlayerGameAnalytics.shots_on_goal).label("shots"),
-            func.sum(PlayerGameAnalytics.unblocked_attempts).label("unblocked"),
-            func.sum(PlayerGameAnalytics.individual_xg).label("xg"),
-            func.sum(PlayerGameAnalytics.toi_seconds).label("toi_seconds"),
-            func.sum(PlayerGameAnalytics.toi_5v5_seconds).label("toi_5v5_seconds"),
-            func.sum(PlayerGameAnalytics.cf_5v5).label("cf"),
-            func.sum(PlayerGameAnalytics.ca_5v5).label("ca"),
-            func.sum(PlayerGameAnalytics.ff_5v5).label("ff"),
-            func.sum(PlayerGameAnalytics.fa_5v5).label("fa"),
-            func.sum(PlayerGameAnalytics.xgf_5v5).label("xgf"),
-            func.sum(PlayerGameAnalytics.xga_5v5).label("xga")
-        )
-        .filter(PlayerGameAnalytics.season == '20232024')
-        .group_by(PlayerGameAnalytics.player_id)
-        .all()
-    )
+    # 3. Call explicit derived method directly
+    derived_skaters = PlayerSeasonService._get_season_skaters_summary_derived(season='20232024', include_on_ice_5v5=True)
+    assert len(derived_skaters) == 10
 
-    derived_map = {r.player_id: r for r in derived_rows}
+    derived_map = {s["player_id"]: s for s in derived_skaters}
 
-    # 4. Assert exact numerical equivalence for every skater
-    for trusted in trusted_skaters:
-        pid = trusted["player_id"]
-        assert pid in derived_map, f"Player {pid} missing from derived analytics aggregation"
+    # 4. Assert 1-to-1 exact equivalence for every skater
+    for leg in legacy_skaters:
+        pid = leg["player_id"]
+        assert pid in derived_map, f"Player {pid} missing from derived summary"
         der = derived_map[pid]
 
-        # Individual Counting Stats Equivalence
-        assert der.gp == trusted["gp"]
-        assert der.goals == trusted["goals"]
-        assert der.assists == trusted["assists"]
-        assert der.points == trusted["points"]
-        assert der.shots == trusted["shots"]
-        assert der.unblocked == trusted["unblocked_attempts"]
-        assert abs(der.xg - trusted["xg"]) < 0.01
-        assert der.toi_seconds == trusted["toi_seconds"]
+        # Individual Counting Stats
+        assert der["gp"] == leg["gp"]
+        assert der["goals"] == leg["goals"]
+        assert der["assists"] == leg["assists"]
+        assert der["points"] == leg["points"]
+        assert der["shots"] == leg["shots"]
+        assert der["unblocked_attempts"] == leg["unblocked_attempts"]
+        assert abs(der["xg"] - leg["xg"]) < 0.01
+        assert der["toi_seconds"] == leg["toi_seconds"]
 
-        # 5v5 On-Ice Primitives Equivalence
-        oi = trusted["on_ice_5v5"]
-        assert der.cf == oi["cf"]
-        assert der.ca == oi["ca"]
-        assert der.ff == oi["ff"]
-        assert der.fa == oi["fa"]
-        assert abs(der.xgf - oi["on_ice_xgf"]) < 0.01
-        assert abs(der.xga - oi["on_ice_xga"]) < 0.01
-        assert der.toi_5v5_seconds == oi["toi_seconds"]
+        # 5v5 On-Ice Primitives & Ratios
+        leg_oi = leg["on_ice_5v5"]
+        der_oi = der["on_ice_5v5"]
 
-        # Aggregated Ratio Equivalence
-        tot_c = der.cf + der.ca
-        derived_cf_pct = round((der.cf / tot_c * 100), 2) if tot_c > 0 else 50.0
-        assert abs(derived_cf_pct - oi["cf_pct"]) < 0.01
+        assert der_oi["cf"] == leg_oi["cf"]
+        assert der_oi["ca"] == leg_oi["ca"]
+        assert der_oi["cf_pct"] == leg_oi["cf_pct"]
+        assert der_oi["ff"] == leg_oi["ff"]
+        assert der_oi["fa"] == leg_oi["fa"]
+        assert der_oi["ff_pct"] == leg_oi["ff_pct"]
+        assert abs(der_oi["on_ice_xgf"] - leg_oi["on_ice_xgf"]) < 0.01
+        assert abs(der_oi["on_ice_xga"] - leg_oi["on_ice_xga"]) < 0.01
+        assert abs(der_oi["on_ice_xg_pct"] - leg_oi["on_ice_xg_pct"]) < 0.01
+        assert der_oi["toi_seconds"] == leg_oi["toi_seconds"]
 
-        tot_f = der.ff + der.fa
-        derived_ff_pct = round((der.ff / tot_f * 100), 2) if tot_f > 0 else 50.0
-        assert abs(derived_ff_pct - oi["ff_pct"]) < 0.01
+def test_partial_season_fallback_to_legacy(app, db, stage1_test_dataset):
+    """
+    Regression Test: Partial-Season Safety
+    - Season 20232024 has 2 games.
+    - We build derived analytics for Game 1 ONLY (Game 2 remains unbuilt).
+    - Verifies that PlayerSeasonService.get_season_skaters_summary detects incomplete season
+      and falls back to _get_season_skaters_summary_legacy (returning 2-game stats instead of partial 1-game stats).
+    """
+    # 1. Build derived analytics for Game 1 only
+    PlayerGameAnalyticsBuilder.build_game_analytics(2023020001)
 
-        tot_xg = der.xgf + der.xga
-        derived_xg_pct = round((der.xgf / tot_xg * 100), 2) if tot_xg > 0 else 50.0
-        assert abs(derived_xg_pct - oi["on_ice_xg_pct"]) < 0.01
+    # 2. Verify Game 2 is unbuilt in database
+    assert PlayerGameAnalytics.query.filter_by(game_id=2023020001).count() == 10
+    assert PlayerGameAnalytics.query.filter_by(game_id=2023020002).count() == 0
+
+    # 3. Call public get_season_skaters_summary
+    public_skaters = PlayerSeasonService.get_season_skaters_summary(season='20232024')
+    legacy_skaters = PlayerSeasonService._get_season_skaters_summary_legacy(season='20232024')
+
+    # 4. Assert public method fell back to legacy and returned 2-game totals for player 101 (2 goals across both games)
+    pub101 = next(s for s in public_skaters if s["player_id"] == 101)
+    leg101 = next(s for s in legacy_skaters if s["player_id"] == 101)
+
+    assert pub101["gp"] == 2
+    assert pub101["goals"] == 2
+    assert pub101["goals"] == leg101["goals"]
+
+    # 5. Build Game 2 analytics so season is 100% complete
+    PlayerGameAnalyticsBuilder.build_game_analytics(2023020002)
+
+    # 6. Call public method again and verify it now uses derived path cleanly
+    public_skaters_complete = PlayerSeasonService.get_season_skaters_summary(season='20232024')
+    pub101_complete = next(s for s in public_skaters_complete if s["player_id"] == 101)
+    assert pub101_complete["goals"] == 2

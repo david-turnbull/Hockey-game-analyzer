@@ -7,6 +7,7 @@ from app.models import db, Game, Player, Event, Shot, Shift, GamePlayer, Team, P
 from app.utils.time_helpers import format_toi
 from app.services.possession_service import PossessionService
 from app.services.on_ice_service import OnIceService
+from app.services.player_game_analytics_audit import PlayerGameAnalyticsAuditService
 
 logger = logging.getLogger(__name__)
 
@@ -45,15 +46,20 @@ class PlayerSeasonService:
     ) -> List[Dict[str, Any]]:
         """
         Aggregates season statistics for all skaters.
-        Uses high-performance derived table (PlayerGameAnalytics) when available,
-        falling back to legacy multi-table join calculation if derived data is not present.
+        Uses high-performance derived table (PlayerGameAnalytics) ONLY when the target season
+        is fully backfilled and complete according to PlayerGameAnalyticsAuditService.
+        Otherwise, falls back to legacy multi-table join calculation.
         """
-        has_derived = (
-            db.session.query(PlayerGameAnalytics.game_id)
-            .filter(PlayerGameAnalytics.season == season)
-            .first() is not None
-        )
-        if not has_derived:
+        if PlayerGameAnalyticsAuditService.is_season_complete(season):
+            return cls._get_season_skaters_summary_derived(
+                season=season,
+                team_id=team_id,
+                min_gp=min_gp,
+                min_toi_seconds=min_toi_seconds,
+                min_unblocked_attempts=min_unblocked_attempts,
+                include_on_ice_5v5=include_on_ice_5v5
+            )
+        else:
             return cls._get_season_skaters_summary_legacy(
                 season=season,
                 team_id=team_id,
@@ -62,6 +68,17 @@ class PlayerSeasonService:
                 min_unblocked_attempts=min_unblocked_attempts,
                 include_on_ice_5v5=include_on_ice_5v5
             )
+
+    @classmethod
+    def _get_season_skaters_summary_derived(
+        cls,
+        season: str,
+        team_id: Optional[int] = None,
+        min_gp: int = 1,
+        min_toi_seconds: int = 0,
+        min_unblocked_attempts: int = 0,
+        include_on_ice_5v5: bool = True
+    ) -> List[Dict[str, Any]]:
 
         # Fast Derived SQL Aggregation Path
         stint_query = (
