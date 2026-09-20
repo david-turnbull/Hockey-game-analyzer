@@ -1,0 +1,93 @@
+{
+  "season": "20212022",
+  "dataset_scale": {
+    "season": "20212022",
+    "games": 1312,
+    "game_player_rows": 10839,
+    "shifts": 210379,
+    "valid_shifts": 208724,
+    "events": 148574,
+    "events_5v5": 132239,
+    "shots": 96015
+  },
+  "benchmarks": [
+    {
+      "operation": "1. Single Player Season Stats (get_skater_season_stats)",
+      "time_ms": 48709.06,
+      "time_s": 48.71,
+      "query_count": 12,
+      "peak_mem_mb": 464.09
+    },
+    {
+      "operation": "2. Full Season Skaters Summary (include_on_ice_5v5=True)",
+      "time_ms": 45590.23,
+      "time_s": 45.59,
+      "query_count": 12,
+      "peak_mem_mb": 463.54
+    },
+    {
+      "operation": "3. Full Season Skaters Summary (include_on_ice_5v5=False)",
+      "time_ms": 16742.2,
+      "time_s": 16.74,
+      "query_count": 8,
+      "peak_mem_mb": 7.98
+    },
+    {
+      "operation": "4. Team Season Stats (get_team_season_stats)",
+      "time_ms": 91.93,
+      "time_s": 0.09,
+      "query_count": 6,
+      "peak_mem_mb": 0.53
+    },
+    {
+      "operation": "5. Skater Leaderboards (get_skater_leaderboards limit=50)",
+      "time_ms": 47205.55,
+      "time_s": 47.21,
+      "query_count": 12,
+      "peak_mem_mb": 463.77
+    }
+  ],
+  "query_plans": [
+    {
+      "query_name": "Game Season Query",
+      "query_plan": [
+        "(4, 0, 62, 'SEARCH game USING INDEX idx_game_season_type (season=?)')",
+        "(16, 0, 0, 'USE TEMP B-TREE FOR ORDER BY')"
+      ]
+    },
+    {
+      "query_name": "GamePlayer Season Join Query",
+      "query_plan": [
+        "(6, 0, 54, 'SEARCH g USING COVERING INDEX idx_game_season_type (season=?)')",
+        "(12, 0, 62, 'SEARCH gp USING INDEX sqlite_autoindex_game_player_1 (game_id=?)')",
+        "(17, 0, 45, 'SEARCH p USING INTEGER PRIMARY KEY (rowid=?)')",
+        "(22, 0, 45, 'SEARCH t USING INTEGER PRIMARY KEY (rowid=?)')"
+      ]
+    },
+    {
+      "query_name": "Shifts Bulk Query",
+      "query_plan": [
+        "(3, 0, 106, 'SEARCH shift USING INDEX ix_shift_game_id (game_id=?)')",
+        "(7, 0, 0, 'LIST SUBQUERY 1')",
+        "(10, 7, 54, 'SEARCH game USING COVERING INDEX idx_game_season_type (season=?)')",
+        "(20, 7, 0, 'CREATE BLOOM FILTER')"
+      ]
+    },
+    {
+      "query_name": "Events 5v5 Shot Query",
+      "query_plan": [
+        "(6, 0, 54, 'SEARCH g USING COVERING INDEX idx_game_season_type (season=?)')",
+        "(12, 0, 60, 'SEARCH e USING INDEX ix_event_game_id (game_id=?)')",
+        "(19, 0, 47, 'SEARCH sh USING INDEX sqlite_autoindex_shot_1 (shot_id=?) LEFT-JOIN')"
+      ]
+    },
+    {
+      "query_name": "Goals Query by Player",
+      "query_plan": [
+        "(8, 0, 62, 'SEARCH e USING INDEX ix_event_event_type (event_type=?)')",
+        "(13, 0, 45, 'SEARCH g USING INTEGER PRIMARY KEY (rowid=?)')",
+        "(18, 0, 0, 'USE TEMP B-TREE FOR GROUP BY')"
+      ]
+    }
+  ]
+}

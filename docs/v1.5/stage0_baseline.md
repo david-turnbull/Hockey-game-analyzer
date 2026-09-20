@@ -1,7 +1,7 @@
 # Stage 0 — Baseline, Measurement & Analytical Contracts
 
 ## Executive Summary
-This document establishes the empirical baseline measurement, query-plan audit, bottleneck diagnosis, and analytical test contracts for **PuckLens v1.5** prior to introducing performance optimizations.
+This document establishes the empirical baseline measurement, dataset scale diagnostics, query-plan audit, bottleneck diagnosis, and frozen numerical reference test contracts for **PuckLens v1.5** prior to introducing performance optimizations.
 
 ---
 
@@ -18,53 +18,64 @@ Request Single Player Season Stats
   ↓
 Calls get_season_skaters_summary(season, include_on_ice_5v5=True)
   ↓
-Queries ALL Games in Season (800+ games)
+Queries ALL Games in Season (1,312 games for 20212022)
   ↓
-Queries ALL GamePlayer rows in Season (~20,000+ rows)
+Queries ALL GamePlayer rows in Season (10,839 rows)
   ↓
-Queries ALL Goals, Assists, Shots, and Shifts for ALL players in the NHL
+Queries ALL Goals, Assists, Shots, and Shifts for ALL players in the NHL (210,379 shifts, 148,574 events)
   ↓
-Computes 5v5 shift boundary intervals in Python memory across all 800+ games (~200,000+ shifts)
+Computes 5v5 shift boundary intervals in Python memory across all 1,312 games
   ↓
-Searches returned list of 780+ skaters to extract the 1 requested player
+Searches returned list of 782 skaters to extract the 1 requested player
 ```
 
 ---
 
-## 2. Empirical Performance Benchmarks (Season 20212022 Data)
+## 2. Empirical Performance & Dataset Scale (Season 20212022 Data)
 
 Benchmarked on local production-sized SQLite database (`hockey.db`, ~1.47 GB).
 
+### Dataset Scale Diagnostics (Season 20212022)
+* **Games:** 1,312
+* **GamePlayer rows:** 10,839
+* **Shifts (total):** 210,379
+* **Shifts (valid, >0s):** 208,724
+* **Events (total):** 148,574
+* **Events (5v5):** 132,239
+* **Shots:** 96,015
+
+### Execution Benchmarks
+
 | Operation | Wall-Clock Time | SQL Query Count | Peak Memory | Output Info |
 | :--- | :--- | :--- | :--- | :--- |
-| **1. Single Player Season Stats** (`get_skater_season_stats`) | **53.89 s** | 12 | **464.09 MB** | 1 player found |
-| **2. Full Season Skaters Summary** (`include_on_ice_5v5=True`) | **46.79 s** | 12 | **463.54 MB** | 782 skaters |
-| **3. Full Season Skaters Summary** (`include_on_ice_5v5=False`) | **16.74 s** | 8 | **7.83 MB** | 782 skaters |
-| **4. Team Season Stats** (`get_team_season_stats`) | **0.14 s** (139.95 ms) | 6 | **0.52 MB** | 1 team found |
-| **5. Skater Leaderboards** (`get_skater_leaderboards limit=50`) | **47.10 s** | 12 | **463.72 MB** | 50 skaters |
+| **1. Single Player Season Stats** (`get_skater_season_stats`) | **48.71 s** | 12 | **464.09 MB** | 1 player found |
+| **2. Full Season Skaters Summary** (`include_on_ice_5v5=True`) | **45.59 s** | 12 | **463.54 MB** | 782 skaters |
+| **3. Full Season Skaters Summary** (`include_on_ice_5v5=False`) | **16.74 s** | 8 | **7.98 MB** | 782 skaters |
+| **4. Team Season Stats** (`get_team_season_stats`) | **0.09 s** (91.93 ms) | 6 | **0.53 MB** | 1 team found |
+| **5. Skater Leaderboards** (`get_skater_leaderboards limit=50`) | **47.21 s** | 12 | **463.77 MB** | 50 skaters |
 
-### Key Bottleneck Findings:
-- **Single-Player Latency:** Requesting stats for one player takes **53.89 seconds** and **464 MB of RAM**, identical to calculating the entire league's season stats.
-- **On-Ice 5v5 Shift Interval Cost:** Computing on-ice 5v5 shift boundary intervals in Python adds **~30 seconds** of pure CPU/RAM overhead (46.79s vs 16.74s) and increases RAM usage from **7.83 MB to 463.54 MB**.
-- **Leaderboard Unbounded Query:** `get_skater_leaderboards(limit=50)` computes full-season 5v5 stats for all 782 skaters in Python memory before slicing the top 50.
+### Reproducible Benchmark Utility Usage
+Run the CLI benchmark script against any season with optional JSON export:
+```bash
+python scripts/stage0_benchmark.py --season 20212022 --output reports/v1.5/stage0_benchmark.json
+```
 
 ---
 
 ## 3. SQL Query-Plan Audit (`EXPLAIN QUERY PLAN`)
 
-Analysis of representative SQL queries against `hockey.db`:
+Analysis of representative SQL queries against `hockey.db` for season `20212022`:
 
 ### A. Game Season Query
 ```sql
 EXPLAIN QUERY PLAN 
 SELECT game_id, game_date FROM game 
-WHERE season = '20232024' 
+WHERE season = '20212022' 
 ORDER BY game_date ASC, game_id ASC;
 ```
 * **Query Plan:**
   - `SEARCH game USING INDEX idx_game_season_type (season=?)`
   - `USE TEMP B-TREE FOR ORDER BY`
-* **Finding:** Uses index `idx_game_season_type`, but requires temp B-Tree sort for composite ordering (`game_date`, `game_id`).
 
 ### B. GamePlayer Season Join
 ```sql
@@ -74,41 +85,79 @@ FROM game_player gp
 JOIN player p ON gp.player_id = p.player_id 
 JOIN team t ON gp.team_id = t.team_id 
 JOIN game g ON gp.game_id = g.game_id 
-WHERE g.season = '20232024' AND p.position != 'G';
+WHERE g.season = '20212022' AND p.position != 'G';
 ```
 * **Query Plan:**
-  - `SEARCH game USING COVERING INDEX idx_game_season_type (season=?)`
-  - `SEARCH game_player USING INDEX sqlite_autoindex_game_player_1 (game_id=?)`
-  - `SEARCH player USING INTEGER PRIMARY KEY (rowid=?)`
-  - `SEARCH team USING INTEGER PRIMARY KEY (rowid=?)`
-* **Finding:** Clean index coverage, but returns ~20,000+ rows into Python memory for full season.
+  - `SEARCH g USING COVERING INDEX idx_game_season_type (season=?)`
+  - `SEARCH gp USING INDEX sqlite_autoindex_game_player_1 (game_id=?)`
+  - `SEARCH p USING INTEGER PRIMARY KEY (rowid=?)`
+  - `SEARCH t USING INTEGER PRIMARY KEY (rowid=?)`
 
 ### C. Shifts Bulk Query
 ```sql
 EXPLAIN QUERY PLAN 
 SELECT player_id, duration FROM shift 
-WHERE game_id IN (SELECT game_id FROM game WHERE season = '20232024') 
+WHERE game_id IN (SELECT game_id FROM game WHERE season = '20212022') 
   AND is_anomaly = 0 AND duration > 0;
 ```
 * **Query Plan:**
   - `SEARCH shift USING INDEX ix_shift_game_id (game_id=?)`
   - `LIST SUBQUERY 1` $\rightarrow$ `SEARCH game USING COVERING INDEX idx_game_season_type (season=?)`
   - `CREATE BLOOM FILTER`
-* **Finding:** Loads ~200,000+ raw shift rows into Python memory, causing the 464 MB peak memory allocation.
+
+### D. 5v5 Events & Shot Query
+```sql
+EXPLAIN QUERY PLAN 
+SELECT e.game_id, e.event_type, sh.xg 
+FROM event e 
+JOIN game g ON e.game_id = g.game_id 
+LEFT OUTER JOIN shot sh ON e.event_id = sh.shot_id 
+WHERE g.season = '20212022' AND e.team_strength_state = '5v5';
+```
+* **Query Plan:**
+  - `SEARCH g USING COVERING INDEX idx_game_season_type (season=?)`
+  - `SEARCH e USING INDEX ix_event_game_id (game_id=?)`
+  - `SEARCH sh USING INDEX sqlite_autoindex_shot_1 (shot_id=?) LEFT-JOIN`
 
 ---
 
-## 4. Analytical Contracts & Invariants
+## 4. Frozen Analytical Reference Outputs & Test Contracts
 
-All future optimization stages (starting with Stage 1 `player_game_analytics`) must strictly preserve the following contracts verified in `tests/test_stage0_baseline.py`:
+Stage 0 freezes the exact analytical truth in `tests/test_stage0_baseline.py` using hard numerical assertions across a deterministic 12-player true-5v5 lineup fixture (Calgary Flames vs Edmonton Oilers).
 
-1. **Points Contract:** $\text{Points} = \text{Goals} + \text{Assists}$
-2. **Shooting Percentage Contract:** $\text{Sh}\% = \text{round}\left(\frac{\text{Goals}}{\text{Shots}} \times 100, 2\right)$ when $\text{Shots} > 0$, else `0.0`.
-3. **Goals Above Expected Contract:** $\text{GAE} = \text{round}(\text{Goals} - \text{xG}, 2)$.
-4. **Additive Primitives Contract:** Persist additive components ($CF, CA, FF, FA, TOI, xGF, xGA$) per game.
-5. **Ratio Aggregation Rule:** Season ratio statistics must be calculated post-aggregation:
-   $$\text{CF}\% = \frac{\sum \text{CF}}{\sum \text{CF} + \sum \text{CA}} \times 100$$
-   **NEVER** average individual game percentages.
+### Frozen Reference Values for Calgary Player 101 (Mikael Backlund)
+
+#### Individual & Counting Statistics
+- **GP:** `1`
+- **Goals:** `1`
+- **Assists:** `0`
+- **Points:** `1`
+- **Shots on Goal:** `1`
+- **Unblocked Attempts:** `1`
+- **Individual xG:** `0.35`
+- **Goals Minus xG ($G - \text{xG}$):** `0.65`
+- **Total TOI:** `600` seconds (`10:00`)
+- **Shooting %:** `100.0%`
+- **Expected Conversion %:** `35.0%`
+- **Goals per 60:** `6.0`
+- **xG per 60:** `2.1`
+
+#### 5v5 On-Ice Statistics
+- **Corsi For (CF):** `3` (Goal, Missed, Blocked)
+- **Corsi Against (CA):** `2` (Saved, Missed)
+- **Corsi For % (CF%):** `60.0%` ($\frac{3}{5} \times 100$)
+- **Fenwick For (FF):** `2` (Goal, Missed)
+- **Fenwick Against (FA):** `2` (Saved, Missed)
+- **Fenwick For % (FF%):** `50.0%` ($\frac{2}{4} \times 100$)
+- **On-Ice xGF:** `0.55` ($0.35 + 0.20$)
+- **On-Ice xGA:** `0.30` ($0.21 + 0.09$)
+- **On-Ice xG %:** `64.71%` ($\frac{0.55}{0.85} \times 100$)
+- **5v5 TOI:** `600` seconds (`10:00`)
+
+### Hard Ratio Aggregation Contract
+Season percentage statistics MUST be calculated from summed additive primitives:
+$$\text{CF}\% = \frac{\sum \text{CF}}{\sum \text{CF} + \sum \text{CA}} \times 100$$
+Tested across asymmetric multi-game scenarios (Game 1: 90.0% CF, Game 2: 1.0% CF) to verify that season CF% yields **9.09%** (summed ratio) and **NEVER** 45.5% (average of game percentages).
 
 ---
 
@@ -116,16 +165,23 @@ All future optimization stages (starting with Stage 1 `player_game_analytics`) m
 
 | Operation | Stage 0 Baseline | Stage 2 Target | Target Improvement |
 | :--- | :--- | :--- | :--- |
-| **Single Player Season Stats** | 53.89 s | **< 50 ms** | **> 1,000x faster** |
-| **Full Season Skaters Summary** | 46.79 s | **< 200 ms** | **> 200x faster** |
-| **Skater Leaderboards (Top 50)** | 47.10 s | **< 50 ms** | **> 900x faster** |
+| **Single Player Season Stats** | 48.71 s | **< 50 ms** | **> 900x faster** |
+| **Full Season Skaters Summary** | 45.59 s | **< 200 ms** | **> 200x faster** |
+| **Skater Leaderboards (Top 50)** | 47.21 s | **< 50 ms** | **> 900x faster** |
 | **Peak Memory Allocation** | 464 MB | **< 15 MB** | **> 95% reduction** |
 
 ---
 
 ## 6. Stage 0 Exit Criteria Verification
 
-- [x] Baseline benchmarks exist (`scripts/stage0_benchmark.py` executed with empirical results recorded).
-- [x] Analytical reference tests exist (`tests/test_stage0_baseline.py` created and passing).
-- [x] Full test suite passes (202 test items passed cleanly).
-- [x] Performance bottlenecks supported by empirical evidence (53.89s single-player latency & 464 MB memory documented).
+- [x] Deterministic true-5v5 fixture exists (`tests/test_stage0_baseline.py`).
+- [x] Both teams contain full skater/goalie lineups (6 players per side, 12 total) for valid 5v5 reconstruction.
+- [x] Hard numerical reference values tested (CF, CA, FF, FA, on-ice xGF, on-ice xGA, 5v5 TOI, counting stats, individual xG).
+- [x] Single-player stats proven equivalent to full-season summary entry across all analytical fields.
+- [x] Ratio-from-additive-primitives behavior explicitly tested (`test_stage0_ratio_aggregation_semantics`).
+- [x] Benchmark CLI season selection implemented (`--season`).
+- [x] `EXPLAIN QUERY PLAN` uses selected season dynamically.
+- [x] Dataset row counts reported (208k shifts, 132k 5v5 events).
+- [x] Machine-readable JSON output supported (`--output`).
+- [x] Full test suite passes cleanly (**205 passed**).
+- [x] Zero Stage 1 optimizations introduced.
