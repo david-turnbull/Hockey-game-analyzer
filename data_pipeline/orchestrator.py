@@ -284,6 +284,13 @@ class PipelineOrchestrator:
         
         if success:
             try:
+                from app.services.player_game_analytics_builder import PlayerGameAnalyticsBuilder
+                PlayerGameAnalyticsBuilder.build_game_analytics(game_id)
+                logger.info(f"Derived player game analytics generated for game {game_id}")
+            except Exception as e:
+                logger.warning(f"Failed to generate derived player game analytics for game {game_id}: {e}")
+
+            try:
                 from app.services.validation_service import ValidationService
                 val_result = ValidationService.validate_game_boxscore(game_id)
                 if val_result:
