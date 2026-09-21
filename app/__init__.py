@@ -88,10 +88,29 @@ def create_app(config_name=None):
     app.register_blueprint(seasons_bp)
     app.register_blueprint(forecast_bp)
     
+    @app.before_request
+    def resolve_presentation_mode():
+        from flask import request, session
+        from app.services.presentation_mode import PresentationModeService
+        raw_mode = request.args.get('mode') or request.args.get('presentation_mode')
+        if raw_mode:
+            norm = PresentationModeService.normalize_mode(raw_mode)
+            session['presentation_mode'] = norm
+
     @app.context_processor
-    def inject_methodology():
+    def inject_presentation_mode_and_methodology():
         from app.services.methodology_registry import MethodologyRegistry
-        return dict(methodology_registry=MethodologyRegistry)
+        from app.services.presentation_mode import PresentationModeService
+        active_mode = PresentationModeService.get_current_mode()
+        mode_info = PresentationModeService.get_mode_info(active_mode)
+        all_modes = PresentationModeService.list_all_modes()
+        return dict(
+            methodology_registry=MethodologyRegistry,
+            presentation_mode=active_mode,
+            current_mode_info=mode_info,
+            all_presentation_modes=all_modes,
+            PresentationModeService=PresentationModeService
+        )
 
     # Global error handlers
     @app.errorhandler(404)

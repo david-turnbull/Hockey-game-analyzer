@@ -655,4 +655,28 @@ def get_methodology_model_card(key):
         return jsonify({"error": f"Model card '{key}' not found"}), 404
     return jsonify(card.to_dict()), 200
 
+@api_bp.route('/v1/presentation_mode', methods=['GET', 'POST'])
+def handle_presentation_mode():
+    """Gets active presentation mode or updates user mode preference in session."""
+    from app.services.presentation_mode import PresentationModeService
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or request.form
+        raw_mode = data.get('mode') or data.get('presentation_mode')
+        norm = PresentationModeService.normalize_mode(raw_mode)
+        from flask import session
+        session['presentation_mode'] = norm
+        return jsonify({
+            "status": "success",
+            "active_mode": norm,
+            "mode_info": PresentationModeService.get_mode_info(norm)
+        }), 200
+
+    active = PresentationModeService.get_current_mode()
+    return jsonify({
+        "active_mode": active,
+        "mode_info": PresentationModeService.get_mode_info(active),
+        "available_modes": PresentationModeService.list_all_modes()
+    }), 200
+
+
 
