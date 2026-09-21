@@ -1,12 +1,17 @@
 """
 Tests for Stage 3 Metric & Model Methodology Registry.
 Verifies repository grounding, completeness, unique keys, metadata integrity,
-artifact hashes, API endpoint availability, Jinja template rendering, and zero analytical regression.
+source-driven artifact hashes, API endpoint availability, Jinja template rendering, and zero analytical regression.
 """
 
+import json
+import hashlib
+from pathlib import Path
 import pytest
 from flask import render_template_string
 from app.services.methodology_registry import MethodologyRegistry, MetricDefinition, ModelCard
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_required_metrics_exist_and_unique():
@@ -76,40 +81,80 @@ def test_required_model_cards_exist_and_unique():
 
 
 def test_grounded_model_card_provenance_and_artifact_hashes():
-    """Verifies that model cards reflect actual repository artifacts, features, and SHA256 hashes."""
-    # 1. xG Model Card Grounding
+    """Verifies that model cards reflect actual repository metadata files, features, and SHA256 hashes."""
+    # Load source files directly from repository artifacts
+    xg_meta_path = REPO_ROOT / "models" / "xg" / "metadata.json"
+    win_manifest_path = REPO_ROOT / "models" / "forecasting" / "pucklens-win-v1.4.0.json"
+    score_params_path = REPO_ROOT / "models" / "forecasting" / "score_candidate_params_v1.4.0.json"
+    stage5_report_path = REPO_ROOT / "reports" / "stage5_score_projection_validation.json"
+
+    with open(xg_meta_path, "r", encoding="utf-8") as f:
+        xg_meta = json.load(f)
+
+    with open(win_manifest_path, "r", encoding="utf-8") as f:
+        win_manifest = json.load(f)
+
+    with open(score_params_path, "r", encoding="utf-8") as f:
+        score_params = json.load(f)
+
+    score_params_raw_bytes = score_params_path.read_bytes()
+    computed_score_file_sha256 = hashlib.sha256(score_params_raw_bytes).hexdigest()
+
+    with open(stage5_report_path, "r", encoding="utf-8") as f:
+        stage5_report = json.load(f)
+
+    # 1. xG Model Card Grounding against models/xg/metadata.json
     xg_card = MethodologyRegistry.get_model_card("xg")
-    assert xg_card.name == "pucklens-xg-logistic"
-    assert xg_card.version == "1.0.0"
-    assert xg_card.model_type == "LogisticRegressionXGModel"
-    assert len(xg_card.features) == 21
-    assert xg_card.evaluation_metrics["log_loss"] == 0.2127
-    assert xg_card.evaluation_metrics["roc_auc"] == 0.7494
+    assert xg_card is not None
+    assert xg_card.name == xg_meta["name"]
+    assert xg_card.version == xg_meta["version"]
+    assert xg_card.model_type == xg_meta["model_type"]
+    assert xg_card.features == xg_meta["features"]
+    assert xg_card.evaluation_metrics["log_loss"] == xg_meta["metrics"]["log_loss"]
+    assert xg_card.evaluation_metrics["brier_score"] == xg_meta["metrics"]["brier_score"]
+    assert xg_card.evaluation_metrics["roc_auc"] == xg_meta["metrics"]["roc_auc"]
+    assert xg_card.evaluation_metrics["actual_goals"] == xg_meta["metrics"]["actual_goals"]
+    assert xg_card.evaluation_metrics["expected_goals"] == xg_meta["metrics"]["expected_goals"]
+    assert xg_card.evaluation_metrics["total_shots"] == xg_meta["metrics"]["total_shots"]
+    assert xg_card.provenance["git_commit"] == xg_meta["git_commit"]
+    assert xg_card.provenance["scikit_learn_version"] == xg_meta["scikit_learn_version"]
 
-    # 2. Win Probability Model Card Grounding
+    # 2. Win Probability Model Card Grounding against models/forecasting/pucklens-win-v1.4.0.json
     win_card = MethodologyRegistry.get_model_card("win_probability")
-    assert win_card.name == "pucklens-win"
-    assert win_card.version == "v1.4.0"
-    assert win_card.model_type == "HistGradientBoostingClassifier (with isotonic calibration)"
-    assert win_card.artifact_hash == "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9"
-    assert len(win_card.features) == 11
-    assert "rest_differential" in win_card.features
-    assert "l10_xgf_pct_diff" in win_card.features
+    assert win_card is not None
+    assert win_card.name == win_manifest["model_name"]
+    assert win_card.version == win_manifest["model_version"]
+    assert win_card.artifact_hash == win_manifest["artifact_sha256"]
+    assert win_card.features == win_manifest["feature_names"]
+    assert win_card.evaluation_metrics["training_samples"] == win_manifest["number_of_training_samples"]
+    assert win_card.evaluation_metrics["calibration_samples"] == win_manifest["number_of_calibration_samples"]
+    assert win_card.evaluation_metrics["selection_metric"] == win_manifest["model_selection_metric"]
+    assert win_card.evaluation_metrics["calibration_method"] == win_manifest["calibration_method"]
+    assert win_card.provenance["git_commit_sha"] == win_manifest["git_commit_sha"]
+    assert win_card.provenance["run_uuid"] == win_manifest["run_uuid"]
 
-    # 3. Score Projection Model Card Grounding
+    # 3. Score Projection Model Card Grounding against score params & stage5 report
     score_card = MethodologyRegistry.get_model_card("score_projection")
-    assert score_card.version == "v1.4.0"
+    assert score_card is not None
+    assert score_card.version == score_params["model_version"]
     assert "Independent Poisson" in score_card.model_type
-    assert score_card.artifact_hash == "c1587ea4d9e0fb6c586dd37c8d918cc8338b5488f03945ebbd40f89fa5c28c32"
-    assert score_card.evaluation_metrics["training_samples"] == 3936
+    assert score_card.evaluation_metrics["training_samples"] == score_params["sample_count"]
+    assert score_card.provenance["fitting_git_sha"] == score_params["fitting_git_sha"]
+    assert score_card.provenance["training_data_snapshot_hash"] == score_params["training_data_snapshot_hash"]
+    assert score_card.provenance["parameter_payload_sha256"] == score_params["parameter_payload_sha256"]
+    assert score_card.provenance["parameter_payload_sha256"] == stage5_report["provenance"]["parameter_payload_sha256"]
+    assert score_card.provenance["parameter_artifact_file_sha256"] == stage5_report["provenance"]["parameter_artifact_file_sha256"]
+    assert score_card.artifact_hash == computed_score_file_sha256
+    assert score_card.artifact_hash == stage5_report["provenance"]["parameter_artifact_file_sha256"]
 
-    # 4. Elo Model Card Grounding
+    # 4. Elo Model Card Grounding against app.services.elo_service module constants
+    from app.services.elo_service import INITIAL_ELO, BASE_K, HOME_ADVANTAGE, SEASON_REGRESSION
     elo_card = MethodologyRegistry.get_model_card("elo")
-    assert elo_card.version == "1.4.0"
-    assert elo_card.evaluation_metrics["initial_elo"] == 1500.0
-    assert elo_card.evaluation_metrics["base_k_factor"] == 20.0
-    assert elo_card.evaluation_metrics["home_advantage_points"] == 35.0
-    assert elo_card.evaluation_metrics["season_regression_rate"] == 0.25
+    assert elo_card is not None
+    assert elo_card.evaluation_metrics["initial_elo"] == INITIAL_ELO
+    assert elo_card.evaluation_metrics["base_k_factor"] == BASE_K
+    assert elo_card.evaluation_metrics["home_advantage_points"] == HOME_ADVANTAGE
+    assert elo_card.evaluation_metrics["season_regression_rate"] == SEASON_REGRESSION
 
 
 def test_metric_category_filtering():

@@ -306,9 +306,11 @@ MODEL_CARD_REGISTRY: Dict[str, ModelCard] = {
         provenance={
             "fitted_at": "2026-09-18T01:57:18 UTC",
             "fitting_git_sha": "e1a492e8d703b1ac85f59d90e79f42c95e5aad6d",
-            "training_data_snapshot_hash": "768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3"
+            "training_data_snapshot_hash": "768412e304bd7305003d4577555475353f83fdf5e4dcc20d11085d8c3c7572e3",
+            "parameter_payload_sha256": "c1587ea4d9e0fb6c586dd37c8d918cc8338b5488f03945ebbd40f89fa5c28c32",
+            "parameter_artifact_file_sha256": "a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701"
         },
-        artifact_hash="c1587ea4d9e0fb6c586dd37c8d918cc8338b5488f03945ebbd40f89fa5c28c32",
+        artifact_hash="a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701",
         version_info="v1.4.0 Score Projection Candidate Parameters. Frozen candidate payload at models/forecasting/score_candidate_params_v1.4.0.json."
     ),
     "elo": ModelCard(
