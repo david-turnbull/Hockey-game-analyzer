@@ -631,3 +631,28 @@ def get_monitoring_calibration():
     min_thresh = request.args.get('min_sample_threshold', 30, type=int)
     return jsonify(OperationalMonitoringService.get_calibration_and_performance(min_sample_threshold=min_thresh)), 200
 
+@api_bp.route('/v1/methodology', methods=['GET'])
+@api_bp.route('/methodology', methods=['GET'])
+def get_methodology():
+    """Returns centralized metric definitions and model cards methodology."""
+    from app.services.methodology_registry import MethodologyRegistry
+    return jsonify(MethodologyRegistry.get_all_methodology()), 200
+
+@api_bp.route('/v1/methodology/metrics', methods=['GET'])
+def get_methodology_metrics():
+    """Returns all analytical metric definitions, optionally filtered by category."""
+    from app.services.methodology_registry import MethodologyRegistry
+    category = request.args.get('category')
+    metrics = MethodologyRegistry.list_metrics(category=category)
+    return jsonify([m.to_dict() for m in metrics]), 200
+
+@api_bp.route('/v1/methodology/models/<string:key>', methods=['GET'])
+def get_methodology_model_card(key):
+    """Returns structured model card for a specified production model."""
+    from app.services.methodology_registry import MethodologyRegistry
+    card = MethodologyRegistry.get_model_card(key)
+    if not card:
+        return jsonify({"error": f"Model card '{key}' not found"}), 404
+    return jsonify(card.to_dict()), 200
+
+

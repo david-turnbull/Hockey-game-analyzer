@@ -88,6 +88,11 @@ def create_app(config_name=None):
     app.register_blueprint(seasons_bp)
     app.register_blueprint(forecast_bp)
     
+    @app.context_processor
+    def inject_methodology():
+        from app.services.methodology_registry import MethodologyRegistry
+        return dict(methodology_registry=MethodologyRegistry)
+
     # Global error handlers
     @app.errorhandler(404)
     def page_not_found(error):
