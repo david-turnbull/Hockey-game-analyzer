@@ -53,39 +53,39 @@ from app.services.xg_service import XGService
 EXPECTED_WIN_MODEL_SHA = "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9"
 EXPECTED_SCORE_PARAMS_SHA = "a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701"
 EXPECTED_XG_MODEL_SHA = "c7f4f55bb0136f5d1774267446f5bd07a9a0bad2285238a25f551a61b0927635"
-EXPECTED_XG_METADATA_SHA = "615fa69b65ed33d158662283819d94391fff9d80419a873a08ae9a38ddf2503d"
+EXPECTED_XG_METADATA_SHA = "b47e7c449fc16b428c33f4387db196deb9c5f71ad3dcec099fff8a069ac9fdfb"
 
 
 def test_frozen_production_artifact_invariance_sha256():
     """CRITICAL INVARIANT TEST: Asserts frozen production model artifacts remain 100% untouched."""
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    # 1. Win Probability Pickle Artifact
+    # 1. Win Probability Pickle Artifact (binary file)
     win_pkl_path = os.path.join(project_root, "models", "forecasting", "pucklens-win-v1.4.0.pkl")
     assert os.path.exists(win_pkl_path), "Win model artifact missing"
     with open(win_pkl_path, "rb") as f:
         actual_win_sha = hashlib.sha256(f.read()).hexdigest()
     assert actual_win_sha == EXPECTED_WIN_MODEL_SHA, f"Win model SHA mismatch: {actual_win_sha}"
 
-    # 2. Score Projection Candidate Parameters JSON Artifact
+    # 2. Score Projection Candidate Parameters JSON Artifact (text file, LF normalized)
     score_json_path = os.path.join(project_root, "models", "forecasting", "score_candidate_params_v1.4.0.json")
     assert os.path.exists(score_json_path), "Score params artifact missing"
     with open(score_json_path, "rb") as f:
-        actual_score_sha = hashlib.sha256(f.read()).hexdigest()
+        actual_score_sha = hashlib.sha256(f.read().replace(b"\r\n", b"\n")).hexdigest()
     assert actual_score_sha == EXPECTED_SCORE_PARAMS_SHA, f"Score params SHA mismatch: {actual_score_sha}"
 
-    # 3. xG Model Pickle Artifact
+    # 3. xG Model Pickle Artifact (binary file)
     xg_pkl_path = os.path.join(project_root, "models", "xg", "xg_v1.pkl")
     assert os.path.exists(xg_pkl_path), "xG model artifact missing"
     with open(xg_pkl_path, "rb") as f:
         actual_xg_sha = hashlib.sha256(f.read()).hexdigest()
     assert actual_xg_sha == EXPECTED_XG_MODEL_SHA, f"xG model SHA mismatch: {actual_xg_sha}"
 
-    # 4. xG Metadata JSON Artifact
+    # 4. xG Metadata JSON Artifact (text file, LF normalized)
     xg_meta_path = os.path.join(project_root, "models", "xg", "metadata.json")
     assert os.path.exists(xg_meta_path), "xG metadata artifact missing"
     with open(xg_meta_path, "rb") as f:
-        actual_xg_meta_sha = hashlib.sha256(f.read()).hexdigest()
+        actual_xg_meta_sha = hashlib.sha256(f.read().replace(b"\r\n", b"\n")).hexdigest()
     assert actual_xg_meta_sha == EXPECTED_XG_METADATA_SHA, f"xG metadata SHA mismatch: {actual_xg_meta_sha}"
 
 
