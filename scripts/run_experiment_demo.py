@@ -3,7 +3,7 @@ Demonstration Script for Stage 5 Modelling & Experiment Foundation.
 
 Runs end-to-end classification and regression experiments on real database games:
 1. Game-level Classification Experiment (Home Win Prediction).
-2. Game-level Regression Experiment (Total Goals Prediction).
+2. Game-level Regression Experiment (Total Goals Prediction via Ridge Regression).
 """
 
 import sys
@@ -60,8 +60,8 @@ def build_demo_dataset(limit_per_season: int = 100):
         # Extract point-in-time features with explicit cutoff auditing
         try:
             feats, cutoff = PointInTimeAdapter.extract_game_features_with_cutoff(g)
-        except TemporalLeakageError as e:
-            # Skip games that have no prior source game history in the database
+        except TemporalLeakageError:
+            # Skip games that have no prior source game history in database
             continue
 
         g_start = cutoff.prediction_cutoff_time
@@ -104,7 +104,7 @@ def main():
 
         feature_set = ["home_l10_gf_per_game", "away_l10_gf_per_game", "home_l10_ga_per_game", "away_l10_ga_per_game"]
 
-        # 1. Classification Experiment
+        # 1. Classification Experiment (Logistic Regression)
         config_clf = ExperimentConfig(
             experiment_id="exp_stage5_win_logistic_v1",
             name="Stage 5 Game Win Classification Baseline",
@@ -120,16 +120,16 @@ def main():
 
         result_clf = ExperimentRunner.run_experiment(config_clf, dataset_clf)
 
-        # 2. Regression Experiment
+        # 2. Regression Experiment (Ridge Regression)
         config_reg = ExperimentConfig(
             experiment_id="exp_stage5_total_goals_ridge_v1",
-            name="Stage 5 Total Goals Regression Baseline",
+            name="Stage 5 Total Goals Ridge Regression Baseline",
             task_type=TASK_REGRESSION,
             target="total_goals",
             feature_set=feature_set,
             train_window={"seasons": ["20212022"]},
             validation_window={"seasons": ["20222023"]},
-            model_type="simple_linear",
+            model_type="simple_ridge",
             hyperparameters={"alpha": 1.0},
             seed=42
         )

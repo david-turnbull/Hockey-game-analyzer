@@ -82,10 +82,7 @@ class ExperimentRunner:
         max_source_time = None
         for rec in dataset:
             cutoff_meta = rec.get("point_in_time_cutoff", {})
-            source_str = (
-                cutoff_meta.get("latest_source_game_start_time") or
-                cutoff_meta.get("feature_availability_time")
-            )
+            source_str = cutoff_meta.get("latest_source_game_start_time")
             if source_str:
                 dt = datetime.fromisoformat(source_str)
                 if max_source_time is None or dt > max_source_time:
@@ -94,8 +91,7 @@ class ExperimentRunner:
         temporal_audit_summary = {
             "passed": True,
             "records_checked": len(dataset),
-            "max_latest_source_game_start_time": max_source_time.isoformat() if max_source_time else None,
-            "max_feature_availability_time": max_source_time.isoformat() if max_source_time else None
+            "max_latest_source_game_start_time": max_source_time.isoformat() if max_source_time else None
         }
 
         # 3. Chronological and Group-Aware Splitting
