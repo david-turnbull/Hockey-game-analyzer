@@ -5,7 +5,8 @@ Provides simple, transparent baselines for framework validation:
 - HistoricalMeanBaseline
 - TrailingNMeanBaseline
 - SimpleLogisticBaseline (classification)
-- SimpleLinearBaseline (regression)
+- SimpleLinearBaseline (regression OLS)
+- SimpleRidgeBaseline (regression Ridge)
 
 Metrics depend strictly on task_type:
 - Classification: Log Loss, Brier Score, Accuracy
@@ -95,13 +96,28 @@ class SimpleLogisticBaseline:
 
 
 class SimpleLinearBaseline:
-    """Wrapper for scikit-learn Ridge linear regression baseline."""
+    """Wrapper for scikit-learn LinearRegression (OLS) baseline."""
+
+    def __init__(self):
+        from sklearn.linear_model import LinearRegression
+        self.model = LinearRegression()
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "SimpleLinearBaseline":
+        self.model.fit(X, y)
+        return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        return self.model.predict(X)
+
+
+class SimpleRidgeBaseline:
+    """Wrapper for scikit-learn Ridge regression baseline."""
 
     def __init__(self, seed: int = 42, alpha: float = 1.0):
         from sklearn.linear_model import Ridge
         self.model = Ridge(random_state=seed, alpha=alpha)
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> "SimpleLinearBaseline":
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "SimpleRidgeBaseline":
         self.model.fit(X, y)
         return self
 

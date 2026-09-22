@@ -5,7 +5,7 @@ Executes:
 1. Configuration parsing & deterministic SHA-256 config hashing.
 2. Dataset loading & PointInTimeAdapter temporal audit (fail-closed).
 3. Chronological group-aware splitting.
-4. Model fitting & evaluation on validation/test splits.
+4. Model fitting on training split & evaluation on validation and optional test splits.
 5. Task metric computation (classification or regression).
 6. Complete provenance packaging.
 """
@@ -38,6 +38,7 @@ from app.analytics.experiments.baselines import (
     TrailingNMeanBaseline,
     SimpleLogisticBaseline,
     SimpleLinearBaseline,
+    SimpleRidgeBaseline,
     evaluate_predictions
 )
 
@@ -78,19 +79,23 @@ class ExperimentRunner:
         # 2. Point-in-Time Temporal Audit (Fail-Closed)
         assert_point_in_time_safety(dataset)
 
-        max_avail_time = None
+        max_source_time = None
         for rec in dataset:
             cutoff_meta = rec.get("point_in_time_cutoff", {})
-            avail_str = cutoff_meta.get("feature_availability_time")
-            if avail_str:
-                dt = datetime.fromisoformat(avail_str)
-                if max_avail_time is None or dt > max_avail_time:
-                    max_avail_time = dt
+            source_str = (
+                cutoff_meta.get("latest_source_game_start_time") or
+                cutoff_meta.get("feature_availability_time")
+            )
+            if source_str:
+                dt = datetime.fromisoformat(source_str)
+                if max_source_time is None or dt > max_source_time:
+                    max_source_time = dt
 
         temporal_audit_summary = {
             "passed": True,
             "records_checked": len(dataset),
-            "max_feature_availability_time": max_avail_time.isoformat() if max_avail_time else None
+            "max_latest_source_game_start_time": max_source_time.isoformat() if max_source_time else None,
+            "max_feature_availability_time": max_source_time.isoformat() if max_source_time else None
         }
 
         # 3. Chronological and Group-Aware Splitting
@@ -122,7 +127,10 @@ class ExperimentRunner:
         X_val = np.array([[r["features"][f] for f in config.feature_set] for r in val_recs], dtype=np.float64)
         y_val = np.array([r["target"] for r in val_recs], dtype=np.float64)
 
-        # 5. Model Instantiation & Training
+        X_test = np.array([[r["features"][f] for f in config.feature_set] for r in test_recs], dtype=np.float64) if test_recs else None
+        y_test = np.array([r["target"] for r in test_recs], dtype=np.float64) if test_recs else None
+
+        # 5. Model Instantiation & Training (Strictly on Train Split)
         model_type = config.model_type.lower()
         seed = config.seed
         task_type = config.task_type
@@ -132,8 +140,10 @@ class ExperimentRunner:
             model.fit(X_train, y_train)
             if task_type == TASK_CLASSIFICATION:
                 y_pred_val = model.predict_proba(X_val)[:, 1]
+                y_pred_test = model.predict_proba(X_test)[:, 1] if X_test is not None else None
             else:
                 y_pred_val = model.predict(X_val)
+                y_pred_test = model.predict(X_test) if X_test is not None else None
 
         elif model_type == "trailing_n_mean":
             n_games = config.hyperparameters.get("n_games", 5)
@@ -142,8 +152,10 @@ class ExperimentRunner:
             y_hist = list(y_train)
             if task_type == TASK_CLASSIFICATION:
                 y_pred_val = model.predict_proba(X_val, y_history=y_hist)[:, 1]
+                y_pred_test = model.predict_proba(X_test, y_history=list(y_val))[:, 1] if X_test is not None else None
             else:
                 y_pred_val = model.predict(X_val, y_history=y_hist)
+                y_pred_test = model.predict(X_test, y_history=list(y_val)) if X_test is not None else None
 
         elif model_type == "simple_logistic":
             if task_type != TASK_CLASSIFICATION:
@@ -152,20 +164,31 @@ class ExperimentRunner:
             model = SimpleLogisticBaseline(seed=seed, C=C)
             model.fit(X_train, y_train)
             y_pred_val = model.predict_proba(X_val)[:, 1]
+            y_pred_test = model.predict_proba(X_test)[:, 1] if X_test is not None else None
 
         elif model_type == "simple_linear":
             if task_type != TASK_REGRESSION:
                 raise ValueError("simple_linear model_type requires task_type='regression'")
-            alpha = config.hyperparameters.get("alpha", 1.0)
-            model = SimpleLinearBaseline(seed=seed, alpha=alpha)
+            model = SimpleLinearBaseline()
             model.fit(X_train, y_train)
             y_pred_val = model.predict(X_val)
+            y_pred_test = model.predict(X_test) if X_test is not None else None
+
+        elif model_type == "simple_ridge":
+            if task_type != TASK_REGRESSION:
+                raise ValueError("simple_ridge model_type requires task_type='regression'")
+            alpha = config.hyperparameters.get("alpha", 1.0)
+            model = SimpleRidgeBaseline(seed=seed, alpha=alpha)
+            model.fit(X_train, y_train)
+            y_pred_val = model.predict(X_val)
+            y_pred_test = model.predict(X_test) if X_test is not None else None
 
         else:
             raise ValueError(f"Unsupported model_type '{config.model_type}'.")
 
-        # 6. Evaluation Metrics
-        metrics = evaluate_predictions(y_val, y_pred_val, task_type=task_type)
+        # 6. Evaluation Metrics (Validation & Optional Test)
+        val_metrics = evaluate_predictions(y_val, y_pred_val, task_type=task_type)
+        test_metrics = evaluate_predictions(y_test, y_pred_test, task_type=task_type) if (y_test is not None and y_pred_test is not None) else None
 
         # 7. Complete Provenance Assembly
         git_sha = cls.get_git_commit_sha()
@@ -192,14 +215,26 @@ class ExperimentRunner:
                 "prediction": round(float(p), 4)
             })
 
+        test_preds_list = None
+        if test_recs and y_pred_test is not None:
+            test_preds_list = []
+            for r, p in zip(test_recs, y_pred_test):
+                test_preds_list.append({
+                    "game_id": r.get("game_id"),
+                    "target": r.get("target"),
+                    "prediction": round(float(p), 4)
+                })
+
         return ExperimentResult(
             experiment_id=config.experiment_id,
             config_hash=config_hash,
             task_type=task_type,
             config=config,
-            metrics=metrics,
+            metrics=val_metrics,
+            test_metrics=test_metrics,
             sample_counts=sample_counts,
             temporal_audit_summary=temporal_audit_summary,
             provenance=provenance,
-            predictions=val_preds_list
+            predictions=val_preds_list,
+            test_predictions=test_preds_list
         )

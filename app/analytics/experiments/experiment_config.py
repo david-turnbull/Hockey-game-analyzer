@@ -2,7 +2,7 @@
 Deterministic Experiment Configuration and Provenance Result Abstractions.
 
 Enforces deterministic config hashing (excluding runtime values, UUIDs, or timestamps)
-and structured experiment result serialization.
+and structured experiment result serialization with train, validation, and optional test evaluation support.
 """
 
 import json
@@ -102,10 +102,12 @@ class ExperimentResult:
     sample_counts: Dict[str, int]
     temporal_audit_summary: Dict[str, Any]
     provenance: Dict[str, Any]
+    test_metrics: Optional[Dict[str, float]] = None
     predictions: Optional[List[Dict[str, Any]]] = None
+    test_predictions: Optional[List[Dict[str, Any]]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "experiment_id": self.experiment_id,
             "config_hash": self.config_hash,
             "task_type": self.task_type,
@@ -116,6 +118,10 @@ class ExperimentResult:
             "provenance": self.provenance,
             "predictions_count": len(self.predictions) if self.predictions else 0
         }
+        if self.test_metrics is not None:
+            d["test_metrics"] = self.test_metrics
+            d["test_predictions_count"] = len(self.test_predictions) if self.test_predictions else 0
+        return d
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)

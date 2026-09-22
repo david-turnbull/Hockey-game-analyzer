@@ -23,6 +23,7 @@ from app.analytics.experiments.baselines import (
     TrailingNMeanBaseline,
     SimpleLogisticBaseline,
     SimpleLinearBaseline,
+    SimpleRidgeBaseline,
     evaluate_predictions
 )
 from app.analytics.experiments.runner import (
@@ -41,6 +42,7 @@ __all__ = [
     "TrailingNMeanBaseline",
     "SimpleLogisticBaseline",
     "SimpleLinearBaseline",
+    "SimpleRidgeBaseline",
     "evaluate_predictions",
     "ExperimentRunner",
 ]

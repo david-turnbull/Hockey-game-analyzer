@@ -20,7 +20,7 @@ if str(project_root) not in sys.path:
 from app import create_app
 from app.models import db, Game
 from app.services.pregame_feature_service import PregameFeatureService
-from app.analytics.experiments.point_in_time import PointInTimeAdapter
+from app.analytics.experiments.point_in_time import PointInTimeAdapter, TemporalLeakageError
 from app.analytics.experiments.experiment_config import ExperimentConfig, TASK_CLASSIFICATION, TASK_REGRESSION
 from app.analytics.experiments.runner import ExperimentRunner
 
@@ -58,7 +58,11 @@ def build_demo_dataset(limit_per_season: int = 100):
             continue
 
         # Extract point-in-time features with explicit cutoff auditing
-        feats, cutoff = PointInTimeAdapter.extract_game_features_with_cutoff(g)
+        try:
+            feats, cutoff = PointInTimeAdapter.extract_game_features_with_cutoff(g)
+        except TemporalLeakageError as e:
+            # Skip games that have no prior source game history in the database
+            continue
 
         g_start = cutoff.prediction_cutoff_time
 

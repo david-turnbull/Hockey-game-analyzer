@@ -3,6 +3,7 @@ Chronological and Group-Aware Dataset Splitter.
 
 Enforces strict chronological train -> validation -> test splits (max(train) < min(val))
 and group-aware grouping (e.g. game_id), ensuring related rows never cross split boundaries.
+Fails closed with TemporalLeakageError if any routed record lacks a valid timestamp.
 """
 
 import logging
@@ -50,14 +51,34 @@ class ChronologicalSplitter:
             rec_season = rec.get("season")
             rec_time = cls._extract_datetime(rec, time_key)
 
-            # Route record to appropriate split
+            # Fail closed: Any record routed to a split MUST have a valid timestamp!
+            matched = False
             if rec_season in train_seasons:
+                if rec_time is None:
+                    raise TemporalLeakageError(
+                        f"UNVERIFIABLE_TEMPORAL_ORDERING: Record id={rec.get('game_id') or rec.get('instance_id')} "
+                        f"in train season '{rec_season}' lacks a valid timestamp."
+                    )
                 train_records.append(rec)
+                matched = True
             elif rec_season in val_seasons:
+                if rec_time is None:
+                    raise TemporalLeakageError(
+                        f"UNVERIFIABLE_TEMPORAL_ORDERING: Record id={rec.get('game_id') or rec.get('instance_id')} "
+                        f"in validation season '{rec_season}' lacks a valid timestamp."
+                    )
                 val_records.append(rec)
+                matched = True
             elif test_window and rec_season in test_seasons:
+                if rec_time is None:
+                    raise TemporalLeakageError(
+                        f"UNVERIFIABLE_TEMPORAL_ORDERING: Record id={rec.get('game_id') or rec.get('instance_id')} "
+                        f"in test season '{rec_season}' lacks a valid timestamp."
+                    )
                 test_records.append(rec)
-            else:
+                matched = True
+
+            if not matched:
                 # Fallback to date range checks if specified
                 if cls._matches_date_range(rec_time, train_window):
                     train_records.append(rec)
@@ -83,36 +104,62 @@ class ChronologicalSplitter:
         """
         Audits chronological split integrity and group separation.
         Fails closed with TemporalLeakageError if:
-        1. max(train_time) >= min(val_time)
-        2. max(val_time) >= min(test_time)
-        3. Any group_id (e.g. game_id) is present in multiple splits.
+        1. Any routed record lacks a timestamp.
+        2. max(train_time) >= min(val_time)
+        3. max(val_time) >= min(test_time)
+        4. Any group_id (e.g. game_id) is present in multiple splits.
         """
         if not train_records or not val_records:
             return
 
-        train_times = [cls._extract_datetime(r, time_key) for r in train_records if cls._extract_datetime(r, time_key)]
-        val_times = [cls._extract_datetime(r, time_key) for r in val_records if cls._extract_datetime(r, time_key)]
-
-        if train_times and val_times:
-            max_train_time = max(train_times)
-            min_val_time = min(val_times)
-
-            if max_train_time >= min_val_time:
+        train_times = []
+        for r in train_records:
+            t = cls._extract_datetime(r, time_key)
+            if t is None:
                 raise TemporalLeakageError(
-                    f"CHRONOLOGICAL_LEAKAGE: Max train timestamp ({max_train_time.isoformat()}) "
-                    f"is not strictly prior to min validation timestamp ({min_val_time.isoformat()})."
+                    f"UNVERIFIABLE_TEMPORAL_ORDERING: Train record id={r.get('game_id') or r.get('instance_id')} "
+                    "lacks a valid timestamp."
                 )
+            train_times.append(t)
 
-        if test_records and val_times:
-            test_times = [cls._extract_datetime(r, time_key) for r in test_records if cls._extract_datetime(r, time_key)]
-            if test_times:
-                max_val_time = max(val_times)
-                min_test_time = min(test_times)
-                if max_val_time >= min_test_time:
+        val_times = []
+        for r in val_records:
+            t = cls._extract_datetime(r, time_key)
+            if t is None:
+                raise TemporalLeakageError(
+                    f"UNVERIFIABLE_TEMPORAL_ORDERING: Validation record id={r.get('game_id') or r.get('instance_id')} "
+                    "lacks a valid timestamp."
+                )
+            val_times.append(t)
+
+        max_train_time = max(train_times)
+        min_val_time = min(val_times)
+
+        if max_train_time >= min_val_time:
+            raise TemporalLeakageError(
+                f"CHRONOLOGICAL_LEAKAGE: Max train timestamp ({max_train_time.isoformat()}) "
+                f"is not strictly prior to min validation timestamp ({min_val_time.isoformat()})."
+            )
+
+        if test_records:
+            test_times = []
+            for r in test_records:
+                t = cls._extract_datetime(r, time_key)
+                if t is None:
                     raise TemporalLeakageError(
-                        f"CHRONOLOGICAL_LEAKAGE: Max validation timestamp ({max_val_time.isoformat()}) "
-                        f"is not strictly prior to min test timestamp ({min_test_time.isoformat()})."
+                        f"UNVERIFIABLE_TEMPORAL_ORDERING: Test record id={r.get('game_id') or r.get('instance_id')} "
+                        "lacks a valid timestamp."
                     )
+                test_times.append(t)
+
+            max_val_time = max(val_times)
+            min_test_time = min(test_times)
+
+            if max_val_time >= min_test_time:
+                raise TemporalLeakageError(
+                    f"CHRONOLOGICAL_LEAKAGE: Max validation timestamp ({max_val_time.isoformat()}) "
+                    f"is not strictly prior to min test timestamp ({min_test_time.isoformat()})."
+                )
 
         # Group-aware audit
         if group_key:

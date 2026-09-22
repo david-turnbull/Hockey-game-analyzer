@@ -2,12 +2,13 @@
 Point-in-Time Temporal Contract and Leakage Prevention Adaptor.
 
 Enforces strict temporal cutoffs for feature calculations:
-- prediction_cutoff_time (T): Decision boundary before which all features must be computed.
-- feature_availability_time: Maximum timestamp of source data used to construct features.
-- target_observation_time: Timestamp when target label is observed (allowed to occur after T).
+- prediction_cutoff_time (T): Decision boundary (game start UTC) before which all feature inputs must exist.
+- latest_source_game_start_time: Timestamp of the most recent completed source game used to construct features.
+  Represents the strongest source-game timestamp available in the repository schema.
+- target_observation_time: Timestamp when target label is observed (allowed to be None if unavailable, or occur after T).
 
-Fails closed with TemporalLeakageError when source timestamps are missing, invalid,
-or greater than or equal to prediction_cutoff_time.
+Fails closed with TemporalLeakageError when temporal provenance is missing, unverifiable,
+or when latest_source_game_start_time >= prediction_cutoff_time.
 """
 
 import logging
@@ -35,7 +36,7 @@ class PointInTimeCutoff:
     def __init__(
         self,
         prediction_cutoff_time: datetime,
-        feature_availability_time: Optional[datetime] = None,
+        latest_source_game_start_time: Optional[datetime] = None,
         target_observation_time: Optional[datetime] = None,
         source_game_ids: Optional[List[int]] = None
     ):
@@ -48,15 +49,20 @@ class PointInTimeCutoff:
 
         self.prediction_cutoff_time = prediction_cutoff_time
 
-        if feature_availability_time is not None and feature_availability_time.tzinfo is None:
-            feature_availability_time = feature_availability_time.replace(tzinfo=timezone.utc)
-        self.feature_availability_time = feature_availability_time
+        if latest_source_game_start_time is not None and latest_source_game_start_time.tzinfo is None:
+            latest_source_game_start_time = latest_source_game_start_time.replace(tzinfo=timezone.utc)
+        self.latest_source_game_start_time = latest_source_game_start_time
 
         if target_observation_time is not None and target_observation_time.tzinfo is None:
             target_observation_time = target_observation_time.replace(tzinfo=timezone.utc)
         self.target_observation_time = target_observation_time
 
         self.source_game_ids = source_game_ids or []
+
+    @property
+    def feature_availability_time(self) -> Optional[datetime]:
+        """Backward compatibility alias for latest_source_game_start_time."""
+        return self.latest_source_game_start_time
 
     def audit_source_timestamp(self, source_time: Optional[datetime], source_id: Optional[Any] = None) -> None:
         """
@@ -83,15 +89,19 @@ class PointInTimeCutoff:
             )
 
     def to_dict(self) -> Dict[str, Any]:
+        # Fail closed: safety_passed is False if latest_source_game_start_time is None/missing!
+        safety_passed = (
+            self.latest_source_game_start_time is not None and
+            self.latest_source_game_start_time < self.prediction_cutoff_time
+        )
+
         return {
             "prediction_cutoff_time": self.prediction_cutoff_time.isoformat(),
-            "feature_availability_time": self.feature_availability_time.isoformat() if self.feature_availability_time else None,
+            "latest_source_game_start_time": self.latest_source_game_start_time.isoformat() if self.latest_source_game_start_time else None,
+            "feature_availability_time": self.latest_source_game_start_time.isoformat() if self.latest_source_game_start_time else None,
             "target_observation_time": self.target_observation_time.isoformat() if self.target_observation_time else None,
             "source_game_ids_count": len(self.source_game_ids),
-            "safety_passed": (
-                self.feature_availability_time < self.prediction_cutoff_time
-                if self.feature_availability_time else True
-            )
+            "safety_passed": safety_passed
         }
 
 
@@ -128,7 +138,11 @@ class PointInTimeAdapter:
         home_prior = PregameFeatureService.get_prior_completed_games_for_team(target_game.home_team_id, target_game)
         away_prior = PregameFeatureService.get_prior_completed_games_for_team(target_game.away_team_id, target_game)
 
-        all_source_games = {g.game_id: g for g in home_prior + away_prior if g.game_id != target_game.game_id}.values()
+        all_source_games = list({g.game_id: g for g in home_prior + away_prior if g.game_id != target_game.game_id}.values())
+
+        if not all_source_games:
+            # Fails closed if no prior completed source games exist (unverifiable feature provenance)
+            raise TemporalLeakageError(f"UNVERIFIABLE_PROVENANCE: Target game {target_game.game_id} has zero prior completed source games.")
 
         max_source_time = None
         source_ids = []
@@ -152,15 +166,12 @@ class PointInTimeAdapter:
             if max_source_time is None or sg_time > max_source_time:
                 max_source_time = sg_time
 
-        cutoff.feature_availability_time = max_source_time
+        cutoff.latest_source_game_start_time = max_source_time
         cutoff.source_game_ids = source_ids
 
-        # Target observation time (when game finishes)
-        target_end = getattr(target_game, 'end_time', None)
-        if target_end is None:
-            # Target observation happens after prediction cutoff
-            target_end = target_start
-        elif target_end.tzinfo is None:
+        # Target observation time: preserve explicit None if end_time is not established in schema
+        target_end = getattr(target_game, 'end_time', None) or getattr(target_game, 'end_time_utc', None)
+        if target_end is not None and target_end.tzinfo is None:
             target_end = target_end.replace(tzinfo=timezone.utc)
 
         cutoff.target_observation_time = target_end
@@ -175,7 +186,8 @@ def assert_point_in_time_safety(records: List[Dict[str, Any]]) -> bool:
     """
     Audits a collection of extracted dataset records. Fails closed with TemporalLeakageError if:
     1. Any record is missing cutoff metadata.
-    2. Any record's feature_availability_time >= prediction_cutoff_time.
+    2. Any record's latest_source_game_start_time (or feature_availability_time) is missing or None.
+    3. Any record's latest_source_game_start_time >= prediction_cutoff_time.
     """
     if not records:
         return True
@@ -184,26 +196,30 @@ def assert_point_in_time_safety(records: List[Dict[str, Any]]) -> bool:
         cutoff_info = rec.get("point_in_time_cutoff")
         if not cutoff_info:
             raise TemporalLeakageError(
-                f"UNVERIFIABLE_PROVENANCE: Record at index {idx} (id={rec.get('instance_id')}) "
+                f"UNVERIFIABLE_PROVENANCE: Record at index {idx} (id={rec.get('game_id') or rec.get('instance_id')}) "
                 "lacks point_in_time_cutoff metadata."
             )
 
         cutoff_time_str = cutoff_info.get("prediction_cutoff_time")
-        avail_time_str = cutoff_info.get("feature_availability_time")
+        source_time_str = cutoff_info.get("latest_source_game_start_time") or cutoff_info.get("feature_availability_time")
 
         if not cutoff_time_str:
             raise TemporalLeakageError(
                 f"UNVERIFIABLE_PROVENANCE: Record at index {idx} lacks prediction_cutoff_time."
             )
 
-        cutoff_time = datetime.fromisoformat(cutoff_time_str)
+        if not source_time_str:
+            raise TemporalLeakageError(
+                f"UNVERIFIABLE_PROVENANCE: Record at index {idx} lacks latest_source_game_start_time/feature_availability_time."
+            )
 
-        if avail_time_str:
-            avail_time = datetime.fromisoformat(avail_time_str)
-            if avail_time >= cutoff_time:
-                raise TemporalLeakageError(
-                    f"TEMPORAL_LEAKAGE: Record at index {idx} has feature_availability_time ({avail_time_str}) "
-                    f">= prediction_cutoff_time ({cutoff_time_str})."
-                )
+        cutoff_time = datetime.fromisoformat(cutoff_time_str)
+        source_time = datetime.fromisoformat(source_time_str)
+
+        if source_time >= cutoff_time:
+            raise TemporalLeakageError(
+                f"TEMPORAL_LEAKAGE: Record at index {idx} has latest_source_game_start_time ({source_time_str}) "
+                f">= prediction_cutoff_time ({cutoff_time_str})."
+            )
 
     return True
