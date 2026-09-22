@@ -3,11 +3,13 @@ Tests for Stage 4 Presentation Mode Architecture (Beginner / Intermediate / Prof
 
 Verifies mode resolution, defaults, fallbacks, session persistence, REST API endpoints,
 MethodologyRegistry integration, query parameter preservation, meaningful representative page rendering (HTTP 200),
+game status semantics (final/live/upcoming), model fallback metadata ('Unavailable'), progressive disclosure,
 and 100% analytical value invariance across execution contexts.
 """
 
 import datetime
 from urllib.parse import urlencode
+from unittest.mock import patch
 import pytest
 from flask import session
 from app.models import db, Game, Team
@@ -93,16 +95,18 @@ def test_query_param_mode_override(app, client):
     assert b"Intermediate" in resp_invalid.data
 
 
-def test_query_parameter_preservation_when_switching_modes(app, client):
-    """Verifies that switching presentation modes preserves existing request query parameters."""
+def test_actual_build_mode_url_output(app):
+    """Tests the actual build_mode_url() context processor helper output in request context."""
     with app.test_request_context("/game/2021020001?team_id=10&tab=lines"):
-        from flask import request
-        args = request.args.copy()
-        args['mode'] = 'beginner'
-        url_beg = f"{request.path}?{urlencode(args)}"
+        processors = app.template_context_processors[None]
+        ctx = {}
+        for p in processors:
+            ctx.update(p())
 
-        args['mode'] = 'professional'
-        url_pro = f"{request.path}?{urlencode(args)}"
+        build_mode_url = ctx["build_mode_url"]
+
+        url_beg = build_mode_url("beginner")
+        url_pro = build_mode_url("professional")
 
         assert "team_id=10" in url_beg
         assert "tab=lines" in url_beg
@@ -214,28 +218,100 @@ def test_executed_request_context_analytical_invariance(app, client, test_game_i
     assert stats_beg["stats"]["away_sog"] == stats_inter["stats"]["away_sog"] == stats_pro["stats"]["away_sog"]
 
 
-def test_representative_page_meaningful_mode_differences(app, client, test_game_id):
+def test_beginner_game_status_wording_semantics(app, client, test_game_id):
     """
-    REQUIRED MEANINGFUL TEST:
-    Verifies HTTP 200 and distinct presentation elements across modes on representative page.
+    Verifies Beginner mode wording:
+    - Final game: uses 'defeated'
+    - Live game: uses 'leads' or 'is tied'
+    - Upcoming game: uses 'Upcoming Matchup' and does not imply a result.
+    """
+    import copy
+    from app.services.game_service import GameService
+
+    with app.app_context():
+        base_stats = GameService.get_game_overview_stats(test_game_id)
+
+    def _make_mock_stats(home, away, home_score, away_score, state, status_display, home_xg, away_xg):
+        st = copy.deepcopy(base_stats)
+        st["home_team_abbrev"] = home
+        st["away_team_abbrev"] = away
+        st["home_score"] = home_score
+        st["away_score"] = away_score
+        st["nhl_game_state"] = state
+        st["game_status_display"] = status_display
+        st["stats"]["home_xg"] = home_xg
+        st["stats"]["away_xg"] = away_xg
+        return st
+
+    # 1. Final Game Wording
+    mock_final = _make_mock_stats("TOR", "MTL", 4, 2, "FINAL", "Final", 3.2, 1.8)
+    with patch.object(GameService, "get_game_overview_stats", return_value=mock_final):
+        resp = client.get(f"/game/{test_game_id}?mode=beginner")
+        assert resp.status_code == 200
+        assert b"TOR defeated MTL 4-2" in resp.data
+        assert b"generated more expected goals" in resp.data
+
+    # 2. Live Game Wording (Home Leading)
+    mock_live_lead = _make_mock_stats("BOS", "NYR", 3, 1, "LIVE", "2nd Period", 2.5, 1.2)
+    with patch.object(GameService, "get_game_overview_stats", return_value=mock_live_lead):
+        resp = client.get(f"/game/{test_game_id}?mode=beginner")
+        assert resp.status_code == 200
+        assert b"BOS leads NYR 3-1" in resp.data
+
+    # 3. Live Game Wording (Tied)
+    mock_live_tied = _make_mock_stats("EDM", "CGY", 2, 2, "LIVE", "3rd Period", 2.0, 2.0)
+    with patch.object(GameService, "get_game_overview_stats", return_value=mock_live_tied):
+        resp = client.get(f"/game/{test_game_id}?mode=beginner")
+        assert resp.status_code == 200
+        assert b"Game is tied 2-2" in resp.data
+
+    # 4. Upcoming Game Wording
+    mock_upcoming = _make_mock_stats("VAN", "SEA", 0, 0, "FUT", "Scheduled", 0.0, 0.0)
+    with patch.object(GameService, "get_game_overview_stats", return_value=mock_upcoming):
+        resp = client.get(f"/game/{test_game_id}?mode=beginner")
+        assert resp.status_code == 200
+        assert b"Upcoming Matchup: SEA vs VAN" in resp.data
+        assert b"defeated" not in resp.data
+        assert b"leads" not in resp.data
+
+
+def test_progressive_disclosure_advanced_rows_hidden_only_in_beginner(app, client, test_game_id):
+    """
+    Verifies progressive disclosure:
+    - Advanced statistics (5v5 Expected Goals, xG Share) are hidden in Beginner mode.
+    - Advanced statistics are retained and rendered in Intermediate and Professional modes.
     """
     game_id = test_game_id
 
-    # 1. Beginner Mode
+    # Beginner mode: advanced rows hidden
     resp_beg = client.get(f"/game/{game_id}?mode=beginner")
     assert resp_beg.status_code == 200
-    assert b"Beginner View: What happened?" in resp_beg.data
-    assert b"Key Game Takeaways" in resp_beg.data
+    assert b"5v5 Expected Goals" not in resp_beg.data
+    assert b"xG Share (xG%)" not in resp_beg.data
 
-    # 2. Intermediate Mode
+    # Intermediate mode: advanced rows present
     resp_inter = client.get(f"/game/{game_id}?mode=intermediate")
     assert resp_inter.status_code == 200
-    assert b"Intermediate" in resp_inter.data
-    assert b"What happened, and why?" in resp_inter.data
+    assert b"5v5 Expected Goals" in resp_inter.data
+    assert b"xG Share (xG%)" in resp_inter.data
 
-    # 3. Professional Mode
+    # Professional mode: advanced rows present
     resp_pro = client.get(f"/game/{game_id}?mode=professional")
     assert resp_pro.status_code == 200
-    assert b"Professional View: Data &amp; Provenance" in resp_pro.data or b"Professional View: Data & Provenance" in resp_pro.data
-    assert b"pucklens-xg-logistic" in resp_pro.data
-    assert b"Methodology Registry API" in resp_pro.data
+    assert b"5v5 Expected Goals" in resp_pro.data
+    assert b"xG Share (xG%)" in resp_pro.data
+
+
+def test_professional_model_card_fallback_unavailable(app, client, test_game_id):
+    """
+    Verifies that if MethodologyRegistry model card lookup returns None, Professional mode
+    displays 'Unavailable' rather than hard-coding model names.
+    """
+    game_id = test_game_id
+    from app.services.methodology_registry import MethodologyRegistry
+
+    with patch.object(MethodologyRegistry, "get_model_card", return_value=None):
+        resp = client.get(f"/game/{game_id}?mode=professional")
+        assert resp.status_code == 200
+        assert b"MODEL: <strong>Unavailable vUnavailable</strong>" in resp.data
+        assert b"pucklens-xg-logistic" not in resp.data

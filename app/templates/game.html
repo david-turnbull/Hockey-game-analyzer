@@ -95,20 +95,42 @@
             <span class="mode-badge mode-badge-beginner">Beginner View: What happened?</span>
         </div>
         <p style="color: var(--text-primary); font-size: 0.95rem; line-height: 1.5;">
-            {% if stats.home_score > stats.away_score %}
-                <strong>{{ stats.home_team_abbrev }} defeated {{ stats.away_team_abbrev }} {{ stats.home_score }}-{{ stats.away_score }}</strong>{% if stats.game_status_display and 'Final' in stats.game_status_display %} in {{ stats.game_status_display }}{% endif %}.
-            {% elif stats.away_score > stats.home_score %}
-                <strong>{{ stats.away_team_abbrev }} defeated {{ stats.home_team_abbrev }} {{ stats.away_score }}-{{ stats.home_score }}</strong>{% if stats.game_status_display and 'Final' in stats.game_status_display %} in {{ stats.game_status_display }}{% endif %}.
-            {% else %}
-                <strong>Game tied {{ stats.home_score }}-{{ stats.away_score }}</strong> between {{ stats.home_team_abbrev }} and {{ stats.away_team_abbrev }}.
-            {% endif %}
-            
-            {% if stats.stats.home_xg > stats.stats.away_xg %}
-                {{ stats.home_team_abbrev }} generated more expected goals ({{ stats.stats.home_xg }} xG vs {{ stats.stats.away_xg }} xG), indicating a greater overall scoring threat.
-            {% elif stats.stats.away_xg > stats.stats.home_xg %}
-                {{ stats.away_team_abbrev }} generated more expected goals ({{ stats.stats.away_xg }} xG vs {{ stats.stats.home_xg }} xG), indicating a greater overall scoring threat.
-            {% else %}
-                Both teams generated equal expected goals ({{ stats.stats.home_xg }} xG), creating an evenly matched scoring threat.
+            {% set state = (stats.nhl_game_state or '')|upper %}
+            {% if state in ['FUT', 'PRE', 'UPCOMING', 'SCHEDULED'] %}
+                <strong>Upcoming Matchup: {{ stats.away_team_abbrev }} vs {{ stats.home_team_abbrev }}</strong>.
+                PuckLens pregame models predict expected goal generation prior to puck drop.
+            {% elif state in ['LIVE', 'CRIT', 'IN_PROGRESS'] %}
+                {% if stats.home_score > stats.away_score %}
+                    <strong>{{ stats.home_team_abbrev }} leads {{ stats.away_team_abbrev }} {{ stats.home_score }}-{{ stats.away_score }}</strong> (Live).
+                {% elif stats.away_score > stats.home_score %}
+                    <strong>{{ stats.away_team_abbrev }} leads {{ stats.home_team_abbrev }} {{ stats.away_score }}-{{ stats.home_score }}</strong> (Live).
+                {% else %}
+                    <strong>Game is tied {{ stats.home_score }}-{{ stats.away_score }}</strong> between {{ stats.home_team_abbrev }} and {{ stats.away_team_abbrev }} (Live).
+                {% endif %}
+
+                {% if stats.stats.home_xg > stats.stats.away_xg %}
+                    {{ stats.home_team_abbrev }} generated more expected goals ({{ stats.stats.home_xg }} xG vs {{ stats.stats.away_xg }} xG), indicating a greater overall scoring threat.
+                {% elif stats.stats.away_xg > stats.stats.home_xg %}
+                    {{ stats.away_team_abbrev }} generated more expected goals ({{ stats.stats.away_xg }} xG vs {{ stats.stats.home_xg }} xG), indicating a greater overall scoring threat.
+                {% else %}
+                    Both teams generated equal expected goals ({{ stats.stats.home_xg }} xG), creating an evenly matched scoring threat.
+                {% endif %}
+            {% else %} {# FINAL / OFF / OVER / DEFAULT #}
+                {% if stats.home_score > stats.away_score %}
+                    <strong>{{ stats.home_team_abbrev }} defeated {{ stats.away_team_abbrev }} {{ stats.home_score }}-{{ stats.away_score }}</strong>{% if stats.game_status_display and 'Final' in stats.game_status_display %} in {{ stats.game_status_display }}{% endif %}.
+                {% elif stats.away_score > stats.home_score %}
+                    <strong>{{ stats.away_team_abbrev }} defeated {{ stats.home_team_abbrev }} {{ stats.away_score }}-{{ stats.home_score }}</strong>{% if stats.game_status_display and 'Final' in stats.game_status_display %} in {{ stats.game_status_display }}{% endif %}.
+                {% else %}
+                    <strong>Game tied {{ stats.home_score }}-{{ stats.away_score }}</strong> between {{ stats.home_team_abbrev }} and {{ stats.away_team_abbrev }}.
+                {% endif %}
+                
+                {% if stats.stats.home_xg > stats.stats.away_xg %}
+                    {{ stats.home_team_abbrev }} generated more expected goals ({{ stats.stats.home_xg }} xG vs {{ stats.stats.away_xg }} xG), indicating a greater overall scoring threat.
+                {% elif stats.stats.away_xg > stats.stats.home_xg %}
+                    {{ stats.away_team_abbrev }} generated more expected goals ({{ stats.stats.away_xg }} xG vs {{ stats.stats.home_xg }} xG), indicating a greater overall scoring threat.
+                {% else %}
+                    Both teams generated equal expected goals ({{ stats.stats.home_xg }} xG), creating an evenly matched scoring threat.
+                {% endif %}
             {% endif %}
         </p>
     </div>
@@ -119,7 +141,7 @@
         <div style="display: flex; align-items: center; justify-content: space-between; font-family: var(--font-mono); font-size: 0.8rem;">
             <div style="display: flex; gap: 1.5rem; align-items: center;">
                 <span class="mode-badge mode-badge-professional">Professional View: Data & Provenance</span>
-                <span>MODEL: <strong>{{ xg_card.name if xg_card else 'pucklens-xg-logistic' }} v{{ xg_card.version if xg_card else '1.0.0' }}</strong></span>
+                <span>MODEL: <strong>{{ xg_card.name if (xg_card and xg_card.name) else 'Unavailable' }} v{{ xg_card.version if (xg_card and xg_card.version) else 'Unavailable' }}</strong></span>
                 <span>GAME_ID: <strong>{{ stats.game_id }}</strong></span>
             </div>
             <a href="/api/v1/methodology" target="_blank" style="color: #c084fc; text-decoration: none;">Methodology Registry API &rarr;</a>
@@ -189,6 +211,7 @@
                 {% endif %}
             </div>
 
+            {% if presentation_mode != 'beginner' %}
             <!-- 5v5 Expected Goals Stat -->
             <div class="stat-label-row">
                 <span class="stat-value font-mono">{{ stats.stats.away_5v5_xg }}</span>
@@ -234,6 +257,7 @@
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
             {% endif %}
 
             <!-- PPG Stat -->
