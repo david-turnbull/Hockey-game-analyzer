@@ -1,59 +1,82 @@
 # Stage 6 — Forecast Intelligence & Elo Research Report
 
-**Evaluated At:** 2026-09-22T00:55:29.290432+00:00  
-**Git Commit SHA:** `df190cf7e172026cb36249bdc3ec3cb623506ea7`  
+**Evaluated At:** `2026-09-22T01:13:17.810999+00:00`  
+**Research Execution Git SHA:** `b08a0168237ea4a26f93ae9de30626901a937e60`  
+**Report Commit Parent SHA:** `68177eb554980b9bdfc6c67ac50186ee2724aaad`  
 **Production Artifact Invariance:** Verified (SHA-256 match)
 
 ---
 
-## 1. Executive Summary
+## 1. Executive Summary & Dynamic Research Conclusions
 
-This research study evaluates whether Elo-derived team strength signals improve PuckLens game forecasting. All evaluations were conducted using a leakage-safe chronological protocol across 4 NHL regular seasons (2021-22 through 2024-25).
+This research study evaluates whether Elo-derived team strength signals improve PuckLens game forecasting. All evaluations were conducted using a strict, leakage-safe chronological protocol across 4 NHL regular seasons:
 
-**Key Takeaways:**
-1. **Production Win Model (`pucklens-win-v1.4.0`)** remains the best standalone model on the untouched 2024-25 holdout split (**Log Loss: 0.6843, Brier: 0.2429, ECE: 0.0277**).
-2. **Reference Elo** serves as a strong zero-feature baseline (**Log Loss: 0.6735, Brier: 0.2402, ECE: 0.041**).
-3. **Optimized Research Elo** (`K=10.0, HA=35.0, Reg=0.1, MOV=True`) selected on 2021-23 data slightly improves upon reference Elo (**Holdout Log Loss: 0.6685**).
-4. **Probability Blend** ($P_{\text{blend}} = 0.85 \cdot P_{\text{prod}} + 0.15 \cdot P_{\text{elo\_sel}}$) achieves **Log Loss: 0.676** on holdout.
-5. **Elo-as-Feature Research** demonstrates that adding pregame Elo features reduces holdout Log Loss from **0.6751** to **0.6702**.
+* **2021–22:** Development & Elo state initialization
+* **2022–23:** Parameter selection & blend weight optimization
+* **2023–24:** Frozen research validation
+* **2024–25:** Untouched final holdout
+
+### Key Empirical Findings:
+
+1. On the untouched 2024-25 holdout split, the observed lowest Log Loss model was Selected Research Elo (Log Loss: 0.6722).
+2. Selected Research Elo produced lower Log Loss (0.6722) than the production model (0.6843) on the 2024-25 holdout, but the paired bootstrap 95% CI [-0.0269, +0.0021] includes zero, indicating statistical uncertainty.
+3. Elo-as-feature augmentation improved Log Loss on the frozen 2023-24 research-validation season (Validation Delta: +0.0079, Baseline Log Loss: 0.6768 -> Elo-Augmented: 0.6689). On the untouched 2024-25 holdout, the delta was +0.0048 (Baseline: 0.6751 -> Elo-Augmented: 0.6703).
+4. All production models and artifacts remain strictly frozen (v1.4.0). Research Elo and Forecast Intelligence outputs remain in the research layer only.
 
 ---
 
-## 2. Model Performance Comparison (Untouched 2024-25 Holdout: 1312 Games)
+## 2. Model Performance Summary Across Evaluation Windows
+
+### Frozen 2023–24 Research Validation Window (1312 Games)
+
+| Forecast Approach | Log Loss | Brier Score | Accuracy (%) | ECE |
+| :--- | :---: | :---: | :---: | :---: |
+| **Production Win Model (v1.4.0)** | 0.6681 | 0.2368 | 58.69% | 0.0149 |
+| **Probability Blend (w=0.95)** | 0.6658 | 0.2363 | 59.45% | 0.0225 |
+| **Selected Research Elo** | 0.6658 | 0.2367 | 59.53% | 0.0140 |
+| **Reference Elo Baseline** | 0.6688 | 0.2380 | 59.22% | 0.0353 |
+
+### Untouched 2024–25 Final Holdout Window (1312 Games)
 
 | Forecast Approach | Log Loss | Brier Score | Accuracy (%) | ECE | Extreme Probs (<0.20 or >0.80) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Production Win Model (v1.4.0)** | **0.6843** | **0.2429** | **57.70%** | 0.0277 | 0.69% (9) |
-| **Probability Blend (w=0.85)** | **0.6760** | **0.2408** | **58.69%** | **0.0303** | 0.91% (12) |
-| **Selected Research Elo** | 0.6685 | 0.2380 | 58.77% | 0.0310 | 1.07% (14) |
+| **Production Win Model (v1.4.0)** | 0.6843 | 0.2429 | 57.70% | 0.0277 | 0.69% (9) |
+| **Probability Blend (w=0.95)** | 0.6807 | 0.2423 | 58.61% | 0.0327 | 0.84% (11) |
+| **Selected Research Elo** | 0.6722 | 0.2398 | 58.00% | 0.0412 | 0.38% (5) |
 | **Reference Elo Baseline** | 0.6735 | 0.2402 | 58.16% | 0.0410 | 1.75% (23) |
 
 ---
 
-## 3. Elo Parameter Research & Bounded Grid Search
+## 3. Elo Parameter Optimization Protocol & Results
 
-A bounded grid search over 120 candidate configurations was evaluated on development/selection seasons (2021-22 to 2023-24). The top configuration was selected strictly without observing 2024-25 holdout performance.
+Parameters were selected strictly on **2022–23 Log Loss** using state initialized from **2021–22**.
 
 * **Reference Configuration:** `initial_elo=1500`, `k_factor=20`, `home_advantage=35`, `season_regression=0.25`, `use_mov=True`
-* **Selected Candidate Configuration:** `initial_elo=1500.0`, `k_factor=10.0`, `home_advantage=35.0`, `season_regression=0.1`, `use_mov=True`
-* **Config Hash:** `db2a503a614707a0...`
-* **Selection Log Loss (2021-24):** `0.6733`
+* **Selected Candidate Configuration:** `initial_elo=1500.0`, `k_factor=15.0`, `home_advantage=20.0`, `season_regression=0.4`, `use_mov=True`
+* **Config Hash:** `de04e2d87f496a99...`
+* **Selection Metric (2022–23 Log Loss):** `0.6674`
 
 ---
 
-## 4. Elo-as-Feature Research
+## 4. Elo-as-Feature Research (Point-in-Time Provenance)
 
-Controlled experiment using Stage 5 `ExperimentRunner` comparing standard Logistic Regression with and without pregame Elo features:
+Controlled experiment using Stage 5 `PointInTimeAdapter` with Logistic Regression:
 
-* **Baseline (11 Production Features):** Holdout Log Loss = `0.6751`, Brier = `0.2411`
-* **Augmented (11 Features + 4 Pregame Elo Features):** Holdout Log Loss = `0.6702`, Brier = `0.2388`
-* **Delta Log Loss:** `+0.0049`
+* **Point-in-Time Provenance:** `PointInTimeAdapter.extract_game_features_with_cutoff` (zero synthetic timestamps).
+* **Baseline Candidate (11 Production Features):**
+  * 2023–24 Validation Log Loss: `0.6768`
+  * 2024–25 Holdout Log Loss: `0.6751`
+* **Elo-Augmented Candidate (11 Features + 4 Pregame Elo Features):**
+  * 2023–24 Validation Log Loss: `0.6689`
+  * 2024–25 Holdout Log Loss: `0.6703`
+* **Validation Delta (Validation Log Loss Improvement):** `+0.0079`
+* **Holdout Delta (Holdout Log Loss Improvement):** `+0.0048`
 
 ---
 
 ## 5. Forecast Intelligence Signals & Agreement Analysis
 
-Evaluation of game-level agreement between the Production Model and Reference Elo on the 2024-25 holdout:
+Game-level agreement analysis on 2024–25 holdout (1312 games):
 
 * **Win Outcome Pick Agreement:** 74.85% (982/1312 games)
 * **High Agreement (|diff| < 0.05):** 34.68% (455 games)
@@ -62,21 +85,23 @@ Evaluation of game-level agreement between the Production Model and Reference El
 
 ---
 
-## 6. Paired Bootstrap Statistical Evidence (1,000 Resamples)
+## 6. Paired Bootstrap Statistical Evidence (1,000 Resamples on 2024–25 Holdout)
 
-| Comparison | Metric | Observed Difference | 95% Confidence Interval | Std Error |
+> **Sign Semantics Note:** Difference = `comparator - base`. A negative difference indicates that the comparator model achieved a lower (better) score than the base production model.
+
+| Comparison | Metric | Observed Difference (Comp - Base) | 95% Confidence Interval | Std Error |
 | :--- | :--- | :---: | :---: | :---: |
 | **Production vs. Reference Elo** | Log Loss | `-0.0108` | `[-0.0262, +0.0045]` | `0.0079` |
 | | Brier Score | `-0.0027` | `[-0.0083, +0.0032]` | `0.0031` |
-| **Production vs. Selected Elo** | Log Loss | `-0.0158` | `[-0.0304, -0.0009]` | `0.0076` |
-| | Brier Score | `-0.0050` | `[-0.0105, +0.0005]` | `0.0029` |
-| **Production vs. Blend (w=0.85)** | Log Loss | `-0.0083` | `[-0.0137, -0.0039]` | `0.0025` |
-| | Brier Score | `-0.0022` | `[-0.0030, -0.0013]` | `0.0004` |
+| **Production vs. Selected Elo** | Log Loss | `-0.0120` | `[-0.0269, +0.0021]` | `0.0076` |
+| | Brier Score | `-0.0032` | `[-0.0086, +0.0024]` | `0.0028` |
+| **Production vs. Blend (w=0.95)** | Log Loss | `-0.0036` | `[-0.0067, -0.0013]` | `0.0014` |
+| | Brier Score | `-0.0007` | `[-0.0010, -0.0004]` | `0.0001` |
 
 ---
 
-## 7. Conclusions & Recommendations
+## 7. Conclusions & Production Invariance Statement
 
-1. **Frozen Production Model Preserved:** `pucklens-win-v1.4.0` remains unchanged as the active production forecasting model.
-2. **Elo Research Value:** Elo features provide strong independent pregame signal and should be considered for inclusion in the feature set of a future candidate model iteration.
-3. **Forecast Intelligence Availability:** `ForecastIntelligenceService` is ready to generate transparent research-layer comparison descriptors when requested.
+1. **Frozen Production Model Preserved:** `pucklens-win-v1.4.0` remains 100% unchanged as the active production model.
+2. **Elo Research Qualification:** Elo research parameters, probability blending, and Elo-as-feature experiments were executed cleanly under point-in-time provenance.
+3. **Forecast Intelligence Availability:** `ForecastIntelligenceService` provides transparent research-layer comparison descriptors when invoked.
