@@ -2,23 +2,23 @@
 Tests for Stage 6 — Forecast Intelligence & Elo Research.
 
 Verifies:
-1. Elo Chronology:
+1. Elo Chronology & Deterministic Sorting:
    - Prediction is produced strictly before rating update.
    - Game result cannot affect its own pregame Elo.
    - Later games may use earlier completed results.
-   - Season regression occurs only at season boundaries.
+   - Season regression occurs only at season boundaries using exact formula.
+   - Shuffled games_override inputs are sorted chronologically.
 2. Parameterization & Non-mutation:
    - Research parameter changes do not mutate production Elo constants (INITIAL_ELO, BASE_K, HOME_ADVANTAGE, SEASON_REGRESSION).
    - Reference research configuration reproduces current EloService outputs within documented tolerance.
-3. Leakage Safety:
+3. Leakage Safety & Provenance:
    - Future games cannot affect earlier Elo.
-   - Holdout outcomes are never used for parameter selection.
-   - Elo-as-feature values are pregame only.
-4. Evaluation & Blend:
-   - Candidate comparison uses identical game populations.
-   - Metrics are task-appropriate (Log Loss primary).
+   - Parameter and blend selection strictly use selection seasons (2022-23) excluding validation and holdout.
+   - Elo-as-feature values use Stage 5 PointInTimeAdapter provenance.
+4. Evaluation & Population Integrity:
+   - Candidate comparison requires exact, identical game populations; fails closed on missing predictions.
+   - Bootstrap differences use explicit comparator_minus_base sign semantics (negative = comparator superior).
    - Blend weights sum correctly (w + (1-w) = 1.0).
-   - Weight selection excludes holdout; holdout uses frozen selected weight.
 5. Forecast Intelligence Signals:
    - Forecast Intelligence produces valid agreement bands and summaries.
    - Enforces prohibition of hype terms ("lock", "safe bet", "certain", "guaranteed").
@@ -32,13 +32,19 @@ import json
 import hashlib
 import pytest
 from types import SimpleNamespace
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from app.services.elo_service import EloService, INITIAL_ELO, BASE_K, HOME_ADVANTAGE, SEASON_REGRESSION
 from app.analytics.experiments.elo_experiment import (
     EloResearchConfig,
     EloResearchEngine,
     run_elo_parameter_grid_search
+)
+from app.analytics.experiments.point_in_time import (
+    PointInTimeAdapter,
+    PointInTimeCutoff,
+    TemporalLeakageError,
+    assert_point_in_time_safety
 )
 from app.services.forecast_intelligence_service import (
     ForecastIntelligenceService,
@@ -48,6 +54,10 @@ from app.services.forecast_intelligence_service import (
 )
 from app.analytics.forecasting.model_registry import ForecastModelRegistry
 from app.services.xg_service import XGService
+from scripts.run_stage6_forecast_research import (
+    validate_paired_game_populations,
+    calculate_paired_bootstrap
+)
 
 EXPECTED_WIN_MODEL_SHA = "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9"
 EXPECTED_SCORE_PARAMS_SHA = "a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701"
@@ -62,7 +72,6 @@ def test_production_elo_constants_are_immutable_and_unmutated():
     assert HOME_ADVANTAGE == 35.0
     assert SEASON_REGRESSION == 0.25
 
-    # Instantiate EloResearchConfig with custom parameters
     custom_cfg = EloResearchConfig(
         initial_elo=1400.0,
         k_factor=30.0,
@@ -71,7 +80,6 @@ def test_production_elo_constants_are_immutable_and_unmutated():
         use_mov_multiplier=False
     )
 
-    # Verify production constants remain unchanged after using research config
     assert INITIAL_ELO == 1500.0
     assert BASE_K == 20.0
     assert HOME_ADVANTAGE == 35.0
@@ -89,9 +97,9 @@ def test_reference_elo_research_reproduces_elo_service_outputs():
     )
 
     dummy_games = [
-        SimpleNamespace(game_id=1, season="20212022", game_date="2021-10-12", home_team_id=1, away_team_id=2, home_score=4, away_score=2),
-        SimpleNamespace(game_id=2, season="20212022", game_date="2021-10-14", home_team_id=2, away_team_id=3, home_score=1, away_score=3),
-        SimpleNamespace(game_id=3, season="20222023", game_date="2022-10-11", home_team_id=1, away_team_id=3, home_score=5, away_score=0),
+        SimpleNamespace(game_id=1, season="20212022", game_date="2021-10-12", start_time_utc=datetime(2021, 10, 12, 23, 0, tzinfo=timezone.utc), home_team_id=1, away_team_id=2, home_score=4, away_score=2),
+        SimpleNamespace(game_id=2, season="20212022", game_date="2021-10-14", start_time_utc=datetime(2021, 10, 14, 23, 0, tzinfo=timezone.utc), home_team_id=2, away_team_id=3, home_score=1, away_score=3),
+        SimpleNamespace(game_id=3, season="20222023", game_date="2022-10-11", start_time_utc=datetime(2022, 10, 11, 23, 0, tzinfo=timezone.utc), home_team_id=1, away_team_id=3, home_score=5, away_score=0),
     ]
 
     res_research = EloResearchEngine.run_elo_backtest(
@@ -100,11 +108,9 @@ def test_reference_elo_research_reproduces_elo_service_outputs():
         games_override=dummy_games
     )
 
-    # Check pregame win probabilities
     p1 = EloService.get_win_probability(1500.0, 1500.0, 35.0)
     assert res_research["predictions"][0]["p_home_win"] == pytest.approx(p1, abs=1e-6)
 
-    # Verify margin multiplier matches
     m1 = EloService.calculate_margin_multiplier(4, 2, 35.0)
     m1_res = EloResearchEngine.calculate_margin_multiplier(4, 2, 35.0, use_mov_multiplier=True)
     assert m1_res == pytest.approx(m1, abs=1e-6)
@@ -113,66 +119,140 @@ def test_reference_elo_research_reproduces_elo_service_outputs():
 def test_elo_chronology_and_pregame_isolation():
     """
     Asserts pregame win probability is computed BEFORE rating update,
-    game result cannot affect its own pregame Elo, and season regression occurs at season boundaries.
+    and game result cannot affect its own pregame Elo.
     """
     ref_cfg = EloResearchConfig(initial_elo=1500.0, k_factor=20.0, home_advantage=35.0, season_regression=0.25)
 
-    g1 = SimpleNamespace(game_id=10, season="20212022", game_date="2021-10-12", home_team_id=10, away_team_id=20, home_score=10, away_score=0)
-    g2 = SimpleNamespace(game_id=11, season="20212022", game_date="2021-10-14", home_team_id=10, away_team_id=30, home_score=3, away_score=2)
+    g1 = SimpleNamespace(game_id=10, season="20212022", game_date="2021-10-12", start_time_utc=datetime(2021, 10, 12, 23, 0, tzinfo=timezone.utc), home_team_id=10, away_team_id=20, home_score=10, away_score=0)
+    g2 = SimpleNamespace(game_id=11, season="20212022", game_date="2021-10-14", start_time_utc=datetime(2021, 10, 14, 23, 0, tzinfo=timezone.utc), home_team_id=10, away_team_id=30, home_score=3, away_score=2)
 
     res = EloResearchEngine.run_elo_backtest(seasons=["20212022"], config=ref_cfg, games_override=[g1, g2])
 
     p1 = res["predictions"][0]
     p2 = res["predictions"][1]
 
-    # Game 1 pregame Elo for Team 10 MUST be 1500.0 despite Team 10 winning 10-0
     assert p1["home_elo_pregame"] == 1500.0
     assert p1["away_elo_pregame"] == 1500.0
-
-    # Game 2 pregame Elo for Team 10 MUST incorporate Game 1's postgame update
     assert p2["home_elo_pregame"] > 1500.0
     assert p2["away_elo_pregame"] == 1500.0
 
 
-def test_season_regression_occurs_only_between_seasons():
-    """Verifies season regression is applied at season transitions only."""
+def test_shuffled_input_chronology_sorting():
+    """
+    Asserts that out-of-order games_override inputs are sorted chronologically by EloResearchEngine,
+    producing identical results to pre-sorted inputs.
+    """
     cfg = EloResearchConfig(initial_elo=1500.0, k_factor=20.0, home_advantage=35.0, season_regression=0.25)
 
-    g1 = SimpleNamespace(game_id=1, season="20212022", game_date="2021-10-12", home_team_id=1, away_team_id=2, home_score=5, away_score=0)
-    g2 = SimpleNamespace(game_id=2, season="20222023", game_date="2022-10-12", home_team_id=1, away_team_id=3, home_score=2, away_score=1)
+    g1 = SimpleNamespace(game_id=101, season="20212022", game_date="2021-10-10", start_time_utc=datetime(2021, 10, 10, 23, 0, tzinfo=timezone.utc), home_team_id=1, away_team_id=2, home_score=3, away_score=1)
+    g2 = SimpleNamespace(game_id=102, season="20212022", game_date="2021-10-12", start_time_utc=datetime(2021, 10, 12, 23, 0, tzinfo=timezone.utc), home_team_id=1, away_team_id=3, home_score=2, away_score=4)
+    g3 = SimpleNamespace(game_id=103, season="20212022", game_date="2021-10-15", start_time_utc=datetime(2021, 10, 15, 23, 0, tzinfo=timezone.utc), home_team_id=2, away_team_id=3, home_score=5, away_score=0)
+
+    # Order 1: Pre-sorted
+    res_sorted = EloResearchEngine.run_elo_backtest(seasons=["20212022"], config=cfg, games_override=[g1, g2, g3])
+
+    # Order 2: Shuffled input
+    res_shuffled = EloResearchEngine.run_elo_backtest(seasons=["20212022"], config=cfg, games_override=[g3, g1, g2])
+
+    assert len(res_sorted["predictions"]) == 3
+    assert len(res_shuffled["predictions"]) == 3
+
+    for p_sort, p_shuf in zip(res_sorted["predictions"], res_shuffled["predictions"]):
+        assert p_sort["game_id"] == p_shuf["game_id"]
+        assert p_sort["p_home_win"] == pytest.approx(p_shuf["p_home_win"], abs=1e-6)
+        assert p_sort["home_elo_pregame"] == pytest.approx(p_shuf["home_elo_pregame"], abs=1e-5)
+
+    assert res_sorted["final_ratings"] == res_shuffled["final_ratings"]
+
+
+def test_season_regression_occurs_only_between_seasons():
+    """
+    Rigorously asserts season regression formula:
+    R_new = (1 - regression) * R_prev + regression * INITIAL_ELO
+    and verifies zero regression occurs between games within the same season.
+    """
+    reg_val = 0.25
+    cfg = EloResearchConfig(initial_elo=1500.0, k_factor=20.0, home_advantage=35.0, season_regression=reg_val)
+
+    g1 = SimpleNamespace(game_id=1, season="20212022", game_date="2021-10-12", start_time_utc=datetime(2021, 10, 12, 23, 0, tzinfo=timezone.utc), home_team_id=1, away_team_id=2, home_score=5, away_score=0)
+    g2 = SimpleNamespace(game_id=2, season="20222023", game_date="2022-10-12", start_time_utc=datetime(2022, 10, 12, 23, 0, tzinfo=timezone.utc), home_team_id=1, away_team_id=3, home_score=2, away_score=1)
 
     res = EloResearchEngine.run_elo_backtest(seasons=["20212022", "20222023"], config=cfg, games_override=[g1, g2])
 
-    # End of season 1 rating for Team 1
-    post_g1_elo = 1500.0 + (res["final_ratings"][1] - 1500.0) # approx
-    g2_pregame_elo_team1 = res["predictions"][1]["home_elo_pregame"]
+    # Calculate exact postgame rating for Team 1 after Game 1
+    new_home_g1, _, _ = EloResearchEngine.update_ratings(1500.0, 1500.0, 5, 0, cfg)
 
-    # Verify Team 1 rating regressed 25% toward 1500 at season boundary
-    expected_regressed = 0.75 * res["predictions"][0]["home_elo_pregame"] + 0.25 * 1500.0 # Wait, post-game 1 elo
-    assert g2_pregame_elo_team1 < res["final_ratings"][1] if res["final_ratings"][1] > 1500.0 else True
+    # Season 2 pregame rating for Team 1 MUST equal regressed value (stored rounded to 1 decimal place)
+    expected_s2_team1 = (1.0 - reg_val) * new_home_g1 + reg_val * 1500.0
+    actual_s2_team1 = res["predictions"][1]["home_elo_pregame"]
+
+    assert actual_s2_team1 == pytest.approx(expected_s2_team1, abs=0.1)
+    assert actual_s2_team1 == round(expected_s2_team1, 1)
 
 
 def test_elo_grid_search_and_holdout_isolation():
-    """Asserts parameter grid search uses selection seasons and excludes holdout."""
+    """Asserts parameter grid search uses selection season metric and excludes holdout."""
     dev_games = [
-        SimpleNamespace(game_id=1, season="20212022", game_date="2021-10-12", home_team_id=1, away_team_id=2, home_score=4, away_score=2),
-        SimpleNamespace(game_id=2, season="20222023", game_date="2022-10-12", home_team_id=1, away_team_id=2, home_score=1, away_score=3),
+        SimpleNamespace(game_id=1, season="20212022", game_date="2021-10-12", start_time_utc=datetime(2021, 10, 12, 23, 0, tzinfo=timezone.utc), home_team_id=1, away_team_id=2, home_score=4, away_score=2),
+        SimpleNamespace(game_id=2, season="20222023", game_date="2022-10-12", start_time_utc=datetime(2022, 10, 12, 23, 0, tzinfo=timezone.utc), home_team_id=1, away_team_id=2, home_score=1, away_score=3),
     ]
 
-    # Grid search strictly on dev seasons
     results = run_elo_parameter_grid_search(
         seasons=["20212022", "20222023"],
         k_factors=[10.0, 20.0],
         home_advantages=[20.0, 35.0],
         season_regressions=[0.25],
         use_mov_options=[True],
-        games_override=dev_games
+        games_override=dev_games,
+        selection_season="20222023"
     )
 
     assert len(results) == 4
     top_config = results[0]
     assert "log_loss" in top_config
-    assert top_config["seasons"] == ["20212022", "20222023"]
+    assert top_config["selection_season"] == "20222023"
+
+
+def test_validate_paired_game_populations_fail_closed():
+    """Verifies validate_paired_game_populations fails closed on missing predictions, length mismatches, or duplicate IDs."""
+    g1 = SimpleNamespace(game_id=10)
+    g2 = SimpleNamespace(game_id=20)
+
+    # Valid population passes
+    res = validate_paired_game_populations([g1, g2], [0.6, 0.4], [0.55, 0.45], [0.58, 0.42])
+    assert res["population_valid"] is True
+
+    # Missing prediction fails
+    with pytest.raises(ValueError, match="MISSING_PREDICTION"):
+        validate_paired_game_populations([g1, g2], [0.6, None], [0.55, 0.45], [0.58, 0.42])
+
+    # Sample count mismatch fails
+    with pytest.raises(ValueError, match="POPULATION_MISMATCH"):
+        validate_paired_game_populations([g1, g2], [0.6], [0.55, 0.45], [0.58, 0.42])
+
+    # Duplicate game ID fails
+    g_dup = SimpleNamespace(game_id=10)
+    with pytest.raises(ValueError, match="DUPLICATE_GAME_IDS"):
+        validate_paired_game_populations([g1, g_dup], [0.6, 0.4], [0.55, 0.45], [0.58, 0.42])
+
+
+def test_paired_bootstrap_sign_semantics():
+    """
+    Verifies paired bootstrap return structure and sign semantics:
+    comparator_minus_base_diff < 0 when comparator has lower (better) log loss.
+    """
+    y_true = [1, 0, 1, 0, 1, 1, 0, 0, 1, 0]
+    # Base model (poor accuracy)
+    p_base = [0.2, 0.8, 0.1, 0.9, 0.3, 0.2, 0.7, 0.8, 0.1, 0.9]
+    # Comparator model (perfect accuracy)
+    p_comp = [0.9, 0.1, 0.9, 0.1, 0.9, 0.9, 0.1, 0.1, 0.9, 0.1]
+
+    res = calculate_paired_bootstrap(y_true, p_base, p_comp, n_bootstraps=100, seed=42)
+
+    diff = res["log_loss_difference"]["comparator_minus_base_diff"]
+    # Superior comparator MUST produce negative diff (comp - base < 0)
+    assert diff < 0.0
+    assert "sign_interpretation" in res["log_loss_difference"]
 
 
 def test_probability_blend_weight_properties():
@@ -184,6 +264,19 @@ def test_probability_blend_weight_properties():
     p_blend = w * p_prod + (1.0 - w) * p_elo
     assert p_blend == pytest.approx(0.67, abs=1e-6)
     assert (w + (1.0 - w)) == pytest.approx(1.0)
+
+
+def test_elo_as_feature_point_in_time_provenance(app):
+    """Verifies Elo-as-feature uses PointInTimeAdapter and produces valid PointInTimeCutoff."""
+    from app.models import Game
+    with app.app_context():
+        g = Game.query.filter_by(season="20222023", game_type="R").first()
+        if g is not None:
+            feats, cutoff = PointInTimeAdapter.extract_game_features_with_cutoff(g)
+            cutoff_dict = cutoff.to_dict()
+            assert cutoff_dict["safety_passed"] is True
+            assert "latest_source_game_start_time" in cutoff_dict
+            assert cutoff_dict["latest_source_game_start_time"] is not None
 
 
 def test_forecast_intelligence_service_outputs_and_prohibited_terms():
@@ -200,7 +293,6 @@ def test_forecast_intelligence_service_outputs_and_prohibited_terms():
     assert res_large["agreement_band"] == "large_disagreement"
     assert res_large["model_agreement"] is False
 
-    # Prohibited words check
     for word in PROHIBITED_WORDS:
         assert word not in res_high["summary"].lower()
         assert word not in res_mod["summary"].lower()
@@ -302,12 +394,10 @@ def test_literal_production_xg_regression_fixtures(app):
     pre-Stage-5 outputs established from commit be3d76d4d3243bc26a4b6d99dcaa0d3ca5774b75.
     """
     with app.app_context():
-        # Shot 1: Close slot shot
         xg1 = XGService.predict_shot_xg(distance=12.0, angle=5.0, period=1, period_seconds=300, is_home=1, shot_type="Wrist", strength_state="5v5")
         assert xg1.xg == 0.2543
         assert xg1.model_name == "pucklens-xg-logistic"
         assert xg1.model_version == "1.0.0"
 
-        # Shot 2: Point shot
         xg2 = XGService.predict_shot_xg(distance=55.0, angle=40.0, period=2, period_seconds=900, is_home=0, shot_type="Slap", strength_state="5v5")
         assert xg2.xg == 0.0387

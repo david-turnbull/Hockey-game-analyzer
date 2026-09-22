@@ -46,12 +46,50 @@ class EloResearchConfig:
         }
 
 
+from datetime import datetime, timezone
+
 class EloResearchEngine:
     """
     Leakage-safe dynamic Elo rating system for research experiments.
     Chronologically updates ratings pregame-to-postgame.
     Does not mutate production EloService constants.
     """
+
+    @staticmethod
+    def sort_games_chronologically(games: List[Any]) -> List[Any]:
+        """
+        Deterministically sorts game objects or dicts chronologically by:
+        1. Best available game datetime (start_time_utc or game_date)
+        2. game_id as tie-breaker.
+        """
+        def get_sort_key(g: Any) -> Tuple[datetime, int]:
+            if isinstance(g, dict):
+                st = g.get("start_time_utc") or g.get("start_time") or g.get("game_date")
+                gid = g.get("game_id", 0)
+            else:
+                st = getattr(g, "start_time_utc", None) or getattr(g, "start_time", None) or getattr(g, "game_date", None)
+                gid = getattr(g, "game_id", 0)
+
+            dt_val = None
+            if isinstance(st, datetime):
+                dt_val = st
+            elif hasattr(st, "year") and hasattr(st, "month") and hasattr(st, "day"):
+                dt_val = datetime.combine(st, datetime.min.time(), tzinfo=timezone.utc)
+            elif isinstance(st, str):
+                try:
+                    dt_val = datetime.fromisoformat(st)
+                except Exception:
+                    dt_val = datetime.min.replace(tzinfo=timezone.utc)
+
+            if dt_val is None:
+                dt_val = datetime.min.replace(tzinfo=timezone.utc)
+
+            if dt_val.tzinfo is None:
+                dt_val = dt_val.replace(tzinfo=timezone.utc)
+
+            return (dt_val, int(gid or 0))
+
+        return sorted(games, key=get_sort_key)
 
     @staticmethod
     def get_win_probability(home_elo: float, away_elo: float, home_advantage: float = 35.0) -> float:
@@ -130,34 +168,44 @@ class EloResearchEngine:
                     team_ratings[tid] = (1.0 - config.season_regression) * team_ratings[tid] + config.season_regression * config.initial_elo
 
             if games_override is not None:
-                games = [g for g in games_override if getattr(g, "season", None) == season]
+                season_games = [
+                    g for g in games_override
+                    if (g.get("season") if isinstance(g, dict) else getattr(g, "season", None)) == season
+                ]
+                games = cls.sort_games_chronologically(season_games)
             else:
-                games = Game.query.filter(
+                raw_games = Game.query.filter(
                     Game.season == season,
                     Game.game_type == 'R',
                     Game.data_source == 'nhl_api',
                     Game.nhl_game_state.in_(['OFF', 'FINAL', 'OVER'])
-                ).order_by(
-                    func.coalesce(Game.start_time_utc, Game.game_date).asc(),
-                    Game.game_id.asc()
                 ).all()
+                games = cls.sort_games_chronologically(raw_games)
 
             season_preds = []
 
             for g in games:
-                h_id = g.home_team_id
-                a_id = g.away_team_id
+                h_id = g["home_team_id"] if isinstance(g, dict) else g.home_team_id
+                a_id = g["away_team_id"] if isinstance(g, dict) else g.away_team_id
+                h_score = g["home_score"] if isinstance(g, dict) else g.home_score
+                a_score = g["away_score"] if isinstance(g, dict) else g.away_score
+                gid = g["game_id"] if isinstance(g, dict) else g.game_id
+                g_season = g["season"] if isinstance(g, dict) else g.season
+
+                g_date_val = g.get("game_date") if isinstance(g, dict) else getattr(g, "game_date", "")
+                game_date_str = g_date_val.strftime("%Y-%m-%d") if hasattr(g_date_val, "strftime") else str(g_date_val)
+
                 home_elo = team_ratings.get(h_id, config.initial_elo)
                 away_elo = team_ratings.get(a_id, config.initial_elo)
 
                 # Pregame win probability prior to result update
                 p_home = cls.get_win_probability(home_elo, away_elo, config.home_advantage)
-                actual_home_win = 1 if g.home_score > g.away_score else 0
+                actual_home_win = 1 if h_score > a_score else 0
 
                 season_preds.append({
-                    "game_id": g.game_id,
-                    "season": g.season,
-                    "game_date": g.game_date.strftime("%Y-%m-%d") if hasattr(g.game_date, "strftime") else str(g.game_date),
+                    "game_id": gid,
+                    "season": g_season,
+                    "game_date": game_date_str,
                     "home_team_id": h_id,
                     "away_team_id": a_id,
                     "home_elo_pregame": round(home_elo, 1),
@@ -165,13 +213,13 @@ class EloResearchEngine:
                     "elo_diff_pregame": round((home_elo + config.home_advantage) - away_elo, 1),
                     "p_home_win": p_home,
                     "actual_home_win": actual_home_win,
-                    "home_score": g.home_score,
-                    "away_score": g.away_score
+                    "home_score": h_score,
+                    "away_score": a_score
                 })
 
                 # Postgame Elo update
                 new_home, new_away, _ = cls.update_ratings(
-                    home_elo, away_elo, g.home_score, g.away_score, config
+                    home_elo, away_elo, h_score, a_score, config
                 )
                 team_ratings[h_id] = new_home
                 team_ratings[a_id] = new_away
@@ -276,11 +324,12 @@ def run_elo_parameter_grid_search(
     season_regressions: Optional[List[float]] = None,
     use_mov_options: Optional[List[bool]] = None,
     initial_elo: float = 1500.0,
-    games_override: Optional[List[Any]] = None
+    games_override: Optional[List[Any]] = None,
+    selection_season: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Runs a bounded parameter research study over candidate Elo parameter combinations.
-    Ranks candidates by primary selection metric (Log Loss) on specified dev/selection seasons.
+    Ranks candidates by primary selection metric (Log Loss) on specified selection season or overall.
     """
     if k_factors is None:
         k_factors = [10.0, 15.0, 20.0, 25.0, 30.0]
@@ -305,18 +354,34 @@ def run_elo_parameter_grid_search(
                         use_mov_multiplier=mov
                     )
                     res = EloResearchEngine.run_elo_backtest(seasons, cfg, games_override=games_override)
+
+                    if selection_season and selection_season in res["season_metrics"]:
+                        sel_metrics = res["season_metrics"][selection_season]
+                        sel_log_loss = sel_metrics["log_loss"]
+                        sel_brier = sel_metrics["brier_score"]
+                        sel_acc = sel_metrics["accuracy"]
+                        sel_ece = sel_metrics["ece"]
+                    else:
+                        sel_log_loss = res["overall_metrics"].get("log_loss", 999.0)
+                        sel_brier = res["overall_metrics"].get("brier_score", 999.0)
+                        sel_acc = res["overall_metrics"].get("accuracy", 0.0)
+                        sel_ece = res["overall_metrics"].get("ece", 999.0)
+
                     candidates_results.append({
                         "config": cfg.to_dict(),
                         "config_hash": cfg.compute_config_hash(),
                         "seasons": seasons,
+                        "selection_season": selection_season,
                         "sample_count": res["predictions_count"],
-                        "log_loss": res["overall_metrics"].get("log_loss", 999.0),
-                        "brier_score": res["overall_metrics"].get("brier_score", 999.0),
-                        "accuracy": res["overall_metrics"].get("accuracy", 0.0),
-                        "ece": res["overall_metrics"].get("ece", 999.0),
+                        "log_loss": sel_log_loss,
+                        "brier_score": sel_brier,
+                        "accuracy": sel_acc,
+                        "ece": sel_ece,
+                        "overall_metrics": res["overall_metrics"],
                         "season_metrics": res["season_metrics"]
                     })
 
     # Rank candidates by Log Loss ascending
     candidates_results.sort(key=lambda c: c["log_loss"])
     return candidates_results
+
