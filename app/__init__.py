@@ -99,17 +99,31 @@ def create_app(config_name=None):
 
     @app.context_processor
     def inject_presentation_mode_and_methodology():
+        from flask import request
         from app.services.methodology_registry import MethodologyRegistry
         from app.services.presentation_mode import PresentationModeService
         active_mode = PresentationModeService.get_current_mode()
         mode_info = PresentationModeService.get_mode_info(active_mode)
         all_modes = PresentationModeService.list_all_modes()
+
+        def build_mode_url(target_mode):
+            try:
+                from urllib.parse import urlencode
+                args = request.args.copy()
+                args['mode'] = target_mode
+                args.pop('presentation_mode', None)
+                query_str = urlencode(args)
+                return f"{request.path}?{query_str}" if query_str else f"{request.path}?mode={target_mode}"
+            except Exception:
+                return f"?mode={target_mode}"
+
         return dict(
             methodology_registry=MethodologyRegistry,
             presentation_mode=active_mode,
             current_mode_info=mode_info,
             all_presentation_modes=all_modes,
-            PresentationModeService=PresentationModeService
+            PresentationModeService=PresentationModeService,
+            build_mode_url=build_mode_url
         )
 
     # Global error handlers
