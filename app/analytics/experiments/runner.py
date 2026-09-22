@@ -148,10 +148,10 @@ class ExperimentRunner:
             y_hist = list(y_train)
             if task_type == TASK_CLASSIFICATION:
                 y_pred_val = model.predict_proba(X_val, y_history=y_hist)[:, 1]
-                y_pred_test = model.predict_proba(X_test, y_history=list(y_val))[:, 1] if X_test is not None else None
+                y_pred_test = model.predict_proba(X_test, y_history=list(y_train) + list(y_val))[:, 1] if X_test is not None else None
             else:
                 y_pred_val = model.predict(X_val, y_history=y_hist)
-                y_pred_test = model.predict(X_test, y_history=list(y_val)) if X_test is not None else None
+                y_pred_test = model.predict(X_test, y_history=list(y_train) + list(y_val)) if X_test is not None else None
 
         elif model_type == "simple_logistic":
             if task_type != TASK_CLASSIFICATION:
