@@ -88,6 +88,44 @@ def create_app(config_name=None):
     app.register_blueprint(seasons_bp)
     app.register_blueprint(forecast_bp)
     
+    @app.before_request
+    def resolve_presentation_mode():
+        from flask import request, session
+        from app.services.presentation_mode import PresentationModeService
+        raw_mode = request.args.get('mode') or request.args.get('presentation_mode')
+        if raw_mode:
+            norm = PresentationModeService.normalize_mode(raw_mode)
+            session['presentation_mode'] = norm
+
+    @app.context_processor
+    def inject_presentation_mode_and_methodology():
+        from flask import request
+        from app.services.methodology_registry import MethodologyRegistry
+        from app.services.presentation_mode import PresentationModeService
+        active_mode = PresentationModeService.get_current_mode()
+        mode_info = PresentationModeService.get_mode_info(active_mode)
+        all_modes = PresentationModeService.list_all_modes()
+
+        def build_mode_url(target_mode):
+            try:
+                from urllib.parse import urlencode
+                args = request.args.copy()
+                args['mode'] = target_mode
+                args.pop('presentation_mode', None)
+                query_str = urlencode(args)
+                return f"{request.path}?{query_str}" if query_str else f"{request.path}?mode={target_mode}"
+            except Exception:
+                return f"?mode={target_mode}"
+
+        return dict(
+            methodology_registry=MethodologyRegistry,
+            presentation_mode=active_mode,
+            current_mode_info=mode_info,
+            all_presentation_modes=all_modes,
+            PresentationModeService=PresentationModeService,
+            build_mode_url=build_mode_url
+        )
+
     # Global error handlers
     @app.errorhandler(404)
     def page_not_found(error):

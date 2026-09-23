@@ -631,3 +631,52 @@ def get_monitoring_calibration():
     min_thresh = request.args.get('min_sample_threshold', 30, type=int)
     return jsonify(OperationalMonitoringService.get_calibration_and_performance(min_sample_threshold=min_thresh)), 200
 
+@api_bp.route('/v1/methodology', methods=['GET'])
+@api_bp.route('/methodology', methods=['GET'])
+def get_methodology():
+    """Returns centralized metric definitions and model cards methodology."""
+    from app.services.methodology_registry import MethodologyRegistry
+    return jsonify(MethodologyRegistry.get_all_methodology()), 200
+
+@api_bp.route('/v1/methodology/metrics', methods=['GET'])
+def get_methodology_metrics():
+    """Returns all analytical metric definitions, optionally filtered by category."""
+    from app.services.methodology_registry import MethodologyRegistry
+    category = request.args.get('category')
+    metrics = MethodologyRegistry.list_metrics(category=category)
+    return jsonify([m.to_dict() for m in metrics]), 200
+
+@api_bp.route('/v1/methodology/models/<string:key>', methods=['GET'])
+def get_methodology_model_card(key):
+    """Returns structured model card for a specified production model."""
+    from app.services.methodology_registry import MethodologyRegistry
+    card = MethodologyRegistry.get_model_card(key)
+    if not card:
+        return jsonify({"error": f"Model card '{key}' not found"}), 404
+    return jsonify(card.to_dict()), 200
+
+@api_bp.route('/v1/presentation_mode', methods=['GET', 'POST'])
+def handle_presentation_mode():
+    """Gets active presentation mode or updates user mode preference in session."""
+    from app.services.presentation_mode import PresentationModeService
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or request.form
+        raw_mode = data.get('mode') or data.get('presentation_mode')
+        norm = PresentationModeService.normalize_mode(raw_mode)
+        from flask import session
+        session['presentation_mode'] = norm
+        return jsonify({
+            "status": "success",
+            "active_mode": norm,
+            "mode_info": PresentationModeService.get_mode_info(norm)
+        }), 200
+
+    active = PresentationModeService.get_current_mode()
+    return jsonify({
+        "active_mode": active,
+        "mode_info": PresentationModeService.get_mode_info(active),
+        "available_modes": PresentationModeService.list_all_modes()
+    }), 200
+
+
+

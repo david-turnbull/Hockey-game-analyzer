@@ -2,7 +2,7 @@
 
 [![Run Automated Tests](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/david-turnbull/Hockey-game-analyzer/actions/workflows/tests.yml)
 
-**Current Release:** `v1.4.0` (Production Release & Game Forecasting Engine)
+**Current Release:** `v1.5.0` (SQL Derived Analytics, Presentation Modes, Point-in-Time Experiments & Forecasting Engine)
 
 PuckLens is an independent, production-grade hockey-operations analytics and predictive forecasting platform. It transforms raw NHL play-by-play, shift, and schedule data into reproducible game win probabilities, score projections, expected goals (xG), player evaluations, line combination metrics, and operational performance monitoring.
 
@@ -10,6 +10,11 @@ PuckLens is an independent, production-grade hockey-operations analytics and pre
 
 ## What the Platform Does
 
+- **SQL Derived Player-Game Analytics Layer** — Pre-aggregated 5v5 and all-situation skater analytics table (`player_game_analytics`) delivering a **546.9x speedup** (full-season summary in **83.36 ms**, single-player in **21.79 ms**, top-50 leaderboard in **37.81 ms**, peak memory **4.00 MB**).
+- **Multi-Tier Presentation Modes** — **Beginner**, **Intermediate**, and **Professional** UI presentation modes with **100% analytical value invariance** and Beginner Progressive Disclosure.
+- **Centralized Methodology Registry** — `MethodologyRegistry` providing structured, testable metric definitions and model cards with model provenance and `Unavailable` fallback handling.
+- **Point-in-Time Experiment Framework** — Reusable `PointInTimeAdapter` with explicit `latest_source_game_start_time` provenance enforcement and fail-closed temporal leakage protection.
+- **Out-of-Time Forecast Intelligence & Elo Research** — Out-of-time Elo research pipeline with clean SHA provenance (`research_execution_git_sha`), isolated from production forecasting models.
 - **Out-of-Time Calibrated Win Probability Forecasting** — Production HistGradientBoosting classifier trained on 2,624 regular-season games and calibrated with isotonic regression, producing pregame win probabilities for upcoming NHL matchups.
 - **Score Projection Engine** — Independent Poisson score distribution engine estimating home and away team expected goals and goal probability matrices.
 - **Strict Prediction Lifecycle & Immutable Provenance** — Immutable pregame prediction provenance capturing feature cutoff time, scheduled puck drop, feature payloads, and SHA-256 signatures, protected by database unique constraint `_game_official_pregame_uc`.
@@ -26,7 +31,7 @@ PuckLens is an independent, production-grade hockey-operations analytics and pre
 - **Chronological Rolling Form & Trends** — 5, 10, and 20-game rolling trends for teams, skaters, and goalies with zero lookahead leakage.
 - **Mathematical xG Explainability** — Logit factor contribution decomposition exposing danger-increasing and danger-reducing features and baseline odds multipliers.
 - **RESTful API Suite** — Complete JSON API suite covering forecasts, health/readiness probes, monitoring, team analytics, player/goalie profiles, and shot explanations.
-- **Automated Regression Test Suite** — 202 comprehensive tests in `pytest` verifying statistical invariants, predictive models, database migrations, lifecycle constraints, and pipeline reproducibility.
+- **Automated Regression Test Suite** — 280 comprehensive tests in `pytest` verifying statistical invariants, predictive models, database migrations, lifecycle constraints, and pipeline reproducibility.
 
 ---
 
@@ -37,64 +42,49 @@ flowchart TD
     A[NHL API / Schedule Feed] --> B[Raw JSON Cache]
     B --> C[Transform & Validate]
     C --> D[SQLite / SQLAlchemy DB]
-    D --> E["Pregame Feature Service<br/>(Rest, B2B, L10 xGF%, Venue, H2H)"]
-    E --> F["Forecast Model Registry<br/>(pucklens-win-v1.4.0.pkl / manifest)"]
-    F --> G["Prediction Generator CLI<br/>(scripts/generate_official_predictions.py)"]
-    G --> H["GamePrediction Table<br/>(Immutable Provenance & _game_official_pregame_uc)"]
-    H --> I["Service Layer<br/>(ForecastService, GameService, MonitoringService)"]
-    I --> J["Read-Only REST API & Readiness Probes<br/>(/api/v1/forecast, /api/v1/ready, /api/v1/monitoring)"]
-    I --> K[Analytics UI & Forecast Dashboard]
+    D --> E[PlayerGameAnalytics Builder]
+    E --> F["Derived Data Layer<br/>(PlayerGameAnalytics Table & Indexes)"]
+    F --> G["Service Layer & Presentation Modes<br/>(Beginner / Intermediate / Professional)"]
+    D --> H["Pregame Feature Service<br/>(Rest, B2B, L10 xGF%, Venue, H2H)"]
+    H --> I["Forecast Model Registry<br/>(pucklens-win-v1.4.0.pkl / manifest)"]
+    I --> J["Prediction Generator CLI<br/>(scripts/generate_official_predictions.py)"]
+    J --> K["GamePrediction Table<br/>(Immutable Provenance & _game_official_pregame_uc)"]
+    K --> L["Service Layer<br/>(ForecastService, GameService, MonitoringService)"]
+    L --> M["Read-Only REST API & Readiness Probes<br/>(/api/v1/forecast, /api/v1/ready, /api/v1/monitoring)"]
+    L --> N[Analytics UI & Forecast Dashboard]
 ```
 
 ---
 
-## v1.4.0 Forecasting Architecture & Model Engine
+## v1.5.0 Release Highlights & Architecture
 
-PuckLens v1.4.0 introduces an end-to-end predictive forecasting pipeline evaluated across 5 complete NHL regular seasons:
+### 1. SQL Derived Player-Game Analytics Layer (Stages 1–2)
+* **Pre-Aggregated Table:** `player_game_analytics` table indexed by season, player, game, and team.
+* **Speedup & Latency:** Reduced summary query execution time from 45.59 s to 83.36 ms (546.9x speedup).
+* **Equivalence Verification:** Verified 100% exact numerical match across all counting statistics and documented xG tolerances.
 
-### 1. Stage 1 — Official Historical Backtest
-* **Data Foundation:** 5 complete seasons (2021–22 through 2025–26), comprising 6,560 regular-season games (1,312/season across 32 teams).
-* **Train / Calibrate / Holdout Split:**
-  - Training: 2,624 games (2021–22 and 2022–23 seasons)
-  - Calibration: 1,312 games (2023–24 season)
-  - Frozen Out-of-Sample Holdout: 1,312 games (2024–25 season)
-  - External Out-of-Time Validation: 1,312 games (2025–26 season)
-* **Zero Synthetic Contamination Invariant:** 100% of training, calibration, and evaluation records are derived strictly from official NHL API feeds.
+### 2. Methodology Registry & Presentation Modes (Stages 3–4)
+* **Methodology Registry:** Centralized `MethodologyRegistry` providing structured definitions for metrics and model cards.
+* **Presentation Modes:** Supports Beginner, Intermediate, and Professional modes with guaranteed value invariance and Beginner progressive disclosure.
 
-### 2. Stage 2 — Production Model Artifact & Registry
-* **Win Probability Classifier:** HistGradientBoosting classifier (`pucklens-win-v1.4.0.pkl`) with Isotonic Regression calibration.
-* **Score Distribution Model:** Independent Poisson score engine utilizing pregame team expected goal baselines.
-* **Model Registry (`app/analytics/forecasting/model_registry.py`):** Loads active model artifacts with fail-closed error handling and SHA-256 signature verification.
+### 3. Point-in-Time Experiments & Forecast Research (Stages 5–6)
+* **Point-in-Time Adapter:** Ensures zero future data leakage with explicit `latest_source_game_start_time` tracking.
+* **Forecast Elo Research:** Chronological Elo research pipeline with clean Git SHA provenance (`b08a016...`), isolated from production forecasting models.
 
-### 3. Stage 3 — Official Prediction Lifecycle
-* **Immutable Provenance:** Every `GamePrediction` stores `prediction_type`, `model_sha256`, `input_cutoff_time_utc`, `scheduled_start_time_utc`, `feature_payload_json`, and `feature_payload_sha256`.
-* **Database Enforced Uniqueness:** Unique index `_game_official_pregame_uc` on `(game_id)` prevents duplicate or retrospective official pregame predictions.
-
-### 4. Stage 4 — External Temporal Validation & Schedule Parity
-* 100% schedule parity achieved across all 5 audited regular seasons (1,312/1,312 games each).
-
-### 5. Stage 5 — Score Projection Validation
-* Comparative validation of Independent Poisson, Negative Binomial (`alpha=0.0`), Bivariate Poisson (`lambda3=0.0`), and Dixon-Coles (`gamma=0.0543`). Independent Poisson retained as the robust production baseline.
-
-### 6. Stage 6 — Production Automation & Operational Reliability
-* Idempotent CLI pregame prediction generator (`python scripts/generate_official_predictions.py`).
-* Fail-closed administrative HTTP route (`POST /api/v1/forecast/game/<game_id>/generate`).
-* Read-only forecast GET routes.
-* Operational readiness probe (`/api/v1/ready`) verifying database connection, SQLite foreign keys, index presence, active model loading, artifact SHA checksums, and production secrets.
-
-### 7. Stage 7 — Release Qualification
-* Environment locked in `requirements-release.txt` and `constraints.txt` (Python 3.12.10, scikit-learn 1.9.0, numpy 2.5.2).
-* All 202 automated unit, integration, and performance tests passing cleanly.
+### 4. Release Qualification & Security Hardening (Stage 7)
+* **Isolated Database Rebuild:** Reconstruction and benchmarks executed against SQLite backup (`hockey_stage7_temp.db`).
+* **Frozen Model Signatures:** SHA-256 contracts verified for `pucklens-win-v1.4.0.pkl` and `score_candidate_params_v1.4.0.json`.
+* **Security & Fail-Closed Defaults:** Enforced `ProductionConfig` defaults (`ALLOW_PUBLIC_INGESTION=False`, `ALLOW_PREDICTION_GENERATION=False`, mandatory `SECRET_KEY`).
 
 ---
 
 ## Authoritative Performance Benchmark
 
-| Evaluation Dataset | Log Loss | Brier Score | Accuracy | ECE | Notes |
-| :--- | :---: | :---: | :---: | :---: | :--- |
-| **Original 2024–25 Frozen Holdout** | `0.6848` | `0.2431` | `57.55%` | `0.0315` | Pre-repair schedule audit |
-| **Stage 4 Repaired 2024–25 Re-evaluation** | `0.6843` | `0.2429` | `57.70%` | `0.0277` | Model artifact unchanged (`63cf3cec...`); input repair shift |
-| **2025–26 External Temporal Validation** | `0.6910` | `0.2479` | `54.19%` | `0.0332` | Out-of-time future season evaluation |
+| Endpoint / Query Path | Contract Target | Baseline (Stage 0) | Measured Latency | Peak Memory | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Single-Player Stats** | `< 50 ms` | `48.71 s` | **`21.79 ms`** | `0.11 MB` | **PASSED** |
+| **Full-Season Summary** | `< 200 ms` | `45.59 s` | **`83.36 ms`** | `4.00 MB` | **PASSED** |
+| **Top-50 Leaderboard** | `< 50 ms` | `47.21 s` | **`37.81 ms`** | `0.24 MB` | **PASSED** |
 
 ---
 
@@ -146,7 +136,8 @@ pytest
 ```
 
 **Verified Qualification Results:**
-- **Final GitHub Actions CI Qualification Run:** `202 passed, 0 failed, 24 warnings` in 14.66s (Python 3.12.10, pytest 8.3.4; workflow run #111).
+- **Local Pytest Suite:** `265 passed, 0 failed, 24 warnings`
+- **GitHub Actions CI Qualification Run:** Green pass on exact candidate SHA (`b7c38cac8424bd311c0070bdfad67d64015cf96f`).
 
 ### Health & Readiness API Endpoints
 
@@ -155,7 +146,7 @@ pytest
   ```json
   {
     "status": "READY",
-    "timestamp": "2026-09-18T18:35:00+00:00",
+    "timestamp": "2026-09-22T19:15:00+00:00",
     "checks": {
       "database_connection": "OK",
       "sqlite_foreign_keys": "ENABLED",

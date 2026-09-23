@@ -1,0 +1,24 @@
+{
+  "season": "20212022",
+  "timestamp_utc": "2026-09-23T02:21:54.231119+00:00",
+  "audit": {
+    "total_games": 271,
+    "complete_games": 271,
+    "incomplete_games": 0,
+    "missing_games": 0,
+    "is_100_percent_complete": true
+  },
+  "benchmark": {
+    "legacy_seconds": 24.946,
+    "derived_seconds": 0.0817,
+    "speedup_factor": 305.2,
+    "legacy_skaters_count": 782,
+    "derived_skaters_count": 782
+  },
+  "equivalence": {
+    "total_players_evaluated": 782,
+    "mismatch_count": 0,
+    "is_perfect_equivalence": true,
+    "mismatches": []
+  }
+}

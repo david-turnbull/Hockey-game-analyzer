@@ -25,6 +25,27 @@
         </nav>
     </header>
 
+    <!-- Presentation Mode Bar -->
+    <div class="mode-switcher-bar">
+        <div class="mode-switcher-container">
+            <span class="mode-switcher-label">Presentation Mode:</span>
+            <div class="mode-switcher-options">
+                {% for mode_opt in all_presentation_modes %}
+                    <a href="{{ build_mode_url(mode_opt.key) }}" 
+                       class="mode-btn {% if presentation_mode == mode_opt.key %}active {{ mode_opt.badge_class }}{% endif %}"
+                       title="{{ mode_opt.description }}">
+                        <span class="mode-btn-name">{{ mode_opt.label }}</span>
+                        <span class="mode-btn-tag">({{ mode_opt.tagline }})</span>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="mode-banner-info">
+            <span class="mode-badge {{ current_mode_info.badge_class }}">{{ current_mode_info.label }}</span>
+            <span class="font-mono text-muted" style="font-size: 0.72rem;">{{ current_mode_info.tagline }}</span>
+        </div>
+    </div>
+
     <main>
         {% block content %}{% endblock %}
     </main>
