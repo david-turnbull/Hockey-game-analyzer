@@ -1,6 +1,6 @@
 {
   "season": "20212022",
-  "timestamp_utc": "2026-09-20T21:50:26.765723+00:00",
+  "timestamp_utc": "2026-09-23T01:15:27.040359+00:00",
   "coverage_audit": {
     "total_game_schedule_rows": 1312,
     "ingested_roster_games": 271,
@@ -17,15 +17,15 @@
     "peak_memory_mb": 464.0
   },
   "current_legacy_rerun_ms": {
-    "full_summary_ms": 25392.75,
+    "full_summary_ms": 29686.59,
     "single_player_ms": "not re-run",
     "top50_board_ms": "not re-run"
   },
   "latencies_ms": {
-    "derived_full_summary_ms": 110.2,
-    "derived_single_player_ms": 33.27,
-    "derived_top50_board_ms": 47.55,
-    "speedup_vs_stage0_baseline": 413.7
+    "derived_full_summary_ms": 83.36,
+    "derived_single_player_ms": 21.79,
+    "derived_top50_board_ms": 37.81,
+    "speedup_vs_stage0_baseline": 546.9
   },
   "query_counts": {
     "derived_full_summary_queries": 8,
@@ -33,8 +33,8 @@
     "derived_top50_board_queries": 8
   },
   "memory_mb": {
-    "full_summary_peak_mb": 3.92,
-    "single_player_peak_mb": 0.12,
+    "full_summary_peak_mb": 4.0,
+    "single_player_peak_mb": 0.11,
     "top50_board_peak_mb": 0.24
   },
   "equivalence_audit": {

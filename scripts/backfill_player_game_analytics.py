@@ -120,17 +120,20 @@ def main():
     args = parser.parse_args()
 
     if args.audit:
-        res = audit_game_analytics(season=args.season)
-        print("\n=== PuckLens Player-Game Analytics Completeness Audit ===")
-        print(f"Season: {args.season}")
-        print(f"Total Games Analyzed: {len(res['complete']) + len(res['incomplete']) + len(res['missing'])}")
-        print(f"  -> Complete Games: {len(res['complete'])}")
-        print(f"  -> Incomplete Games (Partial): {len(res['incomplete'])}")
-        print(f"  -> Missing Games (Unbuilt): {len(res['missing'])}")
-        if res['incomplete']:
-            print(f"Incomplete Game IDs: {res['incomplete']}")
-        if res['missing']:
-            print(f"Missing Game IDs (first 20): {res['missing'][:20]}")
+        from app import create_app
+        app = create_app()
+        with app.app_context():
+            res = audit_game_analytics(season=args.season)
+            print("\n=== PuckLens Player-Game Analytics Completeness Audit ===")
+            print(f"Season: {args.season}")
+            print(f"Total Games Analyzed: {len(res['complete']) + len(res['incomplete']) + len(res['missing'])}")
+            print(f"  -> Complete Games: {len(res['complete'])}")
+            print(f"  -> Incomplete Games (Partial): {len(res['incomplete'])}")
+            print(f"  -> Missing Games (Unbuilt): {len(res['missing'])}")
+            if res['incomplete']:
+                print(f"Incomplete Game IDs: {res['incomplete']}")
+            if res['missing']:
+                print(f"Missing Game IDs (first 20): {res['missing'][:20]}")
     else:
         run_backfill(season=args.season, force=args.force, batch_size=args.batch_size)
 

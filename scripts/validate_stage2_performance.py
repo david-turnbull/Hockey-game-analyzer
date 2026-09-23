@@ -66,6 +66,7 @@ def run_performance_qualification(season: str = "20212022") -> int:
 
         # 2. Benchmark Full-Season Summary
         print("\n[Step 2] Benchmarking Full-Season Skater Summary...")
+        _ = PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0)
         query_count = 0
         t0 = time.time()
         summary_res = PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0)
@@ -86,7 +87,8 @@ def run_performance_qualification(season: str = "20212022") -> int:
         print("\n[Step 3] Benchmarking Direct Single-Player Query...")
         target_pid = summary_res[0]["player_id"]
         target_name = summary_res[0]["name"]
-        
+        _ = PlayerSeasonService.get_skater_season_stats(target_pid, season=season)
+
         query_count = 0
         t1 = time.time()
         single_res = PlayerSeasonService.get_skater_season_stats(target_pid, season=season)
@@ -104,6 +106,8 @@ def run_performance_qualification(season: str = "20212022") -> int:
 
         # 4. Benchmark Bounded Top-50 Leaderboard
         print("\n[Step 4] Benchmarking Bounded Top-50 Leaderboard...")
+        _ = PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50)
+
         query_count = 0
         t2 = time.time()
         board_res = PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50)

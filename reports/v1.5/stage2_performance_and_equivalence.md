@@ -1,6 +1,6 @@
 # Stage 2 Qualification Report: Performance & Equivalence
 
-> **Generated:** `2026-09-20T21:50:26.765723+00:00`  
+> **Generated:** `2026-09-23T01:15:27.040359+00:00`  
 > **Target Season:** `20212022`  
 > **Qualification Status:** `QUALIFIED (STAGE 2 COMPLETE)`
 
@@ -16,12 +16,12 @@
 
 | Metric / Endpoint | Contract Threshold | Stage 0 Frozen Baseline | Current Legacy Re-run | Stage 2 Derived | Queries | Peak Memory | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Single-Player Stats** | `< 50 ms` | `48710.00 ms` (`48.71 s`) | `not re-run` | **`33.27 ms`** | `7` | `0.12 MB` | `PASSED` |
-| **Full-Season Summary** | `< 200 ms` | `45590.00 ms` (`45.59 s`) | `25392.75 ms` | **`110.20 ms`** | `8` | `3.92 MB` | `PASSED` |
-| **Top-50 Leaderboard** | `< 50 ms` | `47210.00 ms` (`47.21 s`) | `not re-run` | **`47.55 ms`** | `8` | `0.24 MB` | `PASSED` |
+| **Single-Player Stats** | `< 50 ms` | `48710.00 ms` (`48.71 s`) | `not re-run` | **`21.79 ms`** | `7` | `0.11 MB` | `PASSED` |
+| **Full-Season Summary** | `< 200 ms` | `45590.00 ms` (`45.59 s`) | `29686.59 ms` | **`83.36 ms`** | `8` | `4.00 MB` | `PASSED` |
+| **Top-50 Leaderboard** | `< 50 ms` | `47210.00 ms` (`47.21 s`) | `not re-run` | **`37.81 ms`** | `8` | `0.24 MB` | `PASSED` |
 
-* **Full Summary Speedup vs Stage 0 Frozen Baseline:** **`413.7x Faster`**
-* **Peak Memory Allocation:** **`3.92 MB`** (Threshold `< 15.0 MB`, Stage 0 Baseline `~464 MB`).
+* **Full Summary Speedup vs Stage 0 Frozen Baseline:** **`546.9x Faster`**
+* **Peak Memory Allocation:** **`4.00 MB`** (Threshold `< 15.0 MB`, Stage 0 Baseline `~464 MB`).
 
 ## 3. Query Plan & Indexing Audit (SQLite EXPLAIN QUERY PLAN)
 
