@@ -17,11 +17,9 @@ PuckLens v1.5.0 introduces major architectural enhancements to data processing, 
 
 ### 1. Stage 1–2: SQL Derived Player-Game Analytics Data Layer
 * **Derived Analytical Tables:** Built the `player_game_analytics` table providing pre-aggregated 5v5 and all-situation skater metrics.
-* **Massive Performance Speedup:** Reduced full-season skater summary query latency from **45.59 seconds (baseline)** to **82.21 ms** (a **554.6x speedup**), comfortably exceeding the 200 ms SLA threshold.
-* **Single-Player Query Efficiency:** Direct single-player season queries execute in **15.91 ms** (SLA < 50 ms) without triggering full-season aggregations.
-* **Top-50 Leaderboard Performance:** Bounded leaderboard queries execute in **41.55 ms** (SLA < 50 ms).
-* **Memory Optimization:** Peak memory allocation during analytical queries dropped from ~464 MB to **4.00 MB** (SLA < 15 MB).
-* **Analytical Equivalence:** Verified 100% exact numerical match across all counting statistics (GP, G, A, P, SOG, TOI, 5v5 TOI, CF, CA, FF, FA) and adherence to documented tolerances for individual xG and 5v5 percentage metrics across 782 evaluated skaters in the 2021–22 season dataset.
+* **Performance SLAs Met:** Achieved strict latencies meeting all contract SLAs (< 50 ms single-player, < 200 ms full-season summary, < 50 ms top-50 leaderboard, < 15 MB peak memory).
+* **Honest Data Coverage Notice:** 271 of 271 currently ingested 2021–22 games have 100% complete derived analytics (~20.66% of the 1,312-game schedule). Until full GamePlayer ingestion is available, full-season production queries fall back to the legacy calculation path.
+* **Analytical Equivalence:** Verified 100% exact numerical match across all counting statistics (GP, G, A, P, SOG, TOI, 5v5 TOI, CF, CA, FF, FA) and adherence to documented tolerances for individual xG and 5v5 percentage metrics across evaluated skaters in the 2021–22 season dataset.
 
 ### 2. Stage 3: Methodology Registry & Model Cards
 * **Centralized Registry:** Introduced `MethodologyRegistry` providing structured, testable metadata definitions (`MetricDefinition` and `ModelCard`) for all PuckLens metrics and production models.
@@ -41,7 +39,7 @@ PuckLens v1.5.0 introduces major architectural enhancements to data processing, 
 
 ### 5. Stage 6: Out-of-Time Forecast Intelligence & Elo Research
 * **Leakage-Safe Research Pipeline:** Executed comprehensive out-of-time Elo research across regular season datasets without modifying frozen v1.4 production models.
-* **Clean Provenance:** Retains `research_execution_git_sha` (`b08a0168237ea4a26f93ae9de30626901a937e60`) while removing misleading parent-commit SHA metadata.
+* **Clean Provenance:** Retains `research_execution_git_sha` while removing misleading parent-commit SHA metadata.
 * **Production Isolation:** Confirmed that dynamic Elo features remain research-only unless explicitly promoted in a future release.
 
 ### 6. Stage 7: Release Qualification & Operational Hardening
@@ -54,8 +52,8 @@ PuckLens v1.5.0 introduces major architectural enhancements to data processing, 
 
 ## Automated Test & CI Verification
 
-* **Local Pytest Suite:** **272 PASSED, 0 FAILED, 3 WARNINGS** (44.47s)
-* **GitHub Actions CI:** Green pass on candidate SHA (`bf505cbcad7b2865e15c11ae78babb17462b8af8`, workflow run #35805809243).
+* **Local Pytest Suite:** All test cases passing cleanly.
+* **GitHub Actions CI:** Successful workflow completion required on exact release candidate SHA.
 
 ---
 
@@ -68,7 +66,7 @@ PuckLens v1.5.0 introduces major architectural enhancements to data processing, 
 - [x] Multi-tier presentation modes verified with value invariance.
 - [x] Frozen model artifact hashes verified via SHA-256 contracts.
 - [x] Operational security fail-closed defaults enforced.
-- [x] Full pytest suite (272 tests) passing cleanly.
+- [x] Full pytest suite passing cleanly.
 - [ ] Manual Visual QA: **MANUAL_VERIFICATION_PENDING** (automated route rendering passed; manual browser inspection required across viewports prior to deployment).
 
-**PuckLens v1.5.0 has passed all 10 automated release qualification gates. Manual visual QA remains pending final browser verification before production deployment.**
+**PuckLens v1.5.0 has passed all automated release qualification checks. Manual visual QA remains pending final browser verification before production deployment.**

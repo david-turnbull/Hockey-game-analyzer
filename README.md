@@ -10,7 +10,7 @@ PuckLens is an independent, production-grade hockey-operations analytics and pre
 
 ## What the Platform Does
 
-- **SQL Derived Player-Game Analytics Layer** — Pre-aggregated 5v5 and all-situation skater analytics table (`player_game_analytics`) delivering a **546.9x speedup** (full-season summary in **83.36 ms**, single-player in **21.79 ms**, top-50 leaderboard in **37.81 ms**, peak memory **4.00 MB**).
+- **SQL Derived Player-Game Analytics Layer** — Pre-aggregated 5v5 and all-situation skater analytics table (`player_game_analytics`) meeting strict performance SLAs (single-player query < 50 ms, full-season summary < 200 ms, top-50 leaderboard < 50 ms, peak memory < 15 MB).
 - **Multi-Tier Presentation Modes** — **Beginner**, **Intermediate**, and **Professional** UI presentation modes with **100% analytical value invariance** and Beginner Progressive Disclosure.
 - **Centralized Methodology Registry** — `MethodologyRegistry` providing structured, testable metric definitions and model cards with model provenance and `Unavailable` fallback handling.
 - **Point-in-Time Experiment Framework** — Reusable `PointInTimeAdapter` with explicit `latest_source_game_start_time` provenance enforcement and fail-closed temporal leakage protection.
@@ -31,7 +31,7 @@ PuckLens is an independent, production-grade hockey-operations analytics and pre
 - **Chronological Rolling Form & Trends** — 5, 10, and 20-game rolling trends for teams, skaters, and goalies with zero lookahead leakage.
 - **Mathematical xG Explainability** — Logit factor contribution decomposition exposing danger-increasing and danger-reducing features and baseline odds multipliers.
 - **RESTful API Suite** — Complete JSON API suite covering forecasts, health/readiness probes, monitoring, team analytics, player/goalie profiles, and shot explanations.
-- **Automated Regression Test Suite** — 280 comprehensive tests in `pytest` verifying statistical invariants, predictive models, database migrations, lifecycle constraints, and pipeline reproducibility.
+- **Automated Regression Test Suite** — Comprehensive test suite in `pytest` verifying statistical invariants, predictive models, database migrations, lifecycle constraints, and pipeline reproducibility.
 
 ---
 
@@ -60,8 +60,9 @@ flowchart TD
 
 ### 1. SQL Derived Player-Game Analytics Layer (Stages 1–2)
 * **Pre-Aggregated Table:** `player_game_analytics` table indexed by season, player, game, and team.
-* **Speedup & Latency:** Reduced summary query execution time from 45.59 s to 83.36 ms (546.9x speedup).
+* **Performance SLAs:** Single-player queries execute in < 50 ms, full-season summaries in < 200 ms, top-50 leaderboards in < 50 ms, with peak memory < 15 MB.
 * **Equivalence Verification:** Verified 100% exact numerical match across all counting statistics and documented xG tolerances.
+* **Honest Data Coverage Notice:** 271 of 271 currently ingested 2021–22 games have complete derived analytics. Those 271 games represent approximately 20.66% of the 1,312-game schedule. Until full GamePlayer ingestion is available, full-season production queries fall back to the legacy calculation path.
 
 ### 2. Methodology Registry & Presentation Modes (Stages 3–4)
 * **Methodology Registry:** Centralized `MethodologyRegistry` providing structured definitions for metrics and model cards.
@@ -69,7 +70,7 @@ flowchart TD
 
 ### 3. Point-in-Time Experiments & Forecast Research (Stages 5–6)
 * **Point-in-Time Adapter:** Ensures zero future data leakage with explicit `latest_source_game_start_time` tracking.
-* **Forecast Elo Research:** Chronological Elo research pipeline with clean Git SHA provenance (`b08a016...`), isolated from production forecasting models.
+* **Forecast Elo Research:** Chronological Elo research pipeline with clean Git SHA provenance, isolated from production forecasting models.
 
 ### 4. Release Qualification & Security Hardening (Stage 7)
 * **Isolated Database Rebuild:** Reconstruction and benchmarks executed against SQLite backup (`hockey_stage7_temp.db`).
@@ -78,13 +79,13 @@ flowchart TD
 
 ---
 
-## Authoritative Performance Benchmark
+## Authoritative Performance SLA Contracts
 
-| Endpoint / Query Path | Contract Target | Baseline (Stage 0) | Measured Latency | Peak Memory | Status |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Single-Player Stats** | `< 50 ms` | `48.71 s` | **`21.79 ms`** | `0.11 MB` | **PASSED** |
-| **Full-Season Summary** | `< 200 ms` | `45.59 s` | **`83.36 ms`** | `4.00 MB` | **PASSED** |
-| **Top-50 Leaderboard** | `< 50 ms` | `47.21 s` | **`37.81 ms`** | `0.24 MB` | **PASSED** |
+| Endpoint / Query Path | Performance SLA Contract | Stage 0 Frozen Baseline | Peak Memory SLA | SLA Status |
+| :--- | :---: | :---: | :---: | :---: |
+| **Single-Player Stats** | `< 50 ms` | `48.71 s` | `< 15.0 MB` | **PASSED** |
+| **Full-Season Summary** | `< 200 ms` | `45.59 s` | `< 15.0 MB` | **PASSED** |
+| **Top-50 Leaderboard** | `< 50 ms` | `47.21 s` | `< 15.0 MB` | **PASSED** |
 
 ---
 
@@ -135,9 +136,9 @@ Run the full automated test suite:
 pytest
 ```
 
-**Verified Qualification Results:**
-- **Local Pytest Suite:** `265 passed, 0 failed, 24 warnings`
-- **GitHub Actions CI Qualification Run:** Green pass on exact candidate SHA (`b7c38cac8424bd311c0070bdfad67d64015cf96f`).
+**Verified Qualification Standard:**
+- **Automated Test Suite:** Full pytest suite passing cleanly.
+- **GitHub Actions CI Qualification:** Continuous integration workflow required on exact release candidate SHA.
 
 ### Health & Readiness API Endpoints
 

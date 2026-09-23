@@ -343,3 +343,67 @@ def test_partial_season_fallback_to_legacy(app, db, stage1_test_dataset):
     public_skaters_complete = PlayerSeasonService.get_season_skaters_summary(season='20232024')
     pub101_complete = next(s for s in public_skaters_complete if s["player_id"] == 101)
     assert pub101_complete["goals"] == 2
+
+
+def test_derived_subset_integrity_vs_full_season_readiness(app, db, stage1_test_dataset):
+    """
+    Component 3A Test:
+    Verifies that is_derived_complete_for_ingested_games returns True when all ingested games are complete,
+    while is_derived_ready_for_full_season_queries returns False when only a subset of schedule games are ingested.
+    """
+    from app.services.player_game_analytics_audit import PlayerGameAnalyticsAuditService
+
+    # 1. Build derived analytics for Game 1 only
+    PlayerGameAnalyticsBuilder.build_game_analytics(2023020001)
+
+    # Ingested games = 2 (Game 1 and Game 2 exist in GamePlayer), completed schedule games = 2
+    # So with only Game 1 built, subset integrity is False
+    assert PlayerGameAnalyticsAuditService.is_derived_complete_for_ingested_games('20232024') is False
+    assert PlayerGameAnalyticsAuditService.is_derived_ready_for_full_season_queries('20232024') is False
+
+    # Build Game 2 as well
+    PlayerGameAnalyticsBuilder.build_game_analytics(2023020002)
+
+    # Now both ingested games are built
+    assert PlayerGameAnalyticsAuditService.is_derived_complete_for_ingested_games('20232024') is True
+    assert PlayerGameAnalyticsAuditService.is_derived_ready_for_full_season_queries('20232024') is True
+
+    # Now simulate extra schedule games that are NOT in GamePlayer (partial season ingestion)
+    g3 = Game(game_id=2023020003, season='20232024', game_date=date(2023, 10, 16), game_type='R', home_team_id=1, away_team_id=2, home_score=1, away_score=0, nhl_game_state='FINAL')
+    db.session.add(g3)
+    db.session.commit()
+
+    # Ingested games (2) != Completed schedule games (3)
+    # Subset integrity should be True (2/2 ingested games are derived complete)
+    assert PlayerGameAnalyticsAuditService.is_derived_complete_for_ingested_games('20232024') is True
+    # Full-season readiness MUST be False
+    assert PlayerGameAnalyticsAuditService.is_derived_ready_for_full_season_queries('20232024') is False
+
+
+def test_audit_set_audit_integrity_checks(app, db, stage1_test_dataset):
+    """
+    Tests detection of missing tuples, orphaned tuples, and team mismatches in audit_game_analytics.
+    """
+    from app.services.player_game_analytics_audit import PlayerGameAnalyticsAuditService
+
+    PlayerGameAnalyticsBuilder.build_game_analytics(2023020001)
+    PlayerGameAnalyticsBuilder.build_game_analytics(2023020002)
+
+    # Introduce an orphaned tuple (derived row for player not in GamePlayer)
+    p999 = Player(player_id=999, first_name='Extra', last_name='Player', position='C')
+    db.session.add(p999)
+    db.session.commit()
+    orphaned_pga = PlayerGameAnalytics(
+        game_id=2023020001,
+        player_id=999,
+        team_id=1,
+        season='20232024',
+        position='C'
+    )
+    db.session.add(orphaned_pga)
+    db.session.commit()
+
+    audit = PlayerGameAnalyticsAuditService.audit_game_analytics('20232024')
+    assert audit["set_audit"]["orphaned_tuples"] >= 1
+    assert PlayerGameAnalyticsAuditService.is_derived_complete_for_ingested_games('20232024') is False
+

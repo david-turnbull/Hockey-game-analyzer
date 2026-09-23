@@ -369,6 +369,11 @@ class Stage7ReleaseQualificationOrchestrator:
         if gate_state.get("execution_git_sha") != self.git_sha:
             return False
 
+        # For Gate 10, evidence is valid ONLY if stored status is PASSED (exact-SHA CI passed)
+        if gate_id == "gate10":
+            if gate_state.get("status") != "PASSED":
+                return False
+
         # For DB-dependent gates (1, 2, 3), check DB fingerprint
         if gate_id in ("gate1", "gate2", "gate3"):
             cur_fp = get_db_fingerprint(self.temp_db).get("combined_digest")
@@ -674,41 +679,83 @@ class Stage7ReleaseQualificationOrchestrator:
         }
 
     def run_gate9(self) -> Dict[str, Any]:
-        """Gate 9: Release artifacts and documentation."""
+        """Gate 9: Release artifacts and documentation content validation."""
         print("\n==================================================")
-        print(" GATE 9: Release Artifacts & Documentation")
+        print(" GATE 9: Release Artifacts & Documentation Content Validation")
         print("==================================================")
 
         rel_notes_path = "docs/release_notes_v1.5.0.md"
         readme_path = "README.md"
+        baseline_path = "docs/v1.5/stage0_baseline.md"
 
         has_rel_notes = os.path.exists(rel_notes_path)
         has_readme = os.path.exists(readme_path)
+        has_baseline = os.path.exists(baseline_path)
+
+        if not (has_rel_notes and has_readme and has_baseline):
+            return {
+                "status": "FAILED",
+                "error": "Required documentation files missing.",
+                "files_exist": {
+                    "docs/release_notes_v1.5.0.md": has_rel_notes,
+                    "README.md": has_readme,
+                    "docs/v1.5/stage0_baseline.md": has_baseline
+                }
+            }
+
+        # Inspect documentation content
+        with open(readme_path, "r", encoding="utf-8") as f:
+            readme_text = f.read()
+
+        with open(rel_notes_path, "r", encoding="utf-8") as f:
+            rel_notes_text = f.read()
+
+        validation_checks = {
+            "readme_contract_slas": ("< 50 ms" in readme_text and "< 200 ms" in readme_text and ("< 15 MB" in readme_text or "< 15.0 MB" in readme_text)),
+            "readme_coverage_distinction": ("271" in readme_text and ("20.66%" in readme_text or "legacy calculation path" in readme_text)),
+            "no_stale_100_percent_season_claim": ("100% season coverage" not in readme_text.lower() and "100% full-season coverage" not in readme_text.lower()),
+            "release_notes_manual_qa_pending": ("MANUAL_VERIFICATION_PENDING" in rel_notes_text or "Manual QA Pending" in rel_notes_text),
+            "release_notes_v15_section": ("v1.5.0" in rel_notes_text)
+        }
+
+        all_content_passed = all(validation_checks.values())
 
         return {
-            "status": "PASSED" if (has_rel_notes and has_readme) else "FAILED",
+            "status": "PASSED" if all_content_passed else "FAILED",
             "artifacts_created": {
                 "reports/v1.5/stage7_release_qualification.json": True,
                 "reports/v1.5/stage7_release_qualification.md": True,
                 "docs/release_notes_v1.5.0.md": has_rel_notes,
-                "README.md": has_readme
-            }
+                "README.md": has_readme,
+                "docs/v1.5/stage0_baseline.md": has_baseline
+            },
+            "content_validation": validation_checks
         }
 
     def run_gate10(self) -> Dict[str, Any]:
-        """Gate 10: Pytest suite & GitHub Actions CI."""
+        """Gate 10: Pytest suite & GitHub Actions CI (fail closed)."""
         print("\n==================================================")
         print(" GATE 10: Pytest Suite & GitHub Actions CI")
         print("==================================================")
 
         res = subprocess.run([sys.executable, "-m", "pytest"], capture_output=True, text=True)
-        passed = (res.returncode == 0)
+        pytest_passed = (res.returncode == 0)
 
         last_line = res.stdout.strip().split("\n")[-1] if res.stdout else ""
         ci_status = check_exact_commit_github_ci_status(self.git_sha)
 
+        if not pytest_passed:
+            gate_status = "FAILED"
+        elif ci_status == "PASSED":
+            gate_status = "PASSED"
+        elif ci_status == "FAILED":
+            gate_status = "FAILED"
+        else:
+            gate_status = "CI_PENDING"
+
         return {
-            "status": "PASSED" if passed else "FAILED",
+            "status": gate_status,
+            "local_pytest_passed": pytest_passed,
             "local_pytest_summary": last_line,
             "exact_head_git_sha": self.git_sha,
             "github_actions_ci_status": ci_status
@@ -817,7 +864,8 @@ class Stage7ReleaseQualificationOrchestrator:
 
         all_gates_present = all(g in self.results for g in self.GATES)
         any_failed = any(r.get("status") == "FAILED" for r in self.results.values())
-        any_pending = any(r.get("status") == "MANUAL_VERIFICATION_PENDING" for r in self.results.values())
+        gate10_status = self.results.get("gate10", {}).get("status")
+        gate8_status = self.results.get("gate8", {}).get("status")
 
         # Check if source database was mutated during qualification
         current_prod_fp = get_db_fingerprint(self.prod_db)
@@ -829,7 +877,9 @@ class Stage7ReleaseQualificationOrchestrator:
             overall_status = "PARTIAL"
         elif any_failed:
             overall_status = "FAILED"
-        elif any_pending:
+        elif gate10_status == "CI_PENDING":
+            overall_status = "AUTOMATED LOCAL GATES PASSED (CI PENDING)"
+        elif gate8_status == "MANUAL_VERIFICATION_PENDING" or any(r.get("status") == "MANUAL_VERIFICATION_PENDING" for r in self.results.values()):
             overall_status = "AUTOMATED GATES PASSED (MANUAL QA PENDING)"
         else:
             overall_status = "QUALIFIED"

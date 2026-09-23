@@ -1,6 +1,6 @@
 {
   "season": "20212022",
-  "timestamp_utc": "2026-09-23T02:22:24.298949+00:00",
+  "timestamp_utc": "2026-09-23T16:46:10.702555+00:00",
   "coverage_audit": {
     "total_game_schedule_rows": 1312,
     "ingested_roster_games": 271,
@@ -17,24 +17,113 @@
     "peak_memory_mb": 464.0
   },
   "current_legacy_rerun_ms": {
-    "full_summary_ms": 25729.42,
+    "full_summary_ms": 24375.09,
     "single_player_ms": "not re-run",
     "top50_board_ms": "not re-run"
   },
+  "benchmarks": {
+    "full_summary": {
+      "raw_ms": [
+        71.79,
+        65.92,
+        168.64,
+        63.7,
+        151.93,
+        79.93,
+        58.84,
+        156.86,
+        79.4,
+        173.81,
+        64.35,
+        67.9,
+        174.78,
+        72.19,
+        160.7,
+        72.22,
+        70.05,
+        149.94,
+        63.18,
+        155.5
+      ],
+      "min_ms": 58.84,
+      "median_ms": 75.81,
+      "p95_ms": 174.73,
+      "max_ms": 174.78
+    },
+    "single_player": {
+      "raw_ms": [
+        0.0,
+        0.0,
+        8.93,
+        0.0,
+        0.0,
+        7.76,
+        0.0,
+        0.0,
+        0.0,
+        10.04,
+        2.01,
+        2.01,
+        2.01,
+        0.0,
+        0.0,
+        7.94,
+        2.01,
+        2.01,
+        2.01,
+        2.01
+      ],
+      "min_ms": 0.0,
+      "median_ms": 2.01,
+      "p95_ms": 9.98,
+      "max_ms": 10.04
+    },
+    "top50_board": {
+      "raw_ms": [
+        11.87,
+        32.13,
+        16.02,
+        26.16,
+        5.76,
+        31.8,
+        15.85,
+        21.74,
+        25.88,
+        23.83,
+        23.72,
+        25.43,
+        22.01,
+        31.18,
+        17.17,
+        14.15,
+        31.83,
+        15.74,
+        23.8,
+        14.71
+      ],
+      "min_ms": 5.76,
+      "median_ms": 22.87,
+      "p95_ms": 32.11,
+      "max_ms": 32.13
+    }
+  },
   "latencies_ms": {
-    "derived_full_summary_ms": 188.92,
-    "derived_single_player_ms": 44.23,
-    "derived_top50_board_ms": 47.3,
-    "speedup_vs_stage0_baseline": 241.3
+    "derived_full_summary_ms": 75.81,
+    "derived_single_player_ms": 2.01,
+    "derived_top50_board_ms": 22.87,
+    "derived_full_summary_p95_ms": 174.73,
+    "derived_single_player_p95_ms": 9.98,
+    "derived_top50_board_p95_ms": 32.11,
+    "speedup_vs_stage0_baseline": 601.4
   },
   "query_counts": {
-    "derived_full_summary_queries": 9,
-    "derived_single_player_queries": 8,
-    "derived_top50_board_queries": 9
+    "derived_full_summary_queries": 4,
+    "derived_single_player_queries": 3,
+    "derived_top50_board_queries": 4
   },
   "memory_mb": {
-    "full_summary_peak_mb": 3.61,
-    "single_player_peak_mb": 0.04,
+    "full_summary_peak_mb": 4.0,
+    "single_player_peak_mb": 0.03,
     "top50_board_peak_mb": 0.23
   },
   "equivalence_audit": {

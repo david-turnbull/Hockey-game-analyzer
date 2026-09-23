@@ -164,3 +164,9 @@ Thumbs.db
 *.db-journal
 
 *.pdf 
+
+# Stage 7 Runtime Qualification Reports
+reports/v1.5/.qualification_state.json
+reports/v1.5/stage7_release_qualification.json
+reports/v1.5/stage7_release_qualification.md
+hockey_stage7_temp.db
