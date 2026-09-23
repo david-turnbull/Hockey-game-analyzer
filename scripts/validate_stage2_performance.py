@@ -102,18 +102,23 @@ def run_performance_qualification(season: str = "20212022") -> int:
 
         # 2. Benchmark Full-Season Summary
         print("\n[Step 2] Benchmarking Full-Season Skater Summary (3 warm-up, 20 recorded iterations)...")
+        use_derived = PlayerGameAnalyticsAuditService.is_derived_complete_for_ingested_games(season)
+        summary_fn = (lambda: PlayerSeasonService._get_season_skaters_summary_derived(season=season, min_gp=0)) if use_derived else (lambda: PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0))
+        single_fn = (lambda pid: PlayerSeasonService._get_skater_season_stats_derived(pid, season=season)) if use_derived else (lambda pid: PlayerSeasonService.get_skater_season_stats(pid, season=season))
+        board_fn = (lambda: PlayerSeasonService._get_skater_leaderboards_derived(season=season, sort_by="points", limit=50)) if use_derived else (lambda: PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50))
+
         query_count = 0
-        summary_stats = benchmark_query(lambda: PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0), warmups=3, iterations=20)
-        summary_res = PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0)
+        summary_stats = benchmark_query(summary_fn, warmups=3, iterations=20)
+        summary_res = summary_fn()
         summary_ms = summary_stats["median_ms"]
 
         # Measure query count on single run
         query_count = 0
-        _ = PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0)
+        _ = summary_fn()
         summary_queries = query_count
 
         tracemalloc.start()
-        _ = PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0)
+        _ = summary_fn()
         _, peak_summary_mem = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
@@ -127,15 +132,15 @@ def run_performance_qualification(season: str = "20212022") -> int:
         target_pid = summary_res[0]["player_id"]
         target_name = summary_res[0]["name"]
 
-        single_stats = benchmark_query(lambda: PlayerSeasonService.get_skater_season_stats(target_pid, season=season), warmups=3, iterations=20)
+        single_stats = benchmark_query(lambda: single_fn(target_pid), warmups=3, iterations=20)
         single_ms = single_stats["median_ms"]
 
         query_count = 0
-        _ = PlayerSeasonService.get_skater_season_stats(target_pid, season=season)
+        _ = single_fn(target_pid)
         single_queries = query_count
 
         tracemalloc.start()
-        _ = PlayerSeasonService.get_skater_season_stats(target_pid, season=season)
+        _ = single_fn(target_pid)
         _, peak_single_mem = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
@@ -145,16 +150,16 @@ def run_performance_qualification(season: str = "20212022") -> int:
 
         # 4. Benchmark Bounded Top-50 Leaderboard
         print("\n[Step 4] Benchmarking Bounded Top-50 Leaderboard (3 warm-up, 20 recorded iterations)...")
-        board_stats = benchmark_query(lambda: PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50), warmups=3, iterations=20)
-        board_res = PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50)
+        board_stats = benchmark_query(board_fn, warmups=3, iterations=20)
+        board_res = board_fn()
         board_ms = board_stats["median_ms"]
 
         query_count = 0
-        _ = PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50)
+        _ = board_fn()
         board_queries = query_count
 
         tracemalloc.start()
-        _ = PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50)
+        _ = board_fn()
         _, peak_board_mem = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 

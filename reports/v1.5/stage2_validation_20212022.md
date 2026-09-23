@@ -1,6 +1,6 @@
 # Stage 2 Validation Report: Season 20212022
 
-> **Generated:** `2026-09-23T02:21:54.231119+00:00`  
+> **Generated:** `2026-09-23T16:02:04.714257+00:00`  
 > **Status:** `PASSED`
 
 ## 1. Audit & Backfill Completeness
@@ -13,8 +13,8 @@
 ## 2. Performance Benchmark
 | Engine | Execution Time | Skaters Loaded | Speedup |
 | :--- | :--- | :--- | :--- |
-| **Legacy `_get_season_skaters_summary_legacy`** | `24.946 s` | `782` | Baseline (1.0x) |
-| **Derived `_get_season_skaters_summary_derived`** | `0.0817 s` | `782` | **305.2x Faster** |
+| **Legacy `_get_season_skaters_summary_legacy`** | `23.963 s` | `782` | Baseline (1.0x) |
+| **Derived `_get_season_skaters_summary_derived`** | `0.0840 s` | `782` | **285.4x Faster** |
 
 ## 3. Player Equivalence Summary
 * **Total Players Evaluated:** `782`
