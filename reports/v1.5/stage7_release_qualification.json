@@ -1,8 +1,8 @@
 {
   "target_release": "v1.5.0",
-  "candidate_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-  "timestamp_utc": "2026-09-23T01:16:46.370145+00:00",
-  "overall_qualification_status": "FAILED",
+  "candidate_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+  "timestamp_utc": "2026-09-23T01:27:40.143868+00:00",
+  "overall_qualification_status": "QUALIFIED (AUTOMATED GATES PASSED, MANUAL QA PENDING)",
   "environment_runtime": {
     "python_version": "3.12.10",
     "platform": "Windows-11-10.0.26200-SP0",
@@ -19,9 +19,9 @@
       "exists": true,
       "path": "C:\\Users\\david\\hockey\\hockey_stage7_temp.db",
       "size_bytes": 1484906496,
-      "mtime_iso": "2026-09-23T01:14:04.567798+00:00"
+      "mtime_iso": "2026-09-23T01:25:02.570453+00:00"
     },
-    "backup_timestamp": "2026-09-23T01:14:05.357504+00:00"
+    "backup_timestamp": "2026-09-23T01:25:03.164422+00:00"
   },
   "gate_results": {
     "gate0": {
@@ -36,8 +36,8 @@
       "checklist_initialized": true,
       "gate_id": "gate0",
       "gate_name": "Release Audit & Baseline Checklist",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:13:38.051859+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:24:50.243238+00:00"
     },
     "gate1": {
       "status": "PASSED",
@@ -67,8 +67,8 @@
       },
       "gate_id": "gate1",
       "gate_name": "Isolated Data Layer Re-Qualification",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:14:27.922229+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:25:22.506079+00:00"
     },
     "gate2": {
       "status": "PASSED",
@@ -80,7 +80,7 @@
       },
       "validation_report": {
         "season": "20212022",
-        "timestamp_utc": "2026-09-23T01:14:55.625195+00:00",
+        "timestamp_utc": "2026-09-23T01:25:50.697258+00:00",
         "audit": {
           "total_games": 271,
           "complete_games": 271,
@@ -89,9 +89,9 @@
           "is_100_percent_complete": true
         },
         "benchmark": {
-          "legacy_seconds": 27.1959,
-          "derived_seconds": 0.1789,
-          "speedup_factor": 152.0,
+          "legacy_seconds": 27.7447,
+          "derived_seconds": 0.1644,
+          "speedup_factor": 168.7,
           "legacy_skaters_count": 782,
           "derived_skaters_count": 782
         },
@@ -104,8 +104,8 @@
       },
       "gate_id": "gate2",
       "gate_name": "Analytical Equivalence Re-Validation",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:14:55.656181+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:25:50.708916+00:00"
     },
     "gate3": {
       "status": "PASSED",
@@ -117,7 +117,7 @@
       },
       "performance_report": {
         "season": "20212022",
-        "timestamp_utc": "2026-09-23T01:15:27.040359+00:00",
+        "timestamp_utc": "2026-09-23T01:26:18.231560+00:00",
         "coverage_audit": {
           "total_game_schedule_rows": 1312,
           "ingested_roster_games": 271,
@@ -134,15 +134,15 @@
           "peak_memory_mb": 464.0
         },
         "current_legacy_rerun_ms": {
-          "full_summary_ms": 29686.59,
+          "full_summary_ms": 25865.6,
           "single_player_ms": "not re-run",
           "top50_board_ms": "not re-run"
         },
         "latencies_ms": {
-          "derived_full_summary_ms": 83.36,
-          "derived_single_player_ms": 21.79,
-          "derived_top50_board_ms": 37.81,
-          "speedup_vs_stage0_baseline": 546.9
+          "derived_full_summary_ms": 82.21,
+          "derived_single_player_ms": 15.91,
+          "derived_top50_board_ms": 41.55,
+          "speedup_vs_stage0_baseline": 554.6
         },
         "query_counts": {
           "derived_full_summary_queries": 8,
@@ -215,12 +215,12 @@
       },
       "gate_id": "gate3",
       "gate_name": "Performance & Memory SLAs",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:15:27.058258+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:26:18.247682+00:00"
     },
     "gate4": {
       "status": "PASSED",
-      "pytest_output": "============================= test session starts =============================\nplatform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0\nrootdir: C:\\Users\\david\\hockey\nplugins: cov-7.1.0\ncollected 7 items / 2 deselected / 5 selected\n\ntests\\test_stage7_release_qualification.py .....                         [100%]\n\n======================= 5 passed, 2 deselected in 2.35s =======================\n",
+      "pytest_output": "============================= test session starts =============================\nplatform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0\nrootdir: C:\\Users\\david\\hockey\nplugins: cov-7.1.0\ncollected 7 items / 2 deselected / 5 selected\n\ntests\\test_stage7_release_qualification.py .....                         [100%]\n\n======================= 5 passed, 2 deselected in 2.46s =======================\n",
       "verified_behaviors": [
         "Analytical value invariance across Beginner, Intermediate, and Professional modes",
         "Progressive Disclosure in Beginner mode",
@@ -229,11 +229,11 @@
       ],
       "gate_id": "gate4",
       "gate_name": "Methodology & Presentation Modes",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:15:31.163497+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:26:22.489906+00:00"
     },
     "gate5": {
-      "status": "FAILED",
+      "status": "PASSED",
       "model_hashes": {
         "pucklens-win-v1.4.0.pkl": "63cf3cec7d11b38004c590503c89b0a686ae4a9a350fd497bc93087e71bf58f9",
         "score_candidate_params_v1.4.0.json": "a6c6c20e7bdbe8f11a518ac8d7832ce65947ccba7ba0b2d15d6db87a5efbd701"
@@ -241,8 +241,8 @@
       "elo_research_status": "Stage 6 Elo outputs verified research-only; production models unchanged",
       "gate_id": "gate5",
       "gate_name": "Frozen Production Forecasting Models",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:15:36.326854+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:26:31.342750+00:00"
     },
     "gate6": {
       "status": "PASSED",
@@ -253,8 +253,8 @@
       },
       "gate_id": "gate6",
       "gate_name": "Stage 5-6 Research Integrity",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:15:46.187147+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:26:41.786195+00:00"
     },
     "gate7": {
       "status": "PASSED",
@@ -266,8 +266,8 @@
       },
       "gate_id": "gate7",
       "gate_name": "Operational, Security & Migration",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:15:50.605834+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:26:46.627670+00:00"
     },
     "gate8": {
       "status": "MANUAL_VERIFICATION_PENDING",
@@ -284,31 +284,31 @@
       "manual_instructions": "To perform manual visual QA, start the dev server (`python run.py`) and inspect the routes listed in the checklist across desktop (1920x1080) and mobile (375x812) viewports using ?mode=beginner, ?mode=intermediate, and ?mode=professional.",
       "gate_id": "gate8",
       "gate_name": "Manual Visual QA Checklist",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:15:57.148642+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:26:52.872998+00:00"
     },
     "gate9": {
-      "status": "FAILED",
+      "status": "PASSED",
       "artifacts_created": {
         "reports/v1.5/stage7_release_qualification.json": true,
         "reports/v1.5/stage7_release_qualification.md": true,
-        "docs/release_notes_v1.5.0.md": false,
+        "docs/release_notes_v1.5.0.md": true,
         "README.md": true
       },
       "gate_id": "gate9",
       "gate_name": "Release Artifacts & Documentation",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:15:57.148642+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:26:52.872998+00:00"
     },
     "gate10": {
       "status": "PASSED",
-      "local_pytest_summary": "====================== 272 passed, 3 warnings in 46.64s =======================",
-      "exact_head_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
+      "local_pytest_summary": "====================== 272 passed, 3 warnings in 44.47s =======================",
+      "exact_head_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
       "github_actions_ci_status": "TRIGGERED ON PUSH / VERIFIED IN ORCHESTRATOR SUMMARY",
       "gate_id": "gate10",
       "gate_name": "Pytest Suite & GitHub Actions CI",
-      "execution_git_sha": "b7c38cac8424bd311c0070bdfad67d64015cf96f",
-      "execution_timestamp_utc": "2026-09-23T01:16:46.370145+00:00"
+      "execution_git_sha": "bf505cbcad7b2865e15c11ae78babb17462b8af8",
+      "execution_timestamp_utc": "2026-09-23T01:27:40.143868+00:00"
     }
   }
 }

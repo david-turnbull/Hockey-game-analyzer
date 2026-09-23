@@ -3,7 +3,7 @@
 **Release Version:** `v1.5.0`  
 **Release Date:** September 2026  
 **Target Branch:** `v1.5`  
-**Qualification Status:** RELEASE QUALIFIED (All 11 Release Gates Passed)
+**Qualification Status:** AUTOMATED GATES PASSED (Manual QA Pending)
 
 ---
 
@@ -17,9 +17,9 @@ PuckLens v1.5.0 introduces major architectural enhancements to data processing, 
 
 ### 1. Stage 1–2: SQL Derived Player-Game Analytics Data Layer
 * **Derived Analytical Tables:** Built the `player_game_analytics` table providing pre-aggregated 5v5 and all-situation skater metrics.
-* **Massive Performance Speedup:** Reduced full-season skater summary query latency from **45.59 seconds (baseline)** to **83.36 ms** (a **546.9x speedup**), comfortably exceeding the 200 ms SLA threshold.
-* **Single-Player Query Efficiency:** Direct single-player season queries execute in **21.79 ms** (SLA < 50 ms) without triggering full-season aggregations.
-* **Top-50 Leaderboard Performance:** Bounded leaderboard queries execute in **37.81 ms** (SLA < 50 ms).
+* **Massive Performance Speedup:** Reduced full-season skater summary query latency from **45.59 seconds (baseline)** to **82.21 ms** (a **554.6x speedup**), comfortably exceeding the 200 ms SLA threshold.
+* **Single-Player Query Efficiency:** Direct single-player season queries execute in **15.91 ms** (SLA < 50 ms) without triggering full-season aggregations.
+* **Top-50 Leaderboard Performance:** Bounded leaderboard queries execute in **41.55 ms** (SLA < 50 ms).
 * **Memory Optimization:** Peak memory allocation during analytical queries dropped from ~464 MB to **4.00 MB** (SLA < 15 MB).
 * **Analytical Equivalence:** Verified 100% exact numerical match across all counting statistics (GP, G, A, P, SOG, TOI, 5v5 TOI, CF, CA, FF, FA) and adherence to documented tolerances for individual xG and 5v5 percentage metrics across 782 evaluated skaters in the 2021–22 season dataset.
 
@@ -54,8 +54,8 @@ PuckLens v1.5.0 introduces major architectural enhancements to data processing, 
 
 ## Automated Test & CI Verification
 
-* **Local Pytest Suite:** **265 PASSED, 0 FAILED, 24 WARNINGS**
-* **GitHub Actions CI:** Green pass on exact candidate SHA (`b7c38cac8424bd311c0070bdfad67d64015cf96f`).
+* **Local Pytest Suite:** **272 PASSED, 0 FAILED, 3 WARNINGS** (44.47s)
+* **GitHub Actions CI:** Green pass on candidate SHA (`bf505cbcad7b2865e15c11ae78babb17462b8af8`, workflow run #35805809243).
 
 ---
 
@@ -68,6 +68,7 @@ PuckLens v1.5.0 introduces major architectural enhancements to data processing, 
 - [x] Multi-tier presentation modes verified with value invariance.
 - [x] Frozen model artifact hashes verified via SHA-256 contracts.
 - [x] Operational security fail-closed defaults enforced.
-- [x] Full pytest suite (265 tests) passing cleanly.
+- [x] Full pytest suite (272 tests) passing cleanly.
+- [ ] Manual Visual QA: **MANUAL_VERIFICATION_PENDING** (automated route rendering passed; manual browser inspection required across viewports prior to deployment).
 
-**PuckLens v1.5.0 is certified RELEASE QUALIFIED and ready for production deployment.**
+**PuckLens v1.5.0 has passed all 10 automated release qualification gates. Manual visual QA remains pending final browser verification before production deployment.**

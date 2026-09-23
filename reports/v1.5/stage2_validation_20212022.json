@@ -1,6 +1,6 @@
 {
   "season": "20212022",
-  "timestamp_utc": "2026-09-23T01:14:55.625195+00:00",
+  "timestamp_utc": "2026-09-23T01:25:50.697258+00:00",
   "audit": {
     "total_games": 271,
     "complete_games": 271,
@@ -9,9 +9,9 @@
     "is_100_percent_complete": true
   },
   "benchmark": {
-    "legacy_seconds": 27.1959,
-    "derived_seconds": 0.1789,
-    "speedup_factor": 152.0,
+    "legacy_seconds": 27.7447,
+    "derived_seconds": 0.1644,
+    "speedup_factor": 168.7,
     "legacy_skaters_count": 782,
     "derived_skaters_count": 782
   },

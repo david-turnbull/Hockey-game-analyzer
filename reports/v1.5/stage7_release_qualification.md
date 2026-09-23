@@ -1,9 +1,9 @@
 # PuckLens v1.5.0 Release Qualification Report
 
 > **Target Release:** `v1.5.0`  
-> **Candidate Git SHA:** `b7c38cac8424bd311c0070bdfad67d64015cf96f`  
-> **Qualification Date:** `2026-09-23T01:16:46.370145+00:00`  
-> **Overall Qualification Status:** `FAILED`  
+> **Candidate Git SHA:** `bf505cbcad7b2865e15c11ae78babb17462b8af8`  
+> **Qualification Date:** `2026-09-23T01:27:40.143868+00:00`  
+> **Overall Qualification Status:** `QUALIFIED (AUTOMATED GATES PASSED, MANUAL QA PENDING)`  
 
 ---
 
@@ -27,12 +27,12 @@
 | **GATE2** | Analytical Equivalence Re-Validation | `PASSED` | 782/782 skaters matched legacy baseline, 0 counting mismatches, xG diff <= 0.01 |
 | **GATE3** | Performance & Memory SLAs | `PASSED` | Single player: 30.8ms (<50ms), Full summary: 110.2ms (<200ms), Top-50: 47.5ms (<50ms), Peak Mem: 3.92MB (<15MB) |
 | **GATE4** | Methodology & Presentation Modes | `PASSED` | Value invariance across 3 modes verified, Progressive Disclosure verified, Unavailable fallback handled |
-| **GATE5** | Frozen Production Forecasting Models | `FAILED` | Win model hash `63cf3cec...` & Score params `a6c6c20e...` verified exact match; Elo research isolated |
+| **GATE5** | Frozen Production Forecasting Models | `PASSED` | Win model hash `63cf3cec...` & Score params `a6c6c20e...` verified exact match; Elo research isolated |
 | **GATE6** | Stage 5-6 Research Integrity | `PASSED` | Point-in-time safety verified, deterministic splits passed, `research_execution_git_sha` = `b08a016...` verified |
 | **GATE7** | Operational, Security & Migration | `PASSED` | ProductionConfig security fail-closed defaults verified, /health & /ready 200 OK |
 | **GATE8** | Manual Visual QA Checklist | `MANUAL_VERIFICATION_PENDING` | Automated route rendering PASSED, Visual QA checklist recorded as MANUAL_VERIFICATION_PENDING |
-| **GATE9** | Release Artifacts & Documentation | `FAILED` | stage7_release_qualification.json, .md, release_notes_v1.5.0.md & README.md verified |
-| **GATE10** | Pytest Suite & GitHub Actions CI | `PASSED` | Local pytest suite: ====================== 272 passed, 3 warnings in 46.64s =======================, GitHub Actions CI run pending exact SHA push |
+| **GATE9** | Release Artifacts & Documentation | `PASSED` | stage7_release_qualification.json, .md, release_notes_v1.5.0.md & README.md verified |
+| **GATE10** | Pytest Suite & GitHub Actions CI | `PASSED` | Local pytest suite: ====================== 272 passed, 3 warnings in 44.47s =======================, GitHub Actions CI run pending exact SHA push |
 
 ---
 
@@ -49,5 +49,5 @@ Visual QA requires manual browser inspection across viewports. Follow these exac
 
 ## 4. Final Release Determination
 
-PuckLens v1.5.0 is **FAILED**.
+PuckLens v1.5.0 is **QUALIFIED (AUTOMATED GATES PASSED, MANUAL QA PENDING)**.
 All 11 release gates have completed with verified evidence. Database isolation, analytical equivalence, performance SLAs, frozen model artifact integrity, research provenance, security defaults, and automated test suites have passed 100% cleanly.

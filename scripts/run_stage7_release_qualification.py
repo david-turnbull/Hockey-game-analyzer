@@ -280,7 +280,7 @@ class Stage7ReleaseQualificationOrchestrator:
         )
 
         res_routes = subprocess.run(
-            [sys.executable, "-m", "pytest", "tests/test_game_prediction_routes.py"],
+            [sys.executable, "-m", "pytest", "tests/test_forecast_routes.py"],
             capture_output=True, text=True
         )
 
