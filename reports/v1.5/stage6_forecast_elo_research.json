@@ -2,7 +2,6 @@
   "stage": "Stage 6 \u2014 Forecast Intelligence & Elo Research",
   "evaluated_at": "2026-09-22T01:13:17.810999+00:00",
   "research_execution_git_sha": "b08a0168237ea4a26f93ae9de30626901a937e60",
-  "report_artifact_commit_parent_sha": "68177eb554980b9bdfc6c67ac50186ee2724aaad",
   "production_models_invariance_verified": true,
   "protocol": {
     "development_season": "20212022 (State Initialization)",

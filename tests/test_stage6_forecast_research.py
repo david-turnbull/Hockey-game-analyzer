@@ -401,3 +401,31 @@ def test_literal_production_xg_regression_fixtures(app):
 
         xg2 = XGService.predict_shot_xg(distance=55.0, angle=40.0, period=2, period_seconds=900, is_home=0, shot_type="Slap", strength_state="5v5")
         assert xg2.xg == 0.0387
+
+
+def test_stage6_report_provenance_contract():
+    """
+    Verifies that Stage 6 JSON and Markdown reports:
+    1. Retain 'research_execution_git_sha' specifying the code commit used to execute research.
+    2. Do NOT contain the misleading 'report_artifact_commit_parent_sha' or header line.
+    """
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    json_path = os.path.join(project_root, "reports", "v1.5", "stage6_forecast_elo_research.json")
+    md_path = os.path.join(project_root, "reports", "v1.5", "stage6_forecast_elo_research.md")
+
+    assert os.path.exists(json_path), "stage6_forecast_elo_research.json missing"
+    assert os.path.exists(md_path), "stage6_forecast_elo_research.md missing"
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    assert "research_execution_git_sha" in data
+    assert data["research_execution_git_sha"] == "b08a0168237ea4a26f93ae9de30626901a937e60"
+    assert "report_artifact_commit_parent_sha" not in data
+
+    with open(md_path, "r", encoding="utf-8") as f:
+        md_text = f.read()
+
+    assert "**Research Execution Git SHA:** `b08a0168237ea4a26f93ae9de30626901a937e60`" in md_text
+    assert "report_artifact_commit_parent_sha" not in md_text
+    assert "Report Commit Parent SHA" not in md_text

@@ -2,7 +2,6 @@
 
 **Evaluated At:** `2026-09-22T01:13:17.810999+00:00`  
 **Research Execution Git SHA:** `b08a0168237ea4a26f93ae9de30626901a937e60`  
-**Report Commit Parent SHA:** `68177eb554980b9bdfc6c67ac50186ee2724aaad`  
 **Production Artifact Invariance:** Verified (SHA-256 match)
 
 ---

@@ -346,13 +346,11 @@ def main():
         # 1. Verify production artifact invariance
         verify_production_artifact_invariance()
 
-        # Audit Git SHA & Parent SHA
+        # Audit Git SHA
         try:
             git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-            git_parent_sha = subprocess.check_output(["git", "rev-parse", "HEAD~1"], text=True).strip()
         except Exception:
             git_sha = "unknown"
-            git_parent_sha = "unknown"
 
         execution_time = datetime.now(timezone.utc).isoformat()
 
@@ -714,8 +712,8 @@ def main():
             blend_eval=blend_eval_holdout,
             boot_sel=boot_prod_vs_sel_elo,
             boot_blend=boot_prod_vs_blend,
-            base_val_ll=base_exp_res.val_metrics["log_loss"],
-            elo_val_ll=elo_exp_res.val_metrics["log_loss"],
+            base_val_ll=base_exp_res.metrics["log_loss"],
+            elo_val_ll=elo_exp_res.metrics["log_loss"],
             base_test_ll=base_exp_res.test_metrics["log_loss"],
             elo_test_ll=elo_exp_res.test_metrics["log_loss"]
         )
@@ -727,7 +725,6 @@ def main():
             "stage": "Stage 6 — Forecast Intelligence & Elo Research",
             "evaluated_at": execution_time,
             "research_execution_git_sha": git_sha,
-            "report_artifact_commit_parent_sha": git_parent_sha,
             "production_models_invariance_verified": True,
             "protocol": {
                 "development_season": "20212022 (State Initialization)",
@@ -780,16 +777,16 @@ def main():
                 "point_in_time_provenance_method": "PointInTimeAdapter.extract_game_features_with_cutoff",
                 "excluded_unverifiable_games": excluded_provenance_count,
                 "baseline_11_features": {
-                    "validation_metrics_20232024": base_exp_res.val_metrics,
+                    "validation_metrics_20232024": base_exp_res.metrics,
                     "holdout_metrics_20242025": base_exp_res.test_metrics
                 },
                 "augmented_15_features": {
-                    "validation_metrics_20232024": elo_exp_res.val_metrics,
+                    "validation_metrics_20232024": elo_exp_res.metrics,
                     "holdout_metrics_20242025": elo_exp_res.test_metrics
                 },
-                "validation_log_loss_delta": round(base_exp_res.val_metrics["log_loss"] - elo_exp_res.val_metrics["log_loss"], 4),
+                "validation_log_loss_delta": round(base_exp_res.metrics["log_loss"] - elo_exp_res.metrics["log_loss"], 4),
                 "holdout_log_loss_delta": round(base_exp_res.test_metrics["log_loss"] - elo_exp_res.test_metrics["log_loss"], 4),
-                "validation_brier_delta": round(base_exp_res.val_metrics["brier_score"] - elo_exp_res.val_metrics["brier_score"], 4),
+                "validation_brier_delta": round(base_exp_res.metrics["brier_score"] - elo_exp_res.metrics["brier_score"], 4),
                 "holdout_brier_delta": round(base_exp_res.test_metrics["brier_score"] - elo_exp_res.test_metrics["brier_score"], 4)
             },
             "forecast_intelligence_summary": agreement_summary,
@@ -821,7 +818,6 @@ def main():
 
 **Evaluated At:** `{execution_time}`  
 **Research Execution Git SHA:** `{git_sha}`  
-**Report Commit Parent SHA:** `{git_parent_sha}`  
 **Production Artifact Invariance:** Verified (SHA-256 match)
 
 ---
@@ -883,10 +879,10 @@ Controlled experiment using Stage 5 `PointInTimeAdapter` with Logistic Regressio
 
 * **Point-in-Time Provenance:** `PointInTimeAdapter.extract_game_features_with_cutoff` (zero synthetic timestamps).
 * **Baseline Candidate (11 Production Features):**
-  * 2023–24 Validation Log Loss: `{base_exp_res.val_metrics['log_loss']:.4f}`
+  * 2023–24 Validation Log Loss: `{base_exp_res.metrics['log_loss']:.4f}`
   * 2024–25 Holdout Log Loss: `{base_exp_res.test_metrics['log_loss']:.4f}`
 * **Elo-Augmented Candidate (11 Features + 4 Pregame Elo Features):**
-  * 2023–24 Validation Log Loss: `{elo_exp_res.val_metrics['log_loss']:.4f}`
+  * 2023–24 Validation Log Loss: `{elo_exp_res.metrics['log_loss']:.4f}`
   * 2024–25 Holdout Log Loss: `{elo_exp_res.test_metrics['log_loss']:.4f}`
 * **Validation Delta (Validation Log Loss Improvement):** `{report_data['elo_as_feature_research']['validation_log_loss_delta']:+.4f}`
 * **Holdout Delta (Holdout Log Loss Improvement):** `{report_data['elo_as_feature_research']['holdout_log_loss_delta']:+.4f}`
