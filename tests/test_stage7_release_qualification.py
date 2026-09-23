@@ -279,3 +279,120 @@ class TestStage7ReleaseQualification:
             data = json.load(f)
         assert data["overall_qualification_status"] == "PARTIAL"
 
+    def test_gate10_local_pytest_failure(self):
+        """Verifies that Gate 10 returns FAILED when local pytest fails, regardless of GitHub CI status."""
+        orchestrator = Stage7ReleaseQualificationOrchestrator()
+        with patch('subprocess.run') as mock_run, patch('scripts.run_stage7_release_qualification.check_exact_commit_github_ci_status', return_value="PASSED"):
+            mock_res = MagicMock()
+            mock_res.returncode = 1
+            mock_res.stdout = "1 failed, 10 passed"
+            mock_run.return_value = mock_res
+
+            res = orchestrator.run_gate10()
+            assert res["status"] == "FAILED"
+            assert res["local_pytest_passed"] is False
+
+    def test_gate10_github_ci_failure(self):
+        """Verifies that Gate 10 returns FAILED when GitHub CI fails for exact target SHA."""
+        orchestrator = Stage7ReleaseQualificationOrchestrator()
+        with patch('subprocess.run') as mock_run, patch('scripts.run_stage7_release_qualification.check_exact_commit_github_ci_status', return_value="FAILED"):
+            mock_res = MagicMock()
+            mock_res.returncode = 0
+            mock_res.stdout = "10 passed"
+            mock_run.return_value = mock_res
+
+            res = orchestrator.run_gate10()
+            assert res["status"] == "FAILED"
+            assert res["github_actions_ci_status"] == "FAILED"
+
+    def test_gate10_github_ci_pending(self):
+        """Verifies that Gate 10 returns CI_PENDING when GitHub CI is queued/in_progress/unverified."""
+        orchestrator = Stage7ReleaseQualificationOrchestrator()
+        with patch('subprocess.run') as mock_run, patch('scripts.run_stage7_release_qualification.check_exact_commit_github_ci_status', return_value="CI_PENDING"):
+            mock_res = MagicMock()
+            mock_res.returncode = 0
+            mock_res.stdout = "10 passed"
+            mock_run.return_value = mock_res
+
+            res = orchestrator.run_gate10()
+            assert res["status"] == "CI_PENDING"
+            assert res["github_actions_ci_status"] == "CI_PENDING"
+
+    def test_gate10_github_ci_success(self):
+        """Verifies that Gate 10 returns PASSED when local pytest succeeds AND exact-SHA GitHub CI succeeds."""
+        orchestrator = Stage7ReleaseQualificationOrchestrator()
+        with patch('subprocess.run') as mock_run, patch('scripts.run_stage7_release_qualification.check_exact_commit_github_ci_status', return_value="PASSED"):
+            mock_res = MagicMock()
+            mock_res.returncode = 0
+            mock_res.stdout = "10 passed"
+            mock_run.return_value = mock_res
+
+            res = orchestrator.run_gate10()
+            assert res["status"] == "PASSED"
+            assert res["github_actions_ci_status"] == "PASSED"
+
+    def test_gate10_stale_sha_invalidation(self):
+        """Verifies that stored Gate 10 evidence is invalidated if execution_git_sha differs or status is not PASSED."""
+        orchestrator = Stage7ReleaseQualificationOrchestrator()
+        state = {
+            "git_sha": orchestrator.git_sha,
+            "gates": {
+                "gate10": {
+                    "status": "PASSED",
+                    "execution_git_sha": "stale_sha_999"
+                }
+            }
+        }
+
+        # SHA mismatch -> invalid
+        assert orchestrator.is_gate_evidence_valid("gate10", state) is False
+
+        # Status not PASSED (e.g. CI_PENDING) -> invalid
+        state["gates"]["gate10"]["execution_git_sha"] = orchestrator.git_sha
+        state["gates"]["gate10"]["status"] = "CI_PENDING"
+        assert orchestrator.is_gate_evidence_valid("gate10", state) is False
+
+        # SHA matches and status PASSED -> valid
+        state["gates"]["gate10"]["status"] = "PASSED"
+        assert orchestrator.is_gate_evidence_valid("gate10", state) is True
+
+    def test_overall_status_propagation(self, tmp_path):
+        """
+        Verifies overall status logic precedence:
+        - CI pending -> AUTOMATED LOCAL GATES PASSED (CI PENDING)
+        - Manual QA pending (and CI passed) -> AUTOMATED GATES PASSED (MANUAL QA PENDING)
+        - All passed -> QUALIFIED
+        """
+        out_dir = str(tmp_path / "reports_status")
+        orchestrator = Stage7ReleaseQualificationOrchestrator(output_dir=out_dir)
+
+        # Populate all 11 gates with PASSED except Gate 10 (CI_PENDING)
+        for g in orchestrator.GATES:
+            orchestrator.results[g] = {"status": "PASSED", "gate_id": g}
+
+        orchestrator.results["gate10"] = {"status": "CI_PENDING", "gate_id": "gate10"}
+        orchestrator.generate_reports(is_partial_run=False)
+
+        json_path = os.path.join(out_dir, "stage7_release_qualification.json")
+        with open(json_path, "r", encoding="utf-8") as f:
+            d1 = json.load(f)
+        assert d1["overall_qualification_status"] == "AUTOMATED LOCAL GATES PASSED (CI PENDING)"
+
+        # Now set Gate 10 to PASSED and Gate 8 to MANUAL_VERIFICATION_PENDING
+        orchestrator.results["gate10"] = {"status": "PASSED", "gate_id": "gate10"}
+        orchestrator.results["gate8"] = {"status": "MANUAL_VERIFICATION_PENDING", "gate_id": "gate8"}
+        orchestrator.generate_reports(is_partial_run=False)
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            d2 = json.load(f)
+        assert d2["overall_qualification_status"] == "AUTOMATED GATES PASSED (MANUAL QA PENDING)"
+
+        # Now set Gate 8 to PASSED
+        orchestrator.results["gate8"] = {"status": "PASSED", "gate_id": "gate8"}
+        orchestrator.generate_reports(is_partial_run=False)
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            d3 = json.load(f)
+        assert d3["overall_qualification_status"] == "QUALIFIED"
+
+

@@ -64,13 +64,52 @@ def run_performance_qualification(season: str = "20212022") -> int:
 
         event.listen(db.engine, "before_cursor_execute", count_queries)
 
+        import statistics
+
+        def benchmark_query(func, warmups=3, iterations=20) -> Dict[str, Any]:
+            # Warm-up iterations
+            for _ in range(warmups):
+                _ = func()
+
+            timings = []
+            for _ in range(iterations):
+                t_start = time.time()
+                _ = func()
+                t_elapsed = (time.time() - t_start) * 1000.0
+                timings.append(t_elapsed)
+
+            sorted_timings = sorted(timings)
+            min_ms = round(sorted_timings[0], 2)
+            max_ms = round(sorted_timings[-1], 2)
+            median_ms = round(statistics.median(timings), 2)
+
+            # Calculate p95 using statistics.quantiles if available
+            try:
+                # quantiles with n=100 gives percentiles 1..99
+                quantiles = statistics.quantiles(timings, n=100)
+                p95_ms = round(quantiles[94], 2)
+            except Exception:
+                idx = int(round(0.95 * (len(sorted_timings) - 1)))
+                p95_ms = round(sorted_timings[idx], 2)
+
+            return {
+                "raw_ms": [round(t, 2) for t in timings],
+                "min_ms": min_ms,
+                "median_ms": median_ms,
+                "p95_ms": p95_ms,
+                "max_ms": max_ms
+            }
+
         # 2. Benchmark Full-Season Summary
-        print("\n[Step 2] Benchmarking Full-Season Skater Summary...")
-        _ = PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0)
+        print("\n[Step 2] Benchmarking Full-Season Skater Summary (3 warm-up, 20 recorded iterations)...")
         query_count = 0
-        t0 = time.time()
+        summary_stats = benchmark_query(lambda: PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0), warmups=3, iterations=20)
         summary_res = PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0)
-        summary_ms = (time.time() - t0) * 1000.0
+        summary_ms = summary_stats["median_ms"]
+
+        # Measure query count on single run
+        query_count = 0
+        _ = PlayerSeasonService.get_season_skaters_summary(season=season, min_gp=0)
         summary_queries = query_count
 
         tracemalloc.start()
@@ -78,21 +117,21 @@ def run_performance_qualification(season: str = "20212022") -> int:
         _, peak_summary_mem = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
-        print(f"  Full Summary Latency: {summary_ms:.2f} ms")
-        print(f"  Skaters Returned:     {len(summary_res)}")
-        print(f"  SQL Query Count:      {summary_queries}")
-        print(f"  Peak Memory:          {peak_summary_mem / (1024*1024):.2f} MB")
+        print(f"  Full Summary Median: {summary_stats['median_ms']:.2f} ms (min: {summary_stats['min_ms']} ms, p95: {summary_stats['p95_ms']} ms, max: {summary_stats['max_ms']} ms)")
+        print(f"  Skaters Returned:    {len(summary_res)}")
+        print(f"  SQL Query Count:     {summary_queries}")
+        print(f"  Peak Memory:         {peak_summary_mem / (1024*1024):.2f} MB")
 
         # 3. Benchmark Direct Single-Player Query
-        print("\n[Step 3] Benchmarking Direct Single-Player Query...")
+        print("\n[Step 3] Benchmarking Direct Single-Player Query (3 warm-up, 20 recorded iterations)...")
         target_pid = summary_res[0]["player_id"]
         target_name = summary_res[0]["name"]
-        _ = PlayerSeasonService.get_skater_season_stats(target_pid, season=season)
+
+        single_stats = benchmark_query(lambda: PlayerSeasonService.get_skater_season_stats(target_pid, season=season), warmups=3, iterations=20)
+        single_ms = single_stats["median_ms"]
 
         query_count = 0
-        t1 = time.time()
-        single_res = PlayerSeasonService.get_skater_season_stats(target_pid, season=season)
-        single_ms = (time.time() - t1) * 1000.0
+        _ = PlayerSeasonService.get_skater_season_stats(target_pid, season=season)
         single_queries = query_count
 
         tracemalloc.start()
@@ -100,18 +139,18 @@ def run_performance_qualification(season: str = "20212022") -> int:
         _, peak_single_mem = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
-        print(f"  Single Player Latency ({target_name}): {single_ms:.2f} ms")
+        print(f"  Single Player Median ({target_name}): {single_stats['median_ms']:.2f} ms (min: {single_stats['min_ms']} ms, p95: {single_stats['p95_ms']} ms, max: {single_stats['max_ms']} ms)")
         print(f"  SQL Query Count:                      {single_queries}")
         print(f"  Peak Memory:                          {peak_single_mem / (1024*1024):.2f} MB")
 
         # 4. Benchmark Bounded Top-50 Leaderboard
-        print("\n[Step 4] Benchmarking Bounded Top-50 Leaderboard...")
-        _ = PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50)
+        print("\n[Step 4] Benchmarking Bounded Top-50 Leaderboard (3 warm-up, 20 recorded iterations)...")
+        board_stats = benchmark_query(lambda: PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50), warmups=3, iterations=20)
+        board_res = PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50)
+        board_ms = board_stats["median_ms"]
 
         query_count = 0
-        t2 = time.time()
-        board_res = PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50)
-        board_ms = (time.time() - t2) * 1000.0
+        _ = PlayerSeasonService.get_skater_leaderboards(season=season, sort_by="points", limit=50)
         board_queries = query_count
 
         tracemalloc.start()
@@ -119,25 +158,25 @@ def run_performance_qualification(season: str = "20212022") -> int:
         _, peak_board_mem = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
-        print(f"  Top-50 Board Latency: {board_ms:.2f} ms")
-        print(f"  Skaters Returned:     {len(board_res)}")
-        print(f"  SQL Query Count:      {board_queries}")
-        print(f"  Peak Memory:          {peak_board_mem / (1024*1024):.2f} MB")
+        print(f"  Top-50 Board Median: {board_stats['median_ms']:.2f} ms (min: {board_stats['min_ms']} ms, p95: {board_stats['p95_ms']} ms, max: {board_stats['max_ms']} ms)")
+        print(f"  Skaters Returned:    {len(board_res)}")
+        print(f"  SQL Query Count:     {board_queries}")
+        print(f"  Peak Memory:         {peak_board_mem / (1024*1024):.2f} MB")
 
         # Event listener cleanup
         event.remove(db.engine, "before_cursor_execute", count_queries)
 
         # 5. Benchmark Legacy Baseline & Perform Real Production Equivalence Audit
         print("\n[Step 5] Benchmarking Legacy Baseline & Performing Real Equivalence Audit...")
-        t3 = time.time()
+        legacy_stats = benchmark_query(lambda: PlayerSeasonService._get_season_skaters_summary_legacy(season=season, min_gp=0), warmups=2, iterations=5)
         legacy_res = PlayerSeasonService._get_season_skaters_summary_legacy(season=season, min_gp=0)
-        legacy_ms = (time.time() - t3) * 1000.0
+        legacy_ms = legacy_stats["median_ms"]
         
         speedup_vs_stage0 = STAGE0_FROZEN_BASELINE["full_summary_ms"] / summary_ms if summary_ms > 0 else 0.0
 
-        print(f"  Current Legacy Re-run Latency: {legacy_ms:.2f} ms")
-        print(f"  Stage 0 Frozen Baseline:      {STAGE0_FROZEN_BASELINE['full_summary_ms']:.2f} ms")
-        print(f"  Speedup vs Stage 0 Baseline:   {speedup_vs_stage0:.1f}x Faster")
+        print(f"  Current Legacy Re-run Median Latency: {legacy_ms:.2f} ms")
+        print(f"  Stage 0 Frozen Baseline:              {STAGE0_FROZEN_BASELINE['full_summary_ms']:.2f} ms")
+        print(f"  Speedup vs Stage 0 Baseline:           {speedup_vs_stage0:.1f}x Faster")
 
         # Equivalence comparison
         legacy_map = {s["player_id"]: s for s in legacy_res}
@@ -218,11 +257,11 @@ def run_performance_qualification(season: str = "20212022") -> int:
         print("  Leaderboard Query Plan:  ", lb_plan_detail)
         print("  Top-N Stint Query Plan:  ", st_plan_detail)
 
-        # 7. Qualification Targets Assessment
+        # 7. Qualification Targets Assessment (Gated on Median Latencies)
         targets_met = {
-            "single_player_latency": single_ms < 50.0,
-            "full_summary_latency": summary_ms < 200.0,
-            "top50_board_latency": board_ms < 50.0,
+            "single_player_latency": single_stats["median_ms"] < 50.0,
+            "full_summary_latency": summary_stats["median_ms"] < 200.0,
+            "top50_board_latency": board_stats["median_ms"] < 50.0,
             "peak_memory_allocation": max(peak_summary_mem, peak_single_mem, peak_board_mem) < 15 * 1024 * 1024,
             "analytical_equivalence": equivalence_confirmed
         }
@@ -230,11 +269,11 @@ def run_performance_qualification(season: str = "20212022") -> int:
         all_targets_passed = all(targets_met.values())
 
         print("\n==================================================")
-        print(" STAGE 2 QUALIFICATION SUMMARY")
+        print(" STAGE 2 QUALIFICATION SUMMARY (MEDIAN LATENCY GATING)")
         print("==================================================")
-        print(f"  Single Player (<50ms):  {single_ms:.2f} ms - {'PASSED' if targets_met['single_player_latency'] else 'FAILED'}")
-        print(f"  Full Summary (<200ms):  {summary_ms:.2f} ms - {'PASSED' if targets_met['full_summary_latency'] else 'FAILED'}")
-        print(f"  Top-50 Board (<50ms):   {board_ms:.2f} ms - {'PASSED' if targets_met['top50_board_latency'] else 'FAILED'}")
+        print(f"  Single Player (<50ms):  median={single_stats['median_ms']:.2f} ms (p95={single_stats['p95_ms']} ms) - {'PASSED' if targets_met['single_player_latency'] else 'FAILED'}")
+        print(f"  Full Summary (<200ms):  median={summary_stats['median_ms']:.2f} ms (p95={summary_stats['p95_ms']} ms) - {'PASSED' if targets_met['full_summary_latency'] else 'FAILED'}")
+        print(f"  Top-50 Board (<50ms):   median={board_stats['median_ms']:.2f} ms (p95={board_stats['p95_ms']} ms) - {'PASSED' if targets_met['top50_board_latency'] else 'FAILED'}")
         print(f"  Peak Memory (<15MB):    {max(peak_summary_mem, peak_single_mem, peak_board_mem) / (1024*1024):.2f} MB - {'PASSED' if targets_met['peak_memory_allocation'] else 'FAILED'}")
         print(f"  Real Equivalence:       {mismatch_count} mismatches - {'PASSED' if equivalence_confirmed else 'FAILED'}")
 
@@ -263,10 +302,18 @@ def run_performance_qualification(season: str = "20212022") -> int:
                 "single_player_ms": "not re-run",
                 "top50_board_ms": "not re-run"
             },
+            "benchmarks": {
+                "full_summary": summary_stats,
+                "single_player": single_stats,
+                "top50_board": board_stats
+            },
             "latencies_ms": {
-                "derived_full_summary_ms": round(summary_ms, 2),
-                "derived_single_player_ms": round(single_ms, 2),
-                "derived_top50_board_ms": round(board_ms, 2),
+                "derived_full_summary_ms": summary_stats["median_ms"],
+                "derived_single_player_ms": single_stats["median_ms"],
+                "derived_top50_board_ms": board_stats["median_ms"],
+                "derived_full_summary_p95_ms": summary_stats["p95_ms"],
+                "derived_single_player_p95_ms": single_stats["p95_ms"],
+                "derived_top50_board_p95_ms": board_stats["p95_ms"],
                 "speedup_vs_stage0_baseline": round(speedup_vs_stage0, 1)
             },
             "query_counts": {

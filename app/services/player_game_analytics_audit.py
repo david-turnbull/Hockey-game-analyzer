@@ -181,7 +181,7 @@ class PlayerGameAnalyticsAuditService:
         }
 
     @classmethod
-    def is_derived_coverage_complete(cls, season: str) -> bool:
+    def is_derived_complete_for_ingested_games(cls, season: str) -> bool:
         """
         Verifies whether derived coverage is 100% complete across all ingested games in a season.
         Executes fast, fail-closed SQL index checks to catch:
@@ -260,9 +260,47 @@ class PlayerGameAnalyticsAuditService:
         return orphaned_tuple is None
 
     @classmethod
+    def is_derived_ready_for_full_season_queries(cls, season: str) -> bool:
+        """
+        Verifies whether derived coverage is ready for full-season queries.
+        Requires:
+        - Subset derived coverage is 100% complete across ingested games
+        - All completed schedule games for the season are ingested (ingested_games == completed_games)
+        """
+        if not cls.is_derived_complete_for_ingested_games(season):
+            return False
+
+        # Check completed schedule games count vs ingested games count
+        completed_games = (
+            db.session.query(func.count(Game.game_id))
+            .filter(
+                Game.season == season,
+                Game.nhl_game_state.in_(['OFF', 'FINAL', 'OVER', 'CRIT', '7', '6', 'Final'])
+            )
+            .scalar()
+        ) or 0
+
+        if completed_games == 0:
+            return False
+
+        ingested_games = (
+            db.session.query(func.count(func.distinct(GamePlayer.game_id)))
+            .join(Game, GamePlayer.game_id == Game.game_id)
+            .filter(Game.season == season)
+            .scalar()
+        ) or 0
+
+        return ingested_games == completed_games
+
+    @classmethod
+    def is_derived_coverage_complete(cls, season: str) -> bool:
+        """Returns whether full-season derived query readiness is satisfied."""
+        return cls.is_derived_ready_for_full_season_queries(season=season)
+
+    @classmethod
     def is_season_complete(cls, season: str) -> bool:
-        """Compatibility wrapper for is_derived_coverage_complete."""
-        return cls.is_derived_coverage_complete(season=season)
+        """Compatibility wrapper for is_derived_ready_for_full_season_queries."""
+        return cls.is_derived_ready_for_full_season_queries(season=season)
 
 def audit_game_analytics(season: Optional[str] = None) -> Dict[str, Any]:
     return PlayerGameAnalyticsAuditService.audit_game_analytics(season=season)

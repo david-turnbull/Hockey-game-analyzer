@@ -97,7 +97,7 @@ def test_grounded_model_card_provenance_and_artifact_hashes():
     with open(score_params_path, "r", encoding="utf-8") as f:
         score_params = json.load(f)
 
-    score_params_raw_bytes = score_params_path.read_bytes()
+    score_params_raw_bytes = score_params_path.read_bytes().replace(b"\r\n", b"\n")
     computed_score_file_sha256 = hashlib.sha256(score_params_raw_bytes).hexdigest()
 
     with open(stage5_report_path, "r", encoding="utf-8") as f:
