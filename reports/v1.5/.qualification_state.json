@@ -1,59 +1,7 @@
 {
-  "target_release": "v1.5.0",
-  "candidate_git_sha": "307eaaeca6fe6c4650ca5f47a7634a95b2c73282",
-  "timestamp_utc": "2026-09-23T02:24:04.404157+00:00",
-  "overall_qualification_status": "AUTOMATED GATES PASSED (MANUAL QA PENDING)",
-  "environment_runtime": {
-    "python_version": "3.12.10",
-    "platform": "Windows-11-10.0.26200-SP0",
-    "sqlite_version": "3.49.1"
-  },
-  "db_isolation": {
-    "source_db": {
-      "exists": true,
-      "path": "C:\\Users\\david\\hockey\\hockey.db",
-      "canonical_path": "C:\\Users\\david\\hockey\\hockey.db",
-      "size_bytes": 1484906496,
-      "mtime_iso": "2026-09-20T21:48:56.538891+00:00",
-      "wal_exists": false,
-      "file_digest": "a0e7297c52402698db910eafaccf337ad3afb92ae8e946ab9710631c4d428cdf",
-      "combined_digest": "4319fef956a5e8febfa1bcb543f9a1a5b6be068f9de2505f72b0b7fd938ed85e",
-      "table_counts": {
-        "event": 1804914,
-        "game": 6560,
-        "game_player": 220754,
-        "game_prediction": 1318,
-        "player": 1650,
-        "player_game_analytics": 51933,
-        "shift": 4152852,
-        "shot": 719862,
-        "team": 33
-      }
-    },
-    "isolated_db": {
-      "exists": true,
-      "path": "C:\\Users\\david\\hockey\\hockey_stage7_temp.db",
-      "canonical_path": "C:\\Users\\david\\hockey\\hockey_stage7_temp.db",
-      "size_bytes": 1484906496,
-      "mtime_iso": "2026-09-23T02:21:04.448615+00:00",
-      "wal_exists": false,
-      "file_digest": "719067ed61710c3d192dbe02a78516656493673b826dc9e15fee475fa1e4a6fb",
-      "combined_digest": "3f1225af4970d0a3b4b9a993e6ebccb17b599c19ca76e55ebb68fae267654a4b",
-      "table_counts": {
-        "event": 1804914,
-        "game": 6560,
-        "game_player": 220754,
-        "game_prediction": 1318,
-        "player": 1650,
-        "player_game_analytics": 51933,
-        "shift": 4152852,
-        "shot": 719862,
-        "team": 33
-      }
-    },
-    "backup_timestamp": "2026-09-23T02:21:09.297017+00:00"
-  },
-  "gate_results": {
+  "schema_version": 1,
+  "git_sha": "307eaaeca6fe6c4650ca5f47a7634a95b2c73282",
+  "gates": {
     "gate0": {
       "status": "PASSED",
       "audited_resources": {
