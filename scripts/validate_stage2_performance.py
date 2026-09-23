@@ -42,7 +42,7 @@ def run_performance_qualification(season: str = "20212022") -> int:
         incomplete_games = len(audit_res["incomplete"])
         missing_games = len(audit_res["missing"])
         coverage_pct = audit_res["derived_coverage_pct"]
-        is_complete = PlayerGameAnalyticsAuditService.is_derived_coverage_complete(season)
+        is_complete = PlayerGameAnalyticsAuditService.is_derived_complete_for_ingested_games(season)
 
         print(f"  Total Schedule Games:         {total_game_rows}")
         print(f"  Ingested Roster Games:        {ingested_games}")
